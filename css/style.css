@@ -35,6 +35,8 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   line-break: strict; text-wrap: pretty;
+  /* 分かち書きのスペースで折り返す（「むか／えに」のような言葉の途中の改行を防ぐ）。入りきらない長い語だけは途中で折る */
+  word-break: keep-all; overflow-wrap: anywhere;
   margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
   font-family: system-ui, -apple-system, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
   font-size: var(--fs); font-weight: 700;
@@ -370,4 +372,9 @@ body.night #hud .time { background: rgba(225, 230, 255, 0.9); }
 }
 /* なにも しない あいだ：ボタン類を うすく（水槽・魚は そのまま） */
 #hud, #gauges, #care, #hint-mini { transition: opacity 150ms; }
-body.idle #hud, body.idle #gauges, body.idle #care, body.idle #hint-mini, body.idle #hint { opacity: 0.3; transition: opacity 600ms; }
+/* うすくすると「おせない ボタン」に見えるので、画面の外へ そっと よける（さわれば もどる） */
+#hud, #gauges, #care, #hint-mini, #hint { transition: translate 500ms ease, opacity 500ms ease; }
+body.idle #hud { translate: 0 -130%; opacity: 0; }
+body.idle #gauges { translate: -130% 0; opacity: 0; }
+body.idle #care, body.idle #hint, body.idle #hint-mini { translate: 0 150%; opacity: 0; }
+body.idle #hud > *, body.idle #gauges, body.idle #care, body.idle #hint, body.idle #hint-mini { pointer-events: none; }  /* 見えない ボタンを まちがえて おさない */
