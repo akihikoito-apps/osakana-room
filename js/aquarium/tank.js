@@ -361,6 +361,7 @@ export class Tank {
     this.heaterGlow = null;
     const W = this.W, D = TANK_D;
     const used = {};
+    const restFrom = [];
     const builders = {
       stone: (i) => this.makeStones(i === 0 ? -0.24 * W : 0.12 * W, -1.2 - i * 0.6, 21 + i),
       rock: (i) => this.makeStones(0.1 * W, -1.5, 31 + i),
@@ -378,8 +379,22 @@ export class Tank {
       const n = used[id] = (used[id] ?? -1) + 1;
       const fn = builders[id];
       let obj = fn ? fn(n) : this.makeStones((((n * 37 + id.length * 13) % 10) / 10 - 0.5) * 0.7 * W, -1.4, id.length * 7 + n, true);
-      if (obj) this.decorGroup.add(obj);
+      if (obj) {
+        this.decorGroup.add(obj);
+        if (['stone', 'rock', 'plant', 'driftwood', 'liverock', 'coral'].includes(id) || !fn) restFrom.push(obj);
+      }
     }
+    // 休む場所（石・水草・流木の手前、底から少し上）
+    const spots = [];
+    for (const o of restFrom) {
+      const bx = new THREE.Box3().setFromObject(o);
+      const cx = (bx.min.x + bx.max.x) / 2;
+      const z = Math.min(bx.max.z + 0.6, this.bounds.maxZ - 0.3);
+      const sand = this.sandHeight(cx, z);
+      spots.push({ x: cx, z, y: sand + clamp((bx.max.y - sand) * 0.5, 0.9, 2.2) });
+    }
+    if (!spots.length) for (const fx of [-0.3, 0.3]) spots.push({ x: fx * W, z: -0.5, y: this.sandHeight(fx * W, -0.5) + 1.3 });
+    this.bounds.restSpots = spots;
     // setWater で bubbles: true なのに エアポンプが無いときは、エアストーンを自動で置く
     this.autoStone = null;
     this.applyWater();
@@ -655,7 +670,7 @@ export class Tank {
     for (let i = 0; i < n; i++) {
       let f = this.foods.find((q) => !q.alive && q.gone);
       if (!f) { if (this.foods.length >= this.maxFood) { f = this.foods.find((q) => q.landed) || this.foods[0]; } else { f = { pos: new THREE.Vector3() }; this.foods.push(f); } }
-      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: 0.3 + Math.random() * 0.15, fade: 1 });
+      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: 0.6 + Math.random() * 0.15, fade: 1 });
       f.pos.set(clamp(x + (Math.random() - 0.5) * 0.9, this.bounds.minX + 0.3, this.bounds.maxX - 0.3), WATER_TOP - 0.05, clamp(z + (Math.random() - 0.5) * 0.9, this.bounds.minZ, this.bounds.maxZ));
     }
     this.addRipple(x, z);

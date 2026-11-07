@@ -46,6 +46,7 @@ export function createAquarium(canvas, opts = {}) {
   const emit = (name, data) => { for (const fn of listeners[name] || []) { try { fn(data); } catch (e) { console.error(e); } } };
 
   let camDist = 12;
+  const ctx = { minLen: 0 };
   let cssW = 1, cssH = 1;
   let look = { yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, idle: 0 };
 
@@ -70,6 +71,9 @@ export function createAquarium(canvas, opts = {}) {
     camDist = Math.max((TANK_H / 2) / t, (W / 2) / (t * camera.aspect));
     tank.setFogRange(camDist + TANK_D / 2);
     tank.setPointScale(h * dpr / (2 * t));
+    // いちばん奥でも全長 28px 以上に見える長さ（ワールド単位）
+    const farDist = camDist + TANK_D / 2 - tank.bounds.minZ;
+    ctx.minLen = 28 / (h / (2 * t * farDist));
   }
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => resize()) : null;
   ro?.observe(canvas);
@@ -144,10 +148,10 @@ export function createAquarium(canvas, opts = {}) {
     const meshes = [...fishes.values()].map((f) => f.mesh);
     const hit = ray.intersectObjects(meshes, false)[0];
     if (hit) return hit.object.userData.uid;
-    // 小さい魚でも押しやすいように、近くの魚を探す（画面上 44px 以内）
-    let best = null, bd = 44 * 44;
+    // 小さい魚でも押しやすいように、近くの魚を探す（体の中心から画面上 48px 以内）
+    let best = null, bd = 48 * 48;
     for (const [uid, f] of fishes) {
-      const p = screenPos(f, _v);
+      const p = centerPos(f, _v);
       const d = (p.x - (clientX - r.left)) ** 2 + (p.y - (clientY - r.top)) ** 2;
       if (d < bd) { bd = d; best = uid; }
     }
@@ -188,13 +192,13 @@ export function createAquarium(canvas, opts = {}) {
   const schools = {};
   let running = false, raf = 0, last = 0, simTime = 0;
   let fpsAcc = 0, fpsN = 0, fps = 60, slowSecs = 0;
-  const ctx = {
+  Object.assign(ctx, {
     bounds: tank.bounds, fishes: [], foods: tank.foods, schools, time: 0,
     onEat: (agent) => {
       emit('eat', { uid: agent.uid });
       if (autoHeart) fx.spawn('eat', anchorFor(agent.uid));
     },
-  };
+  });
 
   function updateSchools(dt) {
     const counts = {};
@@ -245,8 +249,7 @@ export function createAquarium(canvas, opts = {}) {
       const u = f.mat.userData.u;
       f.mesh.position.set(a.pos.x, a.pos.y + a.oy, a.pos.z + a.oz);
       f.mesh.rotation.y = a.renderYaw();
-      const droop = a.weak && !a.isShrimp ? -0.14 : 0;   // 元気がないと少しうつむく（ひっくり返さない）
-      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch + droop, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
+      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
       f.mesh.rotation.x = 0;
       f.mesh.scale.set(a.len * a.sx, a.len * (2 - a.sx) * 0.5 + a.len * 0.5, a.len);
       u.uWave.value = a.wave;
@@ -263,6 +266,13 @@ export function createAquarium(canvas, opts = {}) {
     look.pitch += (look.tPitch - look.pitch) * Math.min(1, dt * 6);
     placeCamera();
     renderer.render(scene, camera);
+  }
+
+  function centerPos(f, out) {
+    _v3.set(f.agent.pos.x, f.agent.pos.y + f.agent.oy, f.agent.pos.z + f.agent.oz).project(camera);
+    out.x = (_v3.x + 1) / 2 * cssW;
+    out.y = (1 - _v3.y) / 2 * cssH;
+    return out;
   }
 
   function screenPos(f, out) {
@@ -303,6 +313,8 @@ export function createAquarium(canvas, opts = {}) {
       const b = tank.bounds;
       tank.dropFood(THREE.MathUtils.clamp(p.x, b.minX + 0.4, b.maxX - 0.4), THREE.MathUtils.clamp(zPlane + (Math.random() - 0.5) * 1.5, b.minZ, b.maxZ));
     },
+    /** 水の中の餌を全部消す（水かえのときなど）。 */
+    clearFood() { for (const f of tank.foods) { f.alive = false; f.gone = true; } },
     react(uid, type) {
       const f = fishes.get(uid);
       if (!f || !REACTIONS.includes(type)) return false;
@@ -333,7 +345,18 @@ export function createAquarium(canvas, opts = {}) {
       listeners.eat.clear(); listeners.tapFish.clear();
     },
     /** 確認用：今の fps と解像度倍率。 */
-    get stats() { return { fps: Math.round(fps), pixelRatio: dpr, fish: fishes.size, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; },
+    get stats() {
+      // いちばん小さく見えている魚の全長（画面のピクセル。横から見たときの長さ）
+      let minPx = Infinity;
+      for (const f of fishes.values()) {
+        const a = f.agent;
+        const p0 = _v.set(a.pos.x - a.len / 2, a.pos.y, a.pos.z).project(camera);
+        const x0 = p0.x, y0 = p0.y;
+        const p1 = _v3.set(a.pos.x + a.len / 2, a.pos.y, a.pos.z).project(camera);
+        minPx = Math.min(minPx, Math.hypot((p1.x - x0) / 2 * cssW, (p1.y - y0) / 2 * cssH));
+      }
+      return { fps: Math.round(fps), pixelRatio: dpr, fish: fishes.size, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, minFishPx: Math.round(minPx) };
+    },
   };
   void WATER_TOP;
   return api;
