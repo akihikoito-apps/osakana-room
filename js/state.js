@@ -4,7 +4,7 @@
 // - 時計はアプリを開いている間だけ進む。hidden の間は止め、閉じていた間は取り戻さない。
 //   ゲームの1日 ＝ 現実 600 秒（1ゲーム分 ＝ 0.4167 秒）。
 export const SAVE_KEY = 'osakana-room-save-v1';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;   // 2：水槽を いくつも もてる（slot・name）・ハート・かいほう
 export const REAL_SEC_PER_GAME_DAY = 600;
 export const MIN_PER_DAY = 1440;
 export const START_MINUTE = 6 * 60;          // 1にちめ の あさ 6:00 から（balance.js TIME.dayStartHour が あれば そちら）
@@ -23,20 +23,24 @@ export function newState(init = {}) {
     clock: { min: init.startMinute ?? START_MINUTE },
     coins: init.coins ?? 100,
     tanks: [{
-      id: 't1', water: 'fresh',
+      id: 't1', water: 'fresh', slot: 0, name: '',
       temp: init.waterTemp ?? 20, clean: init.clean ?? 100, air: init.air ?? 70, leftover: init.leftover ?? 0,
       decor: [], equip: [],
       fish: [],
     }],
+    hearts: 0,               // なでて もらった ハート（いまの かず。あとで つかう よてい）
+    heartsTotal: 0,          // つうさんの ハート（つかっても へらない）
+    unlocks: {},             // 解放ずみ { tank6: その日 }（いちど ひらいたら もどさない）
+    notices: {},             // まだ 見せていない 大きな お知らせ { tank6: true }
     inv: {},                 // 持っている消耗品（えさ など）{ id: かず }
     owned: {},               // 一度でも持った魚・器具 { id: true }（ずかん用は dex）
     dex: {},                 // ずかん { speciesId: { first: day, count } }
     missions: { done: {}, claimed: {}, prog: {} },
     stats: {},               // かぞえる（えさ・みずかえ・そうじ・ありがとう …）
-    daily: { day: 1, care: 0, thanks: 0 },
+    daily: { day: 1, care: 0, thanks: 0, hearts: 0 },
     tutorial: { step: 0, done: false },
     settings: { sound: true },
-    ui: { lastScreen: 'room' },
+    ui: { lastScreen: 'room', tankId: 't1' },
   };
 }
 
@@ -45,7 +49,11 @@ export function migrate(raw, init) {
   if (!raw || typeof raw !== 'object') return null;
   let s = raw;
   const v = Number.isFinite(s.v) ? s.v : 0;
-  // 版ごとの読み替えはここに足していく（例：if (v < 2) { …; s.v = 2; }）
+  // 版ごとの読み替え
+  if (v < 2) {
+    // v0.1：水槽は 1つ（slot・name なし）、ハート・かいほう なし → 1つめの 水槽を へやの 1ばんめの わくへ
+    s = { ...s, tanks: Array.isArray(s.tanks) ? s.tanks.map((t, i) => (isObj(t) ? { slot: i, name: '', ...t } : t)) : s.tanks, hearts: 0, heartsTotal: 0, unlocks: {}, notices: {} };
+  }
   if (v > SAVE_VERSION) console.warn('あたらしい ばんの セーブ', v);
   const base = newState(init);
   const out = { ...base, ...s, v: SAVE_VERSION };
@@ -61,6 +69,19 @@ export function migrate(raw, init) {
   out.tutorial = { ...base.tutorial, ...(isObj(s.tutorial) ? s.tutorial : {}) };
   out.settings = { ...base.settings, ...(isObj(s.settings) ? s.settings : {}) };
   out.ui = { ...base.ui, ...(isObj(s.ui) ? s.ui : {}) };
+  out.hearts = Number.isFinite(s.hearts) ? Math.max(0, Math.floor(s.hearts)) : 0;
+  out.heartsTotal = Number.isFinite(s.heartsTotal) ? Math.max(out.hearts, Math.floor(s.heartsTotal)) : out.hearts;
+  out.unlocks = isObj(s.unlocks) ? s.unlocks : {};
+  out.notices = isObj(s.notices) ? s.notices : {};
+  // 水槽の わく（0〜5）が かさならない ように
+  const used = new Set();
+  for (const t of out.tanks) {
+    let k = Number.isInteger(t.slot) && t.slot >= 0 && t.slot < 6 && !used.has(t.slot) ? t.slot : -1;
+    if (k < 0) { k = 0; while (used.has(k) && k < 6) k++; }
+    t.slot = k; used.add(k);
+  }
+  out.tanks = out.tanks.filter((t) => t.slot < 6);
+  if (!out.tanks.some((t) => t.id === out.ui.tankId)) out.ui.tankId = out.tanks[0].id;
   return out;
 }
 
@@ -70,6 +91,8 @@ function fixTank(t, b, i) {
     ...b, ...t,
     id: typeof t.id === 'string' ? t.id : 't' + (i + 1),
     water: t.water === 'salt' ? 'salt' : 'fresh',
+    name: typeof t.name === 'string' ? t.name.slice(0, 16) : '',
+    slot: Number.isInteger(t.slot) ? t.slot : i,
     temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99),
     decor: Array.isArray(t.decor) ? t.decor.filter((x) => typeof x === 'string') : [],
     equip: Array.isArray(t.equip) ? t.equip.filter((x) => typeof x === 'string') : [],

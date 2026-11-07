@@ -44,7 +44,9 @@ async function boot() {
     listeners: {},
     on(name, fn) { (this.listeners[name] ||= []).push(fn); },
     emit(name, payload) { for (const fn of this.listeners[name] || []) { try { fn(payload); } catch (e) { console.error(e); } } },
-    tank() { return state.tanks[0]; },
+    /** いま 見ている 水槽 */
+    tank() { return state.tanks.find((t) => t.id === state.ui.tankId) || state.tanks[0]; },
+    setTank(id) { if (state.tanks.some((t) => t.id === id)) { state.ui.tankId = id; this.markDirty(); } },
     dirty: false,
     markDirty() { this.dirty = true; },
     saveNow() { this.dirty = false; S.save(state); },
@@ -59,14 +61,18 @@ async function boot() {
   // ---------- 画面の切り替え ----------
   const SHEETS = ['shop', 'dex', 'missions'];
   function go(name, opts = {}) {
-    if (name === G.screen) return;
+    if (name === G.screen) {
+      // おなじ 画面でも タブや 水槽が かわったら かきなおす
+      if (name === 'shop') shop.show(G, opts);
+      return;
+    }
     const from = G.screen;
     if (from && !SHEETS.includes(from)) G.prevScreen = from;
     G.screen = name;
     for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
     // すいそうの3Dは すいそう画面のときだけ動かす（シートの後ろでは止める）
     if (name === 'tank') tankUi.show(G); else tankUi.hide(G);
-    if (name === 'room') room.show(G);
+    if (name === 'room') room.show(G, { from });
     if (name === 'shop') shop.show(G, opts);
     if (name === 'dex') dex.show(G);
     if (name === 'missions') missions.show(G);
@@ -74,6 +80,8 @@ async function boot() {
     $('#btn-back .lb').textContent = SHEETS.includes(name) ? 'もどる' : 'へや';
     $('#btn-menu').hidden = name !== 'tank';
     state.ui.lastScreen = SHEETS.includes(name) ? G.prevScreen : name;
+    document.body.classList.toggle('on-sheet', SHEETS.includes(name));
+    document.body.classList.toggle('on-room', name === 'room');
     G.emit('screen', name);
   }
   G.on('action', (a) => { if (a.type === 'openTank') state.stats.openTank = (state.stats.openTank || 0) + 1; });
@@ -96,6 +104,8 @@ async function boot() {
     $('#hud-phase').textContent = S.PHASE_LABEL[ph];
     $('#hud-phase-ic').textContent = { morning: '🌅', noon: '☀️', evening: '🌇', night: '🌙' }[ph];
     $('#hud-coin-n').textContent = state.coins;
+    $('#hud-heart-n').textContent = state.hearts > 9999 ? '9999＋' : String(state.hearts || 0);
+    $('#hud-heart-day').textContent = `きょう ${Math.min(state.daily.hearts || 0, sim.balance().HEART.perDay ?? 20)}／${sim.balance().HEART.perDay ?? 20}`;
     document.body.classList.toggle('night', ph === 'night');
     if (ph !== lastPhase) { lastPhase = ph; G.emit('phase', ph); }
     const n = missions.claimableCount(G);
@@ -107,7 +117,7 @@ async function boot() {
   // ---------- 時計 ----------
   let saveAcc = 0;
   const clock = S.createClock((gameMin) => {
-    if (tutorial.pausesClock(G)) return;
+    if (tutorial.pausesClock(G) || celebrating) return;   // チュートリアル・大きな お知らせの あいだは とめる
     const events = sim.tick(state, gameMin);
     G.handleEvents(events);
     refreshHud();
@@ -119,6 +129,53 @@ async function boot() {
   G.clock = clock;
   document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') G.saveNow(); });
   window.addEventListener('pagehide', () => G.saveNow());
+
+  // ---------- かいほうの おいわい ----------
+  // balance.js UNLOCK.tank6.banner を 1まいずつ（タップで つぎへ）。出ている あいだは 時計を とめる。
+  let celebrating = false;
+  function celebrate() {
+    if (!state.notices?.tank6 || celebrating) return;
+    if (!state.tutorial.done) return;              // チュートリアルが おわってから
+    const box = $('#celebrate');
+    const pages = sim.balance().UNLOCK?.tank6?.banner || ['うみの すいそうが かえるように なったよ！'];
+    let page = 0;
+    celebrating = true;
+    const showPage = () => {
+      box.querySelector('.cel-ic').textContent = page === 0 ? '🌊' : '🐠';
+      box.querySelector('.cel-text').textContent = pages[page];
+      const last = page >= pages.length - 1;
+      box.querySelector('.cel-sub').textContent = '';
+      box.querySelector('.cel-ok').textContent = last ? 'やったー！' : 'つぎへ';
+      box.querySelector('.cel-shop').hidden = !last;
+      const cf = box.querySelector('.confetti');
+      cf.replaceChildren();
+      const colors = ['#b8e4f5', '#a8dcc3', '#ffe08a', '#f5b7a9'];
+      for (let i = 0; i < 24; i++) {
+        const p = el('i');
+        p.style.left = ((i * 37 + page * 11) % 100) + '%';
+        p.style.background = colors[i % 4];
+        p.style.animationDelay = ((i * 0.07) % 0.6) + 's';
+        p.style.setProperty('--rx', ((i * 53) % 360) + 'deg');
+        cf.append(p);
+      }
+    };
+    const close = (toShop) => {
+      box.hidden = true;
+      celebrating = false;
+      delete state.notices.tank6;
+      G.saveNow();
+      if (toShop) go('shop', { tab: 'tanks' });      // 水槽の 売り場へ ちょくせつ
+      G.emit('changed');
+    };
+    box.querySelector('.cel-ok').onclick = () => { if (page < pages.length - 1) { page++; showPage(); } else close(false); };
+    box.querySelector('.cel-shop').onclick = () => close(true);
+    showPage();
+    box.hidden = false;
+  }
+  G.celebrating = () => celebrating;
+  G.celebrate = celebrate;
+  G.on('sim', (ev) => { if (ev.type === 'unlock') setTimeout(celebrate, 400); });
+  $('#hud-hearts').addEventListener('click', () => toast('さかなを なでると ハートが たまるよ'));
 
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
@@ -136,6 +193,9 @@ async function boot() {
   go(start);
   clock.start();
   tutorial.resume(G);
+  // v0.1 の セーブで もう 6ぴき いた・まえに 見のがした ときも ここで おいわい
+  setTimeout(celebrate, 900);
+  G.on('tutorialDone', () => setTimeout(celebrate, 1200));
 
   if (DEBUG) setupDebug(G);
   registerSW();

@@ -98,10 +98,30 @@ async function audit(p) {
       if (r.right > W + 2 || r.left < -2) if (!e.closest('.grid, .list, #toasts')) issues.push(`文字が 画面の よこから はみでた: ${name(e)}`);
     }
     // ボタンどうしの かさなり
+    // スクロールの 入れものの そとに はみでた ぶんは 見えないので きりとる
+    const clip = (e) => {
+      let r = e.getBoundingClientRect(); r = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      for (let x = e.parentElement; x; x = x.parentElement) {
+        const s = getComputedStyle(x);
+        if (s.overflowY === 'auto' || s.overflowY === 'scroll' || s.overflow === 'hidden') {
+          const q = x.getBoundingClientRect();
+          r = { left: Math.max(r.left, q.left), top: Math.max(r.top, q.top), right: Math.min(r.right, q.right), bottom: Math.min(r.bottom, q.bottom) };
+        }
+      }
+      return r;
+    };
+    const MODAL = '#celebrate, #dialog, #guide';
     for (let i = 0; i < btns.length; i++) for (let j = i + 1; j < btns.length; j++) {
-      const a = btns[i].getBoundingClientRect(), b = btns[j].getBoundingClientRect();
+      const A = btns[i], Bt = btns[j];
+      if (A.contains(Bt) || Bt.contains(A)) continue;
+      if (!!A.closest(MODAL) !== !!Bt.closest(MODAL)) continue;     // お知らせ・ダイアログの 下に かくれた ものは よい
+      const a = clip(A), b = clip(Bt);
       const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left), oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-      if (ox > 6 && oy > 6 && !btns[i].contains(btns[j]) && !btns[j].contains(btns[i])) issues.push(`ボタンが かさなっている: ${name(btns[i])} ／ ${name(btns[j])}`);
+      if (ox > 6 && oy > 6) {
+        const top = document.elementFromPoint((Math.max(a.left, b.left) + Math.min(a.right, b.right)) / 2, (Math.max(a.top, b.top) + Math.min(a.bottom, b.bottom)) / 2);
+        if (top && !A.contains(top) && !Bt.contains(top)) continue;   // べつの ものが 上に ある
+        issues.push(`ボタンが かさなっている: ${name(A)} ／ ${name(Bt)}`);
+      }
     }
     return issues;
   });
@@ -285,8 +305,167 @@ async function run(browser, base, W, H) {
   const same = ['c', 'f', 'd', 'cl', 'tut'].every((k) => save1[k] === save2[k]) && Math.abs(save1.m - save2.m) < 30;
   notes.push(`リロード まえ ${JSON.stringify(save1)} → あと ${JSON.stringify(save2)} ${same ? 'OK' : '【不具合】もどらない'}`);
   await shot('22_after_reload');
+
+  // 8. v0.2：解放 → 大きな お知らせ → すいそうを かう → へやの わく → ズーム → ハート → そうじ → すいそうの きりかえ
+  if (await p.evaluate(() => typeof G.sim.checkUnlock === 'function')) {
+    try { await v02(); } catch (e) { notes.push('【不具合？】v0.2 の ながれが とちゅうで とまった: ' + e.message.split('\n')[0]); await shot('99_v02_stopped').catch(() => {}); }
+  }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
+
+  async function v02() {
+    const goRoom = async () => { for (let i = 0; i < 3 && (await st()).scr !== 'room'; i++) { await p.click('#btn-back'); await p.waitForTimeout(500); } };
+    const toFishShop = async () => { await goRoom(); await p.click('#room-nav [data-go="shop"]'); await p.waitForTimeout(300); await p.click('#scr-shop .tab[data-tab="fish"]'); await p.waitForTimeout(300); };
+    await p.evaluate(() => { G.state.coins = Math.max(G.state.coins, 300); G.refreshHud(); });
+    const before = await p.evaluate(() => ({ n: G.state.tanks[0].fish.length, unlocked: !!G.state.unlocks?.tank6 }));
+    notes.push(`v0.2：1つめの すいそうの 生きもの ${before.n}ひき・解放 ${before.unlocked}`);
+    // かぎつき カード
+    await toFishShop();
+    const locked = await p.evaluate(() => ({ cards: document.querySelectorAll('#shop-list .locked-card').length, heads: [...document.querySelectorAll('#shop-list .shop-head')].map((h) => h.textContent) }));
+    notes.push(`v0.2：おみせの 見出し ${JSON.stringify(locked.heads)}・かぎつき カード ${locked.cards}まい`);
+    const band = await p.evaluate(() => document.querySelector('#shop-list .lb-text, .lock-banner')?.textContent || '');
+    notes.push('まだ かえない 帯: ' + (band || '（なし）'));
+    if (!band) notes.push('【仕様と ちがう？】かぎつきの 案内の 帯（あと ◯ひき）が 見つからない');
+    await p.evaluate(() => { const h = document.querySelector('#shop-list .locked-card'); h?.scrollIntoView({ block: 'center' }); });
+    await shot('23_shop_locked');
+    await p.evaluate(() => document.querySelector('#shop-list')?.scrollTo?.(0, 0));
+    await shot('23b_shop_band');
+    // 6ぴきに する（イシマキガイ。はじめから かえる）
+    let need = 6 - before.n;
+    while (need-- > 0) await buy('ishimaki');
+    const cel = await p.waitForSelector('#celebrate:not([hidden])', { timeout: 4000 }).then(() => true, () => false);
+    if (!cel) notes.push('【不具合】6ぴきに しても 大きな お知らせが でない');
+    else {
+      const m0 = await p.evaluate(() => G.state.clock.min);
+      await p.waitForTimeout(3000);
+      const m1 = await p.evaluate(() => G.state.clock.min);
+      if (m1 !== m0) notes.push(`【不具合】お知らせの あいだに 時計が すすんだ（${m0}→${m1}）`);
+      notes.push('お知らせ 1まいめ: ' + await p.textContent('#celebrate .cel-text'));
+      await shot('24_unlock_1');
+      await p.click('#celebrate .cel-ok'); await p.waitForTimeout(400);
+      notes.push('お知らせ 2まいめ: ' + await p.textContent('#celebrate .cel-text'));
+      await shot('25_unlock_2');
+      await p.click('#celebrate .cel-shop'); await p.waitForTimeout(800);
+    }
+    if ((await st()).scr !== 'shop') { await goRoom(); await p.click('#room-nav [data-go="shop"]'); await p.click('#scr-shop .tab[data-tab="equip"]'); }
+    const short = await p.evaluate(() => [...document.querySelectorAll('#shop-list .lock-line.short')].map((e) => e.closest('[data-id]')?.dataset.id + ':' + e.textContent));
+    notes.push(`すいそうの カード（コイン ${await p.evaluate(() => G.state.coins)}）: ${JSON.stringify(short)}`);
+    await shot('26_shop_tanks');
+    // うみの すいそうを かう
+    await p.evaluate(() => { G.state.coins += 3000; G.refreshHud(); G.emit('changed'); });
+    await p.evaluate(() => document.querySelector('#shop-list [data-id="tank_salt"]')?.scrollIntoView({ block: 'center' }));
+    await buy('tank_salt');
+    const tanks = await p.evaluate(() => G.state.tanks.map((t) => ({ id: t.id, water: t.water, slot: t.slot, decor: t.decor })));
+    if (tanks.length !== 2 || tanks[1].water !== 'salt') notes.push('【不具合】うみの すいそうが ふえない: ' + JSON.stringify(tanks));
+    // へやの 6わく
+    await goRoom();
+    await p.waitForTimeout(800);
+    const slots = await p.evaluate(() => [...document.querySelectorAll('.room-slot')].map((b) => b.className.replace('room-slot', '').trim()));
+    notes.push('へやの わく: ' + JSON.stringify(slots));
+    if (slots.length !== 6) notes.push(`【不具合】へやの わくが ${slots.length}こ（6こ の はず）`);
+    await shot('27_room_slots');
+    // ズーム
+    const saltSlot = tanks.find((t) => t.water === 'salt')?.slot ?? 1;
+    await p.click(`.room-slot[data-slot="${saltSlot}"]`);
+    await p.waitForTimeout(220);
+    { const f = join(OUT, `${tag}_28_zoom.png`); await p.screenshot({ path: f }); shots.push(f); }
+    await p.waitForFunction(() => G.screen === 'tank', null, { timeout: 5000 }).catch(() => notes.push('【不具合】ズームの あと すいそうの 画面に ならない'));
+    await p.waitForTimeout(1500);
+    const cur = await p.evaluate(() => ({ id: G.tank().id, water: G.tank().water, title: document.querySelector('#tank-title')?.textContent }));
+    if (cur.water !== 'salt') notes.push('【不具合】うみの すいそうを おしたのに ちがう すいそうが ひらいた: ' + JSON.stringify(cur));
+    await shot('29_salt_tank_empty');
+    // うみの 生きものを かう（おみせの「いれる すいそう」が うみ に なっているか）
+    await goRoom(); await p.click('#room-nav [data-go="shop"]'); await p.waitForTimeout(300);
+    await p.click('#scr-shop .tab[data-tab="fish"]'); await p.waitForTimeout(300);
+    const shopTank = await p.textContent('#shop-tank .st-name').catch(() => '');
+    notes.push('おみせの いれる すいそう: ' + shopTank);
+    await shot('30_shop_salt');
+    for (const id of ['clownfish', 'skunk_shrimp', 'shittaka']) await buy(id);
+    await p.click('#scr-shop .tab[data-tab="equip"]'); await p.waitForTimeout(300);
+    await buy('liverock');
+    const saltFish = await p.evaluate(() => G.state.tanks.find((t) => t.water === 'salt').fish.map((f) => f.speciesId));
+    if (saltFish.length !== 3) notes.push('【不具合】うみの すいそうに 生きものが 入らない: ' + JSON.stringify(saltFish));
+    // すいそうへ（ズームで）
+    await goRoom();
+    await p.click(`.room-slot[data-slot="${saltSlot}"]`);
+    await p.waitForFunction(() => G.screen === 'tank', null, { timeout: 5000 }).catch(() => {});
+    await p.waitForTimeout(2500);
+    await shot('31_salt_tank');
+    // ハート：魚を なでる
+    const h0 = await p.evaluate(() => ({ h: G.state.hearts, d: G.state.daily.hearts, text: document.getElementById('hud-heart-n')?.textContent }));
+    const uids = await p.evaluate(() => G.tank().fish.map((f) => f.uid));
+    let popSeen = false, popShot = false;
+    for (const u of uids) {
+      // 魚の いちが ボタンの 下なら おさない（しゃしん ボタンなどを おしてしまう）
+      const pos = await p.evaluate((x) => { const q = G.aq?.screenPosOf?.(x); if (!q) return null; const e = document.elementFromPoint(q.x, q.y + 2); return e && e.tagName === 'CANVAS' ? q : null; }, u);
+      if (!pos) continue;
+      await p.mouse.click(pos.x, pos.y + 2);
+      await p.waitForTimeout(250);
+      if (await p.evaluate(() => !!document.querySelector('.pop-heart'))) {
+        popSeen = true;
+        if (!popShot) { popShot = true; const f = join(OUT, `${tag}_32a_heart_plus1.png`); await p.screenshot({ path: f }); shots.push(f); }
+      }
+      await p.waitForTimeout(150);
+    }
+    if (await p.evaluate(() => document.body.classList.contains('photo'))) { notes.push('（魚の タップで しゃしんに なった ので もどした）'); await p.click('#photo-exit'); }
+    await p.waitForTimeout(300);
+    await shot('32_hearts');
+    const h1 = await p.evaluate(() => ({ h: G.state.hearts, d: G.state.daily.hearts, text: document.getElementById('hud-heart-n')?.textContent, card: !document.getElementById('fish-card').hidden }));
+    notes.push(`ハート ${JSON.stringify(h0)} → ${JSON.stringify(h1)}`);
+    if (!(h1.h > h0.h)) notes.push('【気になる】魚を タップしても ハートが ふえなかった（タップの いちが ずれた かも）');
+    if (String(h1.h) !== h1.text) notes.push(`【不具合】ハートの カウンターの 表示 ${h1.text} が 数 ${h1.h} と ちがう`);
+    const daily = await p.evaluate(() => ({ text: document.getElementById('hud-hearts')?.textContent || '', d: G.state.daily.hearts }));
+    const dm = daily.text.match(/(\d+)\s*[／/]\s*20/);
+    if (!dm) notes.push('【仕様と ちがう】ハートの カウンターに「きょう 8／20」の ような 今日の 数が 出ていない（仕様 6章）');
+    else if (+dm[1] !== Math.min(20, daily.d)) notes.push(`【不具合】「きょう ${dm[1]}／20」が 今日の 数 ${daily.d} と ちがう`);
+    if (h1.h > h0.h && !popSeen) notes.push('【仕様と ちがう？】ハートが ふえたのに「＋1」が 見えなかった');
+    notes.push(`ハートの ＋1: ${popSeen ? 'みえた' : 'みえない'}・カウンター「${daily.text.trim()}」`);
+    await p.mouse.click(5, H / 2); await p.waitForTimeout(300);
+    // そうじ（あみの アニメ 2びょう、おわりに たべのこし 0）
+    await p.evaluate(() => { G.tank().leftover = 2; G.emit('changed'); });
+    await p.waitForTimeout(300);
+    await p.click('#care [data-care="clean"]');
+    await p.waitForTimeout(700);
+    { const f = join(OUT, `${tag}_33_scoop_anim.png`); await p.screenshot({ path: f }); shots.push(f); }
+    const mid = await p.evaluate(() => ({ left: G.tank().leftover, feedLocked: document.querySelector('#care [data-care="feed"]').classList.contains('cool') || document.querySelector('#care [data-care="feed"]').disabled }));
+    if (mid.left === 0) notes.push('【仕様と ちがう】そうじの アニメの とちゅうで もう たべのこしが 0（仕様は アニメの おわり）');
+    if (!mid.feedLocked) notes.push('【仕様と ちがう】そうじの アニメ中に えさボタンが おせる ように 見える');
+    // アニメの おわり（仕様 2びょう）で 0 に なるか。なるまでの 時間を はかる
+    const doneMs = await p.evaluate(async () => { const t0 = performance.now(); while (performance.now() - t0 < 8000) { if (G.tank().leftover === 0) return performance.now() - t0; await new Promise((r) => setTimeout(r, 100)); } return -1; });
+    const total = doneMs < 0 ? -1 : Math.round(doneMs + 700);
+    notes.push(`そうじ：たべのこしが 0 に なるまで ${total < 0 ? '8びょう いじょう' : total + 'ms'}`);
+    if (total < 0) notes.push('【不具合】そうじの あと たべのこしが 0 に ならない');
+    else if (total > 2800) notes.push(`【仕様と ちがう】そうじが おわるまで ${total}ms（仕様 7章は 2びょう）`);
+    // たべのこし 0 でも あみを つかえる
+    await p.waitForTimeout(400);
+    await p.click('#care [data-care="clean"]');
+    await p.waitForTimeout(2600);
+    await shot('34_after_scoop');
+    // しゃしん：すいそうの なまえ・◀▶ が きえるか
+    await p.click('#care [data-care="photo"]'); await p.waitForTimeout(800);
+    const titleVis = await p.evaluate(() => { const e = document.getElementById('tank-title'); if (!e) return false; const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return !e.hidden && s.display !== 'none' && s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0 && r.bottom > 0 && r.top < innerHeight; });
+    await shot('34b_photo');
+    if (titleVis) notes.push('【不具合】しゃしんの とき すいそうの なまえ・◀▶ が のこる');
+    await p.click('#photo-exit'); await p.waitForTimeout(400);
+    // すいそうの きりかえ
+    const id0 = await p.evaluate(() => G.tank().id);
+    const nextBtn = await p.$('#tank-title .tt-next:not([hidden])');
+    if (nextBtn) { await nextBtn.click(); await p.waitForTimeout(1500); }
+    const id1 = await p.evaluate(() => G.tank().id);
+    if (id0 === id1) notes.push('【不具合？】すいそうの きりかえ（▶）で かわらない');
+    await shot('35_tank_switch');
+    await goRoom(); await p.waitForTimeout(800);
+    await shot('36_room_final');
+    // リロードで のこる
+    await p.evaluate(() => G.saveNow());
+    await p.goto(base + '/index.html?nosw', { waitUntil: 'load' });
+    await p.waitForFunction(() => window.G && G.state, null, { timeout: 20000 });
+    await p.waitForTimeout(1200);
+    const back = await p.evaluate(() => ({ tanks: G.state.tanks.length, unlocked: !!G.state.unlocks.tank6, hearts: G.state.hearts, cel: !document.getElementById('celebrate').hidden }));
+    notes.push('v0.2 リロード あと: ' + JSON.stringify(back));
+    if (back.cel) notes.push('【不具合】リロードすると お知らせが また でる');
+    if (back.tanks !== 2 || !back.unlocked) notes.push('【不具合】リロードで すいそう・解放が のこらない');
+  }
 }
 
 const pw = findPlaywright();
@@ -309,7 +488,7 @@ try {
     if (r.warns.length) { console.log(`けいこく ${r.warns.length} けん`); for (const w of [...new Set(r.warns)]) console.log('  △ ' + w); }
     const allIssues = Object.entries(r.audits).flatMap(([k, v]) => v.map((x) => `${k}: ${x}`));
     console.log(`画面の 気になる ところ ${allIssues.length} けん`); for (const x of [...new Set(allIssues)]) console.log('  ・' + x);
-    if (r.errors.length || r.notes.some((n) => n.includes('【不具合】'))) bad++;
+    if (r.errors.length || r.notes.some((n) => /【不具合|【仕様と/.test(n))) bad++;
   }
 } finally {
   await browser.close();

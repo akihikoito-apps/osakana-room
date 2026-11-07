@@ -96,26 +96,35 @@ button.pill:active, .nav-btn:active, .care-btn:active, .shop-item:active, .btn:a
 #room-stage { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
 #room-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #room-night { position: absolute; inset: 0; background: #1b2a5c; mix-blend-mode: multiply; opacity: 0; pointer-events: none; transition: opacity 2s; }
-#room-tank {
-  position: absolute; left: 38.2%; width: 32.6%; bottom: calc(100% - 56.6%); height: 25%;
-  display: block; filter: drop-shadow(0 6px 6px rgba(60, 40, 10, 0.25));
+.room-slot {
+  position: absolute; display: block; filter: drop-shadow(0 6px 6px rgba(60, 40, 10, 0.25));
 }
-#room-tank .glass {
+.room-slot .glass {
   position: absolute; inset: 0; border-radius: 6px 6px 3px 3px; overflow: hidden;
   background: linear-gradient(90deg, rgba(255,255,255,0.55), rgba(230,248,255,0.25) 12%, rgba(230,248,255,0.15) 88%, rgba(255,255,255,0.5));
   border: 3px solid rgba(160, 200, 215, 0.95); border-top-width: 4px;
 }
-#room-tank .water {
+.room-slot .water {
   position: absolute; left: 0; right: 0; bottom: 0; top: 9%;
   background: linear-gradient(#8fd6ea, #5fb3cf 70%, #4c9fbb);
   transition: filter 1s;
 }
-#room-tank .water::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: rgba(255,255,255,0.7); }
-#room-tank .sand { position: absolute; left: 0; right: 0; bottom: 0; height: 15%; background: url(../assets/room/sand.png) center / 60px; filter: brightness(1.05); }
-#room-tank .shine { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0.35) 0 8%, transparent 9% 70%, rgba(255,255,255,0.18) 71% 74%, transparent 75%); pointer-events: none; }
-#room-tank .tank-rim { position: absolute; left: -2%; right: -2%; top: -4%; height: 7%; border-radius: 4px; background: linear-gradient(#5d8899, #3f6a7b); }
-#room-tank.dirty .water { filter: sepia(0.5) hue-rotate(40deg) saturate(0.8) brightness(0.92); }
-#room-tank-decor img { position: absolute; bottom: 6%; height: 34%; }
+.room-slot.salt .water { background: linear-gradient(#7fd2f0, #3f9fd0 70%, #2f86b8); }
+.room-slot .water::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: rgba(255,255,255,0.7); }
+.room-slot .sand { position: absolute; left: 0; right: 0; bottom: 0; height: 15%; background: url(../assets/room/sand.png) center / 60px; filter: brightness(1.05); }
+.room-slot .shine { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0.35) 0 8%, transparent 9% 70%, rgba(255,255,255,0.18) 71% 74%, transparent 75%); pointer-events: none; }
+.room-slot .tank-rim { position: absolute; left: -2%; right: -2%; top: -4%; height: 7%; border-radius: 4px; background: linear-gradient(#5d8899, #3f6a7b); }
+.room-slot.salt .tank-rim { background: linear-gradient(#4f7fa8, #34628b); }
+.room-slot.dirty .water { filter: sepia(0.5) hue-rotate(40deg) saturate(0.8) brightness(0.92); }
+.room-slot .rt-decor img { position: absolute; bottom: 6%; height: 34%; }
+.room-slot.free, .room-slot.lock { filter: none; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.room-slot.free { background: rgba(255, 253, 243, 0.55); border: 3px dashed rgba(242, 185, 59, 0.9); }
+.room-slot.lock { background: rgba(244, 250, 247, 0.35); border: 2px dashed rgba(77, 106, 116, 0.35); }
+.slot-plus { width: 44px; height: 44px; border-radius: 50%; background: var(--coin); color: var(--ink); font-size: 28px; line-height: 44px; text-align: center; box-shadow: var(--shadow); }
+.slot-lock { font-size: 26px; opacity: 0.75; }
+.slot-tag { position: absolute; transform: translateX(-50%); padding: 1px 10px; border-radius: 999px; background: rgba(255,255,255,0.92); font-size: 13px; white-space: nowrap; max-width: 30%; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--shadow); pointer-events: none; }
+@media (min-height: 600px) and (min-width: 900px) { .slot-tag { font-size: 16px; } .slot-plus { width: 56px; height: 56px; line-height: 56px; font-size: 34px; } .slot-lock { font-size: 34px; } }
+body.zooming #hud, body.zooming #room-nav, body.zooming .slot-tag, body.zooming .tip-bubble { opacity: 0; transition: opacity 200ms; }
 .rt-bubbles { position: absolute; left: 76%; bottom: 10%; width: 8%; height: 80%; }
 .rt-bubbles i { position: absolute; left: 30%; bottom: 0; width: 5px; height: 5px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.9); animation: rtBub 2.4s linear infinite; }
 .rt-bubbles i:nth-child(2) { animation-delay: -0.6s; left: 10%; } .rt-bubbles i:nth-child(3) { animation-delay: -1.2s; left: 50%; } .rt-bubbles i:nth-child(4) { animation-delay: -1.8s; left: 25%; }
@@ -123,8 +132,8 @@ button.pill:active, .nav-btn:active, .care-btn:active, .shop-item:active, .btn:a
 .rt-heater { position: absolute; left: 4%; bottom: 12%; width: 3%; height: 55%; border-radius: 4px; background: linear-gradient(90deg, rgba(255,255,255,0.7), rgba(255,190,140,0.8), rgba(255,255,255,0.6)); }
 .rt-filter { position: absolute; right: 2%; top: 0; width: 10%; height: 30%; border-radius: 0 0 4px 4px; background: linear-gradient(#3b4a52, #26323a); }
 .rt-light { position: absolute; left: 10%; right: 10%; top: 0; height: 4%; background: #fffbe8; box-shadow: 0 4px 14px rgba(255, 250, 220, 0.9); }
-#room-tank-fish .rf { position: absolute; height: auto; animation: swimX var(--d, 9s) ease-in-out infinite alternate; }
-#room-tank-fish .rf img { display: block; width: 100%; animation: faceX var(--d, 9s) steps(1) infinite alternate; }
+.rt-fish .rf { position: absolute; height: auto; animation: swimX var(--d, 9s) ease-in-out infinite alternate; }
+.rt-fish .rf img { display: block; width: 100%; animation: faceX var(--d, 9s) steps(1) infinite alternate; }
 @keyframes swimX { from { transform: translateX(0); } to { transform: translateX(var(--dx, 120px)); } }
 @keyframes faceX { 0% { transform: scaleX(1); } 50% { transform: scaleX(1); } 100% { transform: scaleX(-1); } }
 .tip-bubble {
@@ -378,3 +387,125 @@ body.idle #hud { translate: 0 -130%; opacity: 0; }
 body.idle #gauges { translate: -130% 0; opacity: 0; }
 body.idle #care, body.idle #hint, body.idle #hint-mini { translate: 0 150%; opacity: 0; }
 body.idle #hud > *, body.idle #gauges, body.idle #care, body.idle #hint, body.idle #hint-mini { pointer-events: none; }  /* 見えない ボタンを まちがえて おさない */
+
+/* ---------- v0.2：ハート・水槽の なまえ・おいわい・おみせの みだし・水の しるし ---------- */
+#hud .hearts { background: #f5b7a9; min-width: 72px; justify-content: center; }
+#hud-hearts.bump { animation: bump 0.4s; }
+.heart-ic { width: 24px; height: 24px; display: inline-block; flex: none; background: url(../assets/items/heart.png) center / contain no-repeat; }
+.fly-heart { position: absolute; z-index: 80; pointer-events: none; transition: transform 450ms cubic-bezier(.5,0,.3,1), opacity 450ms; }
+.fly-heart .heart-ic { width: 26px; height: 24px; }
+
+#tank-title { position: absolute; z-index: 11; left: 50%; transform: translateX(-50%); top: calc(var(--safe-t) + 8px); display: flex; align-items: center; gap: 4px; pointer-events: none; }
+#tank-title > * { pointer-events: auto; }
+#tank-title button { width: 44px; height: 44px; border-radius: 50%; background: rgba(189, 232, 242, 0.92); box-shadow: var(--shadow); font-size: 14px; }
+#tank-title .tt-body { min-width: 120px; max-width: 200px; padding: 3px 12px; border-radius: 16px; background: rgba(255,255,255,0.9); box-shadow: var(--shadow); display: grid; justify-items: center; line-height: 1.15; }
+#tank-title .tt-name { font-size: 15px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tank-title .tt-dots { display: flex; gap: 3px; margin-top: 2px; }
+#tank-title .tt-dots i { width: 6px; height: 6px; border-radius: 50%; background: #cfdcd7; }
+#tank-title .tt-dots i.on { background: var(--ink); width: 12px; border-radius: 3px; }
+#tank-title .tt-water { display: none; }
+@media (min-height: 600px) and (min-width: 900px) { #tank-title { top: calc(var(--safe-t) + 14px); } #tank-title .tt-body { min-width: 180px; max-width: 280px; padding: 5px 16px; } #tank-title .tt-name { font-size: 18px; } #tank-title .tt-water { display: inline-block; } }
+body.idle #tank-title { translate: 0 -150%; opacity: 0; pointer-events: none; }
+#tank-title { transition: translate 500ms ease, opacity 500ms ease; }
+#scr-tank.slide-l canvas:not([hidden]) { animation: slideL 240ms ease; }
+#scr-tank.slide-r canvas:not([hidden]) { animation: slideR 240ms ease; }
+@keyframes slideL { from { opacity: 0.2; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes slideR { from { opacity: 0.2; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+#aq-salt { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.care-btn.busy { opacity: 0.45; pointer-events: none; }
+
+.water-tag { display: inline-block; font-size: 12px; line-height: 1.6; padding: 0 8px; border-radius: 999px; background: var(--good); color: var(--ink); white-space: nowrap; }
+.water-tag.salt { background: var(--main); }
+.water-tag.both { background: #eef3f1; }
+.shop-item .water-tag { position: absolute; top: 6px; left: 6px; }
+.shop-item .rec + .water-tag { top: 28px; }
+.shop-head { grid-column: 1 / -1; margin: 6px 4px 0; font-size: 18px; line-height: 28px; }
+.shop-head:first-child { margin-top: 0; }
+.tank-pic { display: block !important; }
+.tank-pic img { width: 100%; height: 100%; object-fit: contain; }
+.tank-pic i { display: block; width: 70%; height: 80%; border-radius: 6px 6px 3px 3px; border: 3px solid rgba(160, 200, 215, 0.95); background: linear-gradient(transparent 10%, #8fd6ea 10%, #5fb3cf 85%, #e7d3a6 85%); }
+.tank-pic.salt i { background: linear-gradient(transparent 10%, #7fd2f0 10%, #3f9fd0 85%, #efe2c0 85%); }
+.tank-pic.big { width: 140px; height: 90px; margin: 0 auto 6px; }
+.pic-alt { font-size: 40px; display: block; text-align: center; }
+
+.pick-head { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.pick-head img { max-height: 40px !important; max-width: 70px !important; margin: 0 !important; }
+.pick-head .big { font-size: 20px; }
+.tank-rows { display: flex; flex-direction: column; gap: 8px; max-height: 190px; overflow-y: auto; touch-action: pan-y; }
+.tank-row { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 6px 12px; border-radius: 16px; background: var(--card); border: 2px solid #e1ebe7; text-align: left; }
+.tank-row.on { background: var(--main); border-color: var(--ink); }
+.tank-row.off { background: #eef2f0; color: #607780; }
+.tr-pic { width: 48px; height: 36px; flex: none; border-radius: 5px 5px 2px 2px; border: 2px solid rgba(160, 200, 215, 0.95); background: linear-gradient(transparent 12%, #8fd6ea 12%, #5fb3cf 85%, #e7d3a6 85%); }
+.tr-pic.salt { background: linear-gradient(transparent 12%, #7fd2f0 12%, #3f9fd0 85%, #efe2c0 85%); }
+.tr-body { flex: 1; display: grid; gap: 2px; }
+.tr-name { font-size: 16px; }
+.tr-sub { font-size: 14px; color: var(--ink-soft); }
+.tr-why { font-size: 14px; color: #b4553f; white-space: nowrap; }
+.btn:disabled { opacity: 0.45; }
+@media (min-height: 600px) and (min-width: 900px) { .tank-rows { max-height: 340px; } }
+
+#celebrate { position: absolute; inset: 0; z-index: 90; background: rgba(32, 62, 74, 0.3); display: grid; place-items: center; overflow: hidden; }
+#celebrate .cel-box { width: min(420px, 92%); padding: 16px 20px; border-radius: 20px; background: #fff; box-shadow: var(--shadow-strong); text-align: center; animation: celIn 220ms ease-out; }
+#celebrate .cel-ic { font-size: 44px; line-height: 1.1; }
+#celebrate .cel-text { font-size: 24px; line-height: 34px; margin-top: 4px; }
+#celebrate .cel-sub { font-size: 15px; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
+#celebrate .cel-btns { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+#celebrate .cel-btns .btn { min-height: 48px; min-width: 140px; }
+@keyframes celIn { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+#celebrate .confetti { position: absolute; inset: 0; pointer-events: none; }
+#celebrate .confetti i { position: absolute; top: -12px; width: 6px; height: 10px; border-radius: 2px; animation: confetti 1.4s ease-in forwards; }
+@keyframes confetti { from { transform: translateY(0) rotate(0); opacity: 1; } to { transform: translateY(105vh) rotate(var(--rx, 180deg)); opacity: 0; } }
+@media (min-height: 600px) and (min-width: 900px) { #celebrate .cel-box { width: 480px; padding: 22px 26px; } #celebrate .cel-text { font-size: 28px; line-height: 40px; } }
+@media (prefers-reduced-motion: reduce) { #celebrate .confetti { display: none; } .room-slot .rf, .room-slot .rf img { animation: none !important; } }
+@media (max-height: 500px) { #hud .hearts { min-width: 64px; } #hud .time { padding: 0 10px; } }
+
+.slot-drop { position: absolute; right: -6px; top: -10px; width: 26px; height: 26px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 15px; box-shadow: var(--shadow); }
+#shop-tank { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 2px 8px; min-height: 48px; border-radius: 16px; background: #e0f3f8; color: #244653; }
+#shop-tank .st-lb { font-size: 15px; }
+#shop-tank button { width: 44px; height: 44px; border-radius: 50%; background: var(--main); box-shadow: var(--shadow); font-size: 14px; }
+#shop-tank .st-name { min-width: 120px; max-width: 260px; padding: 0 12px; min-height: 44px; display: flex; align-items: center; gap: 6px; border-radius: 22px; background: #fff; box-shadow: var(--shadow); font-size: 15px; white-space: nowrap; overflow: hidden; }
+.shop-item.locked-card .pic img { filter: brightness(0) opacity(0.25); }
+.shop-item.locked-card .nm { color: #8aa0a8; }
+.shop-item .lock-line { font-size: 12px; color: var(--ink-soft); line-height: 1.3; }
+
+.rt-fish .rf-dot { display: block; width: 100%; padding-top: 45%; border-radius: 50%; background: radial-gradient(circle at 70% 40%, #fff 0 8%, transparent 9%), linear-gradient(90deg, #f5b7a9, #ffb347); }
+.room-slot.salt .rt-fish .rf-dot { background: radial-gradient(circle at 70% 40%, #fff 0 8%, transparent 9%), linear-gradient(90deg, #ffe08a, #ff8c42); }
+body.night #scr-room { background: linear-gradient(#8f8579 0 var(--floor-y, 78%), #b88a5f var(--floor-y, 78%)); }
+
+.slot-tag { font-size: 14px; line-height: 24px; color: #244653; }
+.shop-item.locked-card { opacity: 1; }
+body.on-sheet #toasts { top: calc(var(--safe-t) + var(--hud-h) + 120px); }
+body.on-room #toasts { top: auto; bottom: calc(var(--safe-b) + 96px); }
+
+.slot-free { font-size: 12px; color: #244653; background: rgba(255,255,255,0.8); padding: 0 6px; border-radius: 8px; }
+@media (min-height: 600px) and (min-width: 900px) { .slot-free { font-size: 15px; } }
+@media (max-height: 500px) { .slot-free { display: none; } }
+
+/* へや：おみせ・ずかん・ミッション は 右はしに たて3だん（ラックの わくを かくさない。Codex 案） */
+#room-nav { flex-direction: column; gap: 10px; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 8px); }
+#room-nav .nav-btn { width: 88px; height: 64px; gap: 0; font-size: 15px; }
+#room-nav .nav-btn .nav-ic { font-size: 28px; }
+
+/* v0.2 てなおし */
+#hud .hearts { gap: 6px; }
+#hud .hearts .hh-body { display: grid; line-height: 1.05; justify-items: start; }
+#hud-heart-day { font-size: 11px; color: #6b3940; font-weight: 700; }
+.heart-ic.sm { width: 16px; height: 16px; vertical-align: -3px; }
+.pop-heart { background: #ffe3e7; }
+.lock-banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px; border-radius: 16px; background: #fff3c4; color: #244653; font-size: 15px; }
+.lock-banner .lb-ic { font-size: 20px; }
+.lock-banner .lb-text { flex: 1; }
+.lock-banner .lb-dots { display: flex; gap: 4px; }
+.lock-banner .lb-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #f2b93b; background: #fff; }
+.lock-banner .lb-dots i.on { background: #f2b93b; }
+.shop-item .lock-line.short { color: #925000; font-size: 13px; }
+.shop-item .tank-pic img, .tank-pic img { width: 100%; height: 100%; object-fit: contain; }
+.tab-tanks { background: #fff3c4; }
+body.photo #tank-title, body.photo #hint-mini { display: none !important; }
+@media (max-height: 500px) { .tab { min-width: 72px; padding: 0 10px; } #hud-heart-day { font-size: 10px; } }
+@media (max-height: 500px) {
+  #btn-menu .lb { display: none; }
+  #btn-menu { width: 48px; min-width: 48px; padding: 0; justify-content: center; }
+  #tank-title .tt-body { min-width: 96px; max-width: 140px; padding: 3px 8px; }
+  #tank-title .tt-name { font-size: 14px; }
+}

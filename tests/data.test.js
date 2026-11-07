@@ -41,11 +41,11 @@ test('likes の タグは items.js の tag に ある・売っている魚は �
   }
 });
 
-test('相性表：売っている魚の すべての くみあわせ（同じ種類も）が 書いてある・キーと 値が ただしい', () => {
-  const sold = SOLD_FISH.map((f) => f.id);
+test('相性表：v0.1 の 10しゅるいは すべての くみあわせが 書いてある・キーと 値が ただしい・淡水×海水は 書かない', () => {
+  const v01 = ['medaka', 'guppy', 'neon_tetra', 'goldfish', 'corydoras', 'minami_shrimp', 'betta', 'angelfish', 'red_bee_shrimp', 'albino_corydoras'];
   const missing = [];
-  for (let i = 0; i < sold.length; i++) for (let j = i; j < sold.length; j++) {
-    const [a, b] = [sold[i], sold[j]].sort();
+  for (let i = 0; i < v01.length; i++) for (let j = i; j < v01.length; j++) {
+    const [a, b] = [v01[i], v01[j]].sort();
     if (!(`${a}|${b}` in COMPAT)) missing.push(`${a}|${b}`);
   }
   assert.deepEqual(missing, [], '表に ない くみあわせ');
@@ -54,30 +54,54 @@ test('相性表：売っている魚の すべての くみあわせ（同じ種
     assert.ok(fishById[a] && fishById[b], `しらない id: ${k}`);
     assert.ok(a <= b, `キーの じゅんばん: ${k}`);
     assert.ok([0, 1, 2].includes(v), `${k}=${v}`);
+    assert.equal(fishById[a].water, fishById[b].water, `淡水×海水が 書いてある: ${k}`);
   }
   assert.equal(compatOf('medaka', 'guppy'), compatOf('guppy', 'medaka'));
   assert.equal(compatOf('clownfish', 'medaka'), COMPAT_DEFAULT);
 });
 
-test('相性表：docs/相性表.md の 表と compat.js が おなじ', () => {
-  const md = read('docs/相性表.md');
-  const rows = md.split('\n').filter((l) => /^\|\s*\*\*/.test(l));
-  const head = md.split('\n').find((l) => /^\|\s*\|/.test(l)).split('|').slice(2, -1).map((s) => s.trim());
+/** docs/相性表.md の 表（## ごと）を よむ。[{ title, rows: [[a, b, mark]] }] */
+function docsTables() {
+  const lines = read('docs/相性表.md').split('\n');
   const byName = Object.fromEntries(FISH.map((f) => [f.name, f.id]));
-  const mark = { '◎': 2, '○': 1, '×': 0 };
-  const diff = [];
-  for (const r of rows) {
-    const cells = r.split('|').slice(1, -1).map((s) => s.trim());
-    const a = byName[cells[0].replace(/\*/g, '')];
-    assert.ok(a, `docs の 行 ${cells[0]}`);
-    cells.slice(1).forEach((c, i) => {
-      const b = byName[head[i]];
-      assert.ok(b, `docs の 列 ${head[i]}`);
-      if (mark[c] !== compatOf(a, b)) diff.push(`${a}×${b}: docs ${c} / compat ${compatOf(a, b)}`);
-    });
+  const out = [];
+  let head = null, cur = null;
+  for (const l of lines) {
+    if (/^##\s/.test(l)) { cur = { title: l.replace(/^#+\s*/, ''), rows: [], ids: [] }; out.push(cur); head = null; continue; }
+    if (/^\|\s*\|/.test(l)) {
+      head = l.split('|').slice(2, -1).map((x) => x.trim());
+      if (!cur) { cur = { title: '(表)', rows: [], ids: [] }; out.push(cur); }
+      cur.ids = head.map((n) => byName[n] || '?' + n);
+      continue;
+    }
+    if (head && /^\|\s*\*\*/.test(l)) {
+      const cells = l.split('|').slice(1, -1).map((x) => x.trim());
+      const a = byName[cells[0].replace(/\*/g, '')] || '?' + cells[0];
+      cells.slice(1).forEach((c, i) => cur.rows.push([a, cur.ids[i], c]));
+    }
   }
-  assert.equal(rows.length, SOLD_FISH.length);
-  assert.deepEqual(diff, []);
+  return out.filter((t) => t.rows.length);
+}
+
+test('相性表：docs/相性表.md の 表（淡水・海水）と compat.js が おなじ', () => {
+  const mark = { '◎': 2, '○': 1, '×': 0 };
+  const tables = docsTables();
+  const diff = [], unknown = [], seen = new Set();
+  for (const t of tables) for (const [a, b, c] of t.rows) {
+    if (a.startsWith('?') || b.startsWith('?')) { unknown.push(`${t.title}: ${a} / ${b}`); continue; }
+    seen.add(a); seen.add(b);
+    if (mark[c] !== compatOf(a, b)) diff.push(`${fishById[a].name}×${fishById[b].name}（${[a, b].sort().join('|')}）: docs ${c} / compat.js ${compatOf(a, b)}`);
+  }
+  assert.deepEqual(unknown, [], 'docs に しらない なまえ');
+  const asym = [];
+  for (const t of tables) {
+    const m = new Map(t.rows.map(([a, b, c]) => [a + '|' + b, c]));
+    for (const [a, b, c] of t.rows) if (m.get(b + '|' + a) !== c) asym.push(`${t.title}: ${a}×${b} ${c} / ${b}×${a} ${m.get(b + '|' + a)}`);
+  }
+  assert.deepEqual([...new Set(asym)], [], 'docs の 表が たいしょうで ない');
+  const notInDocs = SOLD_FISH.filter((f) => !seen.has(f.id)).map((f) => f.id);
+  assert.deepEqual(notInDocs, [], 'docs の 表に ない 売りものの 魚');
+  assert.deepEqual([...new Set(diff)], []);
 });
 
 test('売っている魚の 絵・売っている どうぐの アイコンが 実在する', () => {
@@ -92,7 +116,8 @@ test('texture の パスは assets/fish/<id>.png の 形', () => {
 });
 
 test('ミッション：id・order が かぶらない、goal の type が わかる もの、placeItem の id が 売っている', () => {
-  const KNOWN = ['buyFish', 'fishCount', 'speciesCount', 'placeItem', 'feed', 'waterChange', 'scoop', 'pet', 'thanks', 'grow', 'natsuki', 'friends', 'allHealthy', 'days', 'zukan'];
+  const KNOWN = ['buyFish', 'fishCount', 'speciesCount', 'placeItem', 'feed', 'waterChange', 'scoop', 'pet', 'thanks', 'grow', 'natsuki', 'friends', 'allHealthy', 'days', 'zukan',
+    'tankCreatures', 'unlock', 'kindCount', 'tankCount', 'hasTankWater', 'waterFishCount', 'hearts'];
   const M = missions.MISSIONS;
   assert.equal(new Set(M.map((m) => m.id)).size, M.length);
   assert.equal(new Set(M.map((m) => m.order)).size, M.length);
@@ -101,19 +126,24 @@ test('ミッション：id・order が かぶらない、goal の type が わ�
     assert.ok(m.reward.coin > 0, m.id);
     if (m.goal.type === 'placeItem') assert.ok(itemById[m.goal.id]?.price != null, `${m.id} の ${m.goal.id} は 売っていない`);
     if (m.goal.type === 'grow') assert.ok([1, 2].includes(m.goal.stage));
+    if (m.goal.type === 'unlock') assert.ok(balance.UNLOCK[m.goal.id], `${m.id} の unlock ${m.goal.id}`);
+    if (m.goal.type === 'kindCount') assert.ok(balance.SHOP_TABS.some((t) => t.kind === m.goal.kind), `${m.id} kind`);
+    if (['hasTankWater', 'waterFishCount'].includes(m.goal.type)) assert.ok(['fresh', 'salt'].includes(m.goal.water));
+    if (m.goal.type === 'zukan') assert.ok(m.goal.count <= SOLD_FISH.length, `${m.id}: ずかん ${m.goal.count} は 売っている ${SOLD_FISH.length}しゅるい より 多い`);
   }
   assert.ok(missions.MISSION_VISIBLE >= 1);
 });
 
 test('ヒント：when.type と action が わかる もの・{like} は 飾りの なまえに なる', () => {
-  const TYPES = ['noHeaterCold', 'tempLow', 'tempHigh', 'veryDirty', 'dirty', 'noPumpAirLow', 'airLow', 'hungry', 'leftover', 'lonelySchool', 'noLikedDecor', 'nigate', 'tankFull', 'noCoins'];
+  const TYPES = ['noHeaterCold', 'tempLow', 'tempHigh', 'veryDirty', 'dirty', 'noPumpAirLow', 'airLow', 'hungry', 'leftover', 'lonelySchool', 'noLikedDecor', 'nigate', 'tankFull', 'noCoins',
+    'airLowSalt', 'saltNoLiverock', 'unlockNear', 'tankEmpty'];
   const ACTIONS = [null, 'shop', 'water_change', 'feed', 'scoop'];
   assert.equal(new Set(hints.HINTS.map((h) => h.id)).size, hints.HINTS.length);
   for (const h of hints.HINTS) {
     assert.ok(TYPES.includes(h.when.type), `${h.id} ${h.when.type}`);
     assert.ok(ACTIONS.includes(h.action ?? null), `${h.id} action ${h.action}`);
     const vars = [...h.text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
-    for (const v of vars) assert.ok(['name', 'like'].includes(v), `${h.id} {${v}}`);
+    for (const v of vars) assert.ok(['name', 'like', 'n'].includes(v), `${h.id} {${v}}`);
   }
 });
 
@@ -166,7 +196,10 @@ test('data の 画面の 文字（name/intro/hint/desc/title/text/セリフ/こ�
   collectUi(hints.HINTS, 'HINTS', out);
   collectUi(tutorial.TUTORIAL, 'TUTORIAL', out);
   collectUi(balance.LABELS, 'LABELS', out, true);
-  for (const [k, v] of Object.entries(hints)) if (typeof v === 'string' || k === 'HAPPY_LINES') collectUi(v, k, out, true);
+  for (const [k, v] of Object.entries(hints)) if (k !== 'HINTS') collectUi(v, k, out, true);   // SHOP_LINES など
+  collectUi(balance.UNLOCK.tank6.banner, 'UNLOCK.banner', out, true); collectUi(balance.UNLOCK.tank6.lockedLine, 'UNLOCK.lockedLine', out, true);
+  for (const k of ['doneLine', 'restLine']) collectUi(balance.HEART[k], 'HEART.' + k, out, true);
+  collectUi(balance.SHOP_TABS.map((t) => t.label), 'SHOP_TABS', out, true); collectUi(balance.WATER_LABELS, 'WATER_LABELS', out, true); collectUi(balance.HEART_LABEL, 'HEART_LABEL', out, true);
   assert.ok(out.length > 100, `しらべた 文字が すくない ${out.length}`);
   const bad = out.filter(([, s]) => KANJI.test(s)).map(([p, s]) => `${p}: ${s}`);
   assert.deepEqual(bad, []);
@@ -254,4 +287,61 @@ test('js の import の さきが 実在する', () => {
     }
   }
   assert.deepEqual(miss, []);
+});
+
+// ---------------- v0.2 の データ ----------------
+test('v0.2：新しい 生きもの 15しゅるいの 絵・すいそうと サンゴの アイコンが 実在する', () => {
+  const NEW = ['ishimaki', 'ramshorn', 'platy', 'cherry_barb', 'otocinclus', 'rummy_nose', 'dwarf_gourami', 'shittaka', 'blue_damsel', 'clownfish', 'skunk_shrimp', 'firefish', 'yellow_tang', 'blue_tang', 'mandarin'];
+  for (const id of NEW) assert.ok(fishById[id]?.price != null, `${id} が 売られていない`);
+  const miss = NEW.map((id) => fishById[id].texture).filter((p) => !exists(p));
+  for (const id of ['tank_fresh', 'tank_salt', 'coral', 'liverock']) if (!exists(itemById[id].icon)) miss.push(itemById[id].icon);
+  assert.deepEqual(miss, []);
+});
+
+test('v0.2：kind は SHOP_TABS の どれか・unlock は UNLOCK の キー・needs は おなじ水の 売りもの・見出しが はじめから からっぽに ならない', () => {
+  const kinds = balance.SHOP_TABS.map((t) => t.kind);
+  for (const f of SOLD_FISH) {
+    assert.ok(kinds.includes(f.kind), `${f.id} kind ${f.kind}`);
+    if (f.unlock) assert.ok(balance.UNLOCK[f.unlock], `${f.id} unlock ${f.unlock}`);
+    for (const n of f.needs || []) { const it = itemById[n]; assert.ok(it?.price != null && (it.water === 'both' || it.water === f.water), `${f.id} needs ${n}`); }
+  }
+  for (const i of SOLD_ITEMS) if (i.unlock) assert.ok(balance.UNLOCK[i.unlock], `${i.id} unlock`);
+  for (const k of kinds) assert.ok(SOLD_FISH.some((f) => f.kind === k && f.water === 'fresh' && !f.unlock), `見出し「${k}」が はじめ から からっぽ`);
+});
+
+test('v0.2：すいそうの しなもの（tank_fresh 800・tank_salt 1000・includes は ある 器具）', () => {
+  assert.equal(itemById.tank_fresh.price, 800);
+  assert.equal(itemById.tank_salt.price, 1000);
+  for (const id of ['tank_fresh', 'tank_salt']) {
+    assert.equal(itemById[id].type, 'tank');
+    assert.equal(itemById[id].unlock, 'tank6');
+    for (const inc of itemById[id].includes) assert.ok(itemById[inc]?.inTank, `${id} includes ${inc}`);
+  }
+  assert.equal(itemById.tank_salt.water, 'salt');
+  assert.equal(itemById.tank_fresh.water, 'fresh');
+});
+
+test('v0.2：ハートの 歯止めの 数値（72ふん＝現実30びょう・1日20こ・けんこう40）', () => {
+  assert.equal(balance.HEART.perFishEveryGameMinutes, 72);
+  assert.equal(balance.HEART.perDay, 20);
+  assert.equal(balance.HEART.need.health, 40);
+  assert.equal(balance.HEART.perFishEveryGameMinutes * balance.TIME.realSecPerGameDay / 1440, balance.BOND.petCooldownRealSec);
+});
+
+test('js と sw.js の ファイルが ぜんぶ 文法エラー なし（ブラウザで ひらけなく なる ことを ふせぐ）', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'osakana-check-'));
+  const bad = [];
+  try {
+    for (const f of [...walk('js', (p) => p.endsWith('.js')), 'sw.js']) {
+      const tmp = join(dir, f.split('/').join('_') + (f === 'sw.js' ? '.cjs' : '.mjs'));
+      writeFileSync(tmp, read(f));
+      const r = spawnSync(process.execPath, ['--check', tmp], { encoding: 'utf8' });
+      if (r.status !== 0) bad.push(`${f}: ${(r.stderr.match(/SyntaxError[^\n]*/) || [''])[0]} ${(r.stderr.match(/:(\d+)\n/) || ['', '?'])[1]}ぎょうめ`);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  assert.deepEqual(bad, []);
 });

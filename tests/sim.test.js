@@ -6,13 +6,14 @@ import { sim, freshState, addFish, seeded, SOLD_FISH, balance, missions } from '
 const B = balance;
 const HOUR = 60, DAY = 1440;
 const allFish = (st) => st.tanks.flatMap((t) => t.fish);
+const tankOf = (st, f) => st.tanks.find((t) => t.fish.includes(f));
 
 // ---------------- けんこう は 10 より 下がらない ----------------
-test('さいあくの みずで 30にち ほうちしても けんこう は 10 より 下がらない（ぜんしゅるい）', () => {
+test('さいあくの みずで 30にち ほうちしても けんこう は 10 より 下がらない（うみ・かい も ふくめ ぜんしゅるい）', () => {
   for (const sp of SOLD_FISH) {
     const st = freshState();
-    addFish(st, sp.id); addFish(st, sp.id);
-    const t = st.tanks[0];
+    const f1 = addFish(st, sp.id); addFish(st, sp.id);
+    const t = tankOf(st, f1);
     const rnd = seeded(7);
     let minH = 100;
     for (let h = 0; h < 30 * 24; h++) {
@@ -70,7 +71,7 @@ test('よい じょうたいなら ちびっこ → おとな → ビッグ の 
     st.tanks[0].decor.push('heater');
     st.tanks[0].temp = 25;
     const f = addFish(st, sp.id);
-    const t = st.tanks[0];
+    const t = tankOf(st, f);
     const grows = [];
     let hours = 0;
     while (f.stage < 2 && hours < 24 * 60) {
@@ -262,35 +263,54 @@ test('ミッション：見えている 3つ だけ たっせい する（さき
   assert.equal(sim.visibleMissions(st).length, missions.MISSION_VISIBLE);
 });
 
-test('ふつうに あそぶと v0.1 の ミッションが ぜんぶ うけとれる（30にち いない）', () => {
+// ふつうの 子の あそびかた：1じかんごとに おせわ・なでる、かえる ものから じゅんに かう
+function playUntilAllMissions(maxDays = 60) {
   const st = freshState();
   st.coins = 250;
   st.inv.food_flake = 1; st.inv.water_change = 1;
-  const t = st.tanks[0];
-  t.decor.push('stone', 'air_pump', 'heater');
+  st.tanks[0].decor.push('stone', 'air_pump', 'heater');
   const rnd = seeded(11);
   let now = 1e11;
-  const wish = ['medaka', 'medaka', 'minami_shrimp', 'plant', 'filter', 'neon_tetra', 'light', 'corydoras', 'plant'];
-  let day = 0;
-  for (let h = 0; h < 30 * 24 && Object.keys(st.missions.claimed).length < missions.MISSIONS.length; h++) {
-    // かいもの
+  const T = { fresh1: st.tanks[0], salt: null, fresh2: null };
+  // [なに, どの すいそう]
+  const wish = [
+    ['medaka', 'fresh1'], ['medaka', 'fresh1'], ['minami_shrimp', 'fresh1'], ['plant', 'fresh1'], ['ishimaki', 'fresh1'],
+    ['neon_tetra', 'fresh1'], ['corydoras', 'fresh1'], ['filter', 'fresh1'], ['light', 'fresh1'],
+    ['tank_salt', 'salt'], ['clownfish', 'salt'], ['skunk_shrimp', 'salt'], ['shittaka', 'salt'], ['liverock', 'salt'],
+    ['tank_fresh', 'fresh2'], ['platy', 'fresh2'], ['cherry_barb', 'fresh2'], ['otocinclus', 'fresh2'], ['rummy_nose', 'fresh2'],
+  ];
+  const log = [];
+  let h = 0;
+  for (; h < maxDays * 24 && Object.keys(st.missions.claimed).length < missions.MISSIONS.length; h++) {
     while (wish.length) {
-      const id = wish[0];
+      const [id, where] = wish[0];
       const isFish = !!sim.data().fishById[id];
-      const r = isFish ? sim.buyFish(st, id) : sim.buyItem(st, id);
+      const r = isFish ? sim.buyFish(st, id, T[where]) : sim.buyItem(st, id, T[where] || st.tanks[0]);
       if (!r.ok) break;
+      if (r.tank) T[where] = r.tank;
+      log.push(`${st.daily.day}にちめ ${id}`);
       wish.shift();
     }
-    // 3じかんごとに えさ、よごれたら みずかえ、たべのこしは そうじ、なでる
-    if (h % 3 === 0) { feedOnce(st, now, false); now += 6000; }
-    if (t.clean < 75) sim.waterChange(st);
-    if (t.leftover >= 1) sim.scoop(st);
-    for (const f of t.fish) { sim.pet(st, f.uid, now); }
+    for (const t of st.tanks) {
+      if (!t.fish.length) continue;
+      if (h % 3 === 0) {
+        for (const f of t.fish) if (f.onaka >= 85) f.onaka = f.onaka;    // そのまま（いっぱいなら たべない）
+        if (sim.feedStart(st, t, 'food_flake', now).ok) for (const f of t.fish) sim.feedEat(st, f.uid, now + 500);
+        sim.feedEnd(st); now += 6000;
+      }
+      if (t.clean < 75) sim.waterChange(st, t);
+      if (t.leftover >= 1) sim.scoop(st, t);
+      for (const f of t.fish) sim.pet(st, f.uid, now, t);
+    }
     now += 31000;
     sim.tick(st, HOUR, rnd);
-    for (const m of sim.visibleMissions(st)) if (st.missions.done[m.id]) sim.claimMission(st, m.id);
-    day = st.daily.day;
+    for (const m of missions.MISSIONS) if (st.missions.done[m.id] && !st.missions.claimed[m.id]) sim.claimMission(st, m.id);
   }
-  const left = missions.MISSIONS.filter((m) => !st.missions.claimed[m.id]).map((m) => m.id);
-  assert.deepEqual(left, [], `${day}にちめ で のこり: ${left.join(', ')}`);
+  return { st, days: st.daily.day, left: missions.MISSIONS.filter((m) => !st.missions.claimed[m.id]).map((m) => m.id), wish, log };
+}
+
+test('ふつうに あそぶと v0.2 の ミッション 24こが ぜんぶ うけとれる（60にち いない）', () => {
+  const { days, left, wish, st } = playUntilAllMissions(60);
+  assert.equal(missions.MISSIONS.length, 24);
+  assert.deepEqual(left, [], `${days}にちめ で のこり: ${left.join(', ')}（かえなかった もの: ${wish.map((w) => w[0]).join(', ')}・コイン ${st.coins}）`);
 });

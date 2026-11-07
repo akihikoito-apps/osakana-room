@@ -41,7 +41,14 @@ function readProfile(src) {
 }
 
 /** 長さ方向の厚み（0..1）。尾びれ部分はうすい膜、胴は頭寄りが一番太い。 */
-function widthEnvelope(heights) {
+function widthEnvelope(heights, round = false) {
+  if (round) {
+    // 貝：その列の高さに合わせた丸い太さ（から が回転体に近い形になる）＋ 両はしだけ少し細く
+    const e = new Float32Array(COLS + 1);
+    let mh = 0; for (const h of heights) mh = Math.max(mh, h);
+    for (let i = 0; i <= COLS; i++) { const u = i / COLS * 2 - 1; e[i] = Math.sqrt(heights[i] / Math.max(mh, 1e-6)) * Math.pow(Math.max(0, 1 - u * u), 0.25); }
+    return e;
+  }
   // 尾の付け根 = 後ろ半分で一番細い列
   let ped = Math.round(COLS * 0.2), minH = Infinity;
   for (let i = Math.round(COLS * 0.08); i <= Math.round(COLS * 0.45); i++) if (heights[i] < minH) { minH = heights[i]; ped = i; }
@@ -60,29 +67,36 @@ function widthEnvelope(heights) {
 }
 
 /** 輪郭から厚みのあるジオメトリを作る（全長 1、頭が +x、体の中心が原点）。 */
-function buildGeometry(prof, thickness) {
+function buildGeometry(prof, thickness, round = false) {
   const { top, bot, x0, y0, bw, bh, sw, sh } = prof;
   const scale = 1 / bw;                    // 画像 px → 長さ 1
   const cy = y0 + bh / 2;
   const heights = new Float32Array(COLS + 1);
   for (let i = 0; i <= COLS; i++) heights[i] = (bot[i] - top[i]) * scale;
-  const env = widthEnvelope(heights);
+  const env = widthEnvelope(heights, round);
   const halfW = Math.max(0.03, thickness * 0.5);
   const pos = [], uv = [], idx = [];
   for (let i = 0; i <= COLS; i++) {
     const u = i / COLS;
-    const px = x0 + u * (bw - 1) + 0.5;
     const x = u - 0.5;
-    const yt = (cy - top[i]) * scale, yb = (cy - bot[i]) * scale;
+    // 貝は両はしを丸くとじる（正面から見てもすき間ができないように）。形と絵は内側の列から借りる
+    const k = round ? Math.min(i, COLS - i) : 2;
+    const si = round && k < 2 ? (i < COLS / 2 ? 2 : COLS - 2) : i;
+    const capK = k === 0 ? 0 : k === 1 ? 0.7 : 1;
+    const ui = round && k < 2 ? Math.round(COLS * 0.45) : si;   // ふたの絵は から の真ん中の列から
+    const px = x0 + (ui / COLS) * (bw - 1) + 0.5;
+    const ytU = (cy - top[ui]) * scale, ybU = (cy - bot[ui]) * scale;
+    const yt = (cy - top[si]) * scale, yb = (cy - bot[si]) * scale;
     const c = (yt + yb) / 2, hh = (yt - yb) / 2;
-    const w = Math.max(0.002, Math.min(halfW * env[i], hh * 0.95 + 0.002));
+    const w = Math.max(0.002, Math.min(halfW * env[si], round ? hh * 1.2 + 0.002 : hh * 0.95 + 0.002));
     for (let j = 0; j <= RING; j++) {
       const phi = (j / RING) * Math.PI * 2;
       const s = Math.sin(phi), co = Math.cos(phi);
-      const y = c + hh * co;
-      const z = w * Math.sign(s) * Math.pow(Math.abs(s), 1.4);
+      const yUv = (ytU + ybU) / 2 + (ytU - ybU) / 2 * co * (round ? 0.9 : 1);   // 貝は ふちの すけた所を拾わない
+      const y = c + hh * co * capK;
+      const z = w * capK * Math.sign(s) * Math.pow(Math.abs(s), round ? 0.25 : 1.4);
       pos.push(x, y, z);
-      const imgY = cy - y / scale;
+      const imgY = cy - yUv / scale;
       uv.push(px / sw, 1 - imgY / sh);
     }
   }
@@ -121,8 +135,9 @@ export class SpeciesLibrary {
     let e = this.map.get(spec.id);
     if (e) { if (onUpgrade) e.listeners.add(onUpgrade); return e; }
     const thick = spec.look?.thickness ?? 0.18;
+    const round = spec.kind === 'snail';
     const fb = drawFallbackFish(spec);
-    e = { spec, geometry: buildGeometry(readProfile(fb), thick), texture: makeTexture(fb), real: false, listeners: new Set() };
+    e = { spec, geometry: buildGeometry(readProfile(fb), thick, round), texture: makeTexture(fb), real: false, listeners: new Set() };
     if (onUpgrade) e.listeners.add(onUpgrade);
     this.map.set(spec.id, e);
     if (spec.texture) {
@@ -131,7 +146,7 @@ export class SpeciesLibrary {
       img.onload = () => {
         if (!img.width || this.disposed) return;
         try {
-          const geo = buildGeometry(readProfile(img), thick);
+          const geo = buildGeometry(readProfile(img), thick, round);
           const tex = makeTexture(img);
           const oldG = e.geometry, oldT = e.texture;
           e.geometry = geo; e.texture = tex; e.real = true;

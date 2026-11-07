@@ -41,7 +41,7 @@ export const CLEAN = {
   perSpacePerHour: -0.4,       // 魚の space 1 あたり（キンギョは space 2 なので -0.8）
   perLeftoverPerHour: -1.5,    // たべのこし 1こ あたり
   leftoverMax: 5,              // たべのこし は 5こ まで たまる
-  cleanerIds: ['corydoras', 'albino_corydoras', 'minami_shrimp', 'red_bee_shrimp'],
+  cleanerIds: ['corydoras', 'albino_corydoras', 'minami_shrimp', 'red_bee_shrimp', 'skunk_shrimp'],  // v0.2 で スカンクシュリンプを 足した（かい は SNAIL）
   cleanerLeftoverPerHour: 0.125, // そうじやの魚 1ぴきで たべのこし を 8じかんで 1こ たべる
   scoopClean: 0,               // 「そうじ」（あみで たべのこしを すくう）：たべのこし 0 にするだけ（きれいさ は ふえない。コインも なし）
   // フィルターは よごれる はやさ（basePerHour＋perSpace＋perLeftover の合計）を filter.effect.dirtMultiplier 倍（0.5）にする
@@ -178,3 +178,85 @@ export const LABELS = {
   nakayoshi: { good: 'なかよし', ok: 'ふつう', bad: 'にがて', goodMin: 80, okMin: 40 },
   stage: ['ちびっこ', 'おとな', 'ビッグ'],
 };
+
+// ================================================================
+// v0.2 で 足したもの（くわしくは docs/仕様_v0.2.md）
+// ================================================================
+
+// ---------------- 解放（あたらしい すいそう・さかなが おみせに ならぶ） ----------------
+export const UNLOCK = {
+  tank6: {
+    tankIndex: 0,              // 1つめの すいそう（state.tanks[0]）を 見る
+    count: 6,                  // その すいそうの 生きもの（さかな・エビ・かい）の 数が 6 以上
+    counts: 'creatures',       // space ではなく 1ぴき＝1 で 数える（エビ・かいも 1）
+    orFull: true,              // または その すいそうが いっぱい（space の合計 ≥ TANK.capacity）でも たっせい。
+                               // キンギョ・エンゼル（space 2）で うまって 6ぴきに とどかない「つみ」を ふせぐ（v0.2 は 魚を てばなせない）
+    permanent: true,           // いちど たっせいしたら、あとで へっても もどさない（state.unlocks.tank6 = ゲームの日）
+    // たっせい したとき 大きな字で 出す（2まい。タップで つぎへ）
+    banner: [
+      'うみの すいそうが かえるように なったよ！ おみせで 1000コイン だよ。',
+      'あたらしい さかなや かい、かわの すいそうも おみせに ふえたよ！',
+    ],
+    // まだの とき、お店の かぎつき カードに 出す
+    lockedLine: '1つめの すいそうに 6ぴき いると あえるよ（エビも かいも かぞえるよ）',  // その下に「4／6」の ように いまの かずも 出す
+  },
+};
+
+// ---------------- すいそう ----------------
+export const TANKS = {
+  max: 6,                      // へやに おける すいそうの 数（はじめの 1つを ふくむ）
+  // 値段は items.js の tank_fresh（800）・tank_salt（1000）。なんこめでも おなじ ねだん
+  // かった すいそうは items.js の includes（ヒーター・ブクブク）が 入った じょうたいで はじまる
+  newTank: { temp: 25, clean: 100, air: 70, leftover: 0 },   // ヒーターつきなので はじめから 25ど
+  // 1つの すいそうの 中身の 上限は TANK.capacity（6）の まま
+};
+
+// ---------------- すいそうが ふえたときの コイン ----------------
+// お世話の 回数の 上限（COIN.care の perDay）は すいそう ごと。
+// 1日の お世話コインの 合計上限は すいそうが ふえると すこし ふえる。
+export const MULTI_TANK = {
+  careDailyCapPerExtraTank: 25,  // 生きものが いる すいそうが 2つめ いこう 1つ ふえるごとに +25（6つで 50+125=175）。からの すいそうは 数えない
+  thanksAllTanksBase: 4,         // ありがとう は すいそう ごとに 1日4かい（COIN.thanks.perTankPerDay）、
+  thanksAllTanksPerExtra: 3,     // ぜんぶで 1日「4 + 3 ×（生きものが いる すいそう − 1）」かい まで（6つで 19）
+  emptyTankNoCareCoin: true,     // 生きものが いない すいそうの みずかえ・えさ は コイン なし
+  // ありがとう の さいてい 2じかん あける（COIN.thanks.minGapHours）は すいそう ごと
+};
+
+// ---------------- かい（貝） ----------------
+export const SNAIL = {
+  cleanPerHour: 0.15,          // かい 1ぴきで きれいさ +0.15/時間（こけを たべる）
+  algaeEaterIds: ['otocinclus'], // かい でなくても こけを たべる 生きもの（cleanPerHour だけ おなじ ように 足す）
+  leftoverPerHour: 0.06,       // かい 1ぴきで たべのこし −0.06/時間
+  // かい は space 0.5。なつき・ごきげん・ありがとう は ほかの 生きものと おなじ
+};
+
+// ---------------- ハート（なでて もらう。v0.2 は ためるだけ） ----------------
+export const HEART = {
+  perPet: 1,                   // 魚を タップして もらえる ハート
+  perFishEveryGameMinutes: 72, // おなじ 魚からは ゲーム内72ふん（現実30びょう。なつき の まち時間と おなじ）に 1こ まで
+  showReadyMark: true,         // いま ハートを くれる 魚の 上に 小さな キラキラハートを うかべる（むだな れんだを ふせぐ）
+  perDay: 20,                  // 1日（6:00 から）ぜんぶの すいそう あわせて 20こ まで。あとは なでても なつき・リアクション だけ
+  doneLine: 'きょうの ハートは いっぱい！ また あしたね',   // 20こに なった とき 1かいだけ ふきだし。あとは カウンターに「20／20」
+  restLine: 'いまは やすんでいるよ',               // けんこう < 40 の 魚を なでた とき
+  need: { health: 40 },        // げんきが ない 魚（けんこう < 40）からは もらわない（よわっている 魚を つつかせない）
+  react: 'heart',              // もらえた ときは なつき に かかわらず aq.react(uid, 'heart')、カウンターに「+1」が とんでいく
+  max: 99999,
+  // 餌を たべた ときに 水槽が 自動で 出す ハートは 数えない
+};
+
+// ---------------- そうじ（あみで すくう アニメ） ----------------
+export const SCOOP = {
+  animRealSec: 2.0,            // あみの アニメの ながさ（現実の びょう）
+  applyAt: 'end',              // たべのこし を 0 に するのは アニメの おわり
+  lockOtherCare: true,         // アニメ中は えさ・みずかえ・そうじ ボタンを おせない（時計・魚は ふつうに うごく）
+  allowWhenEmpty: true,        // たべのこし 0 でも アニメは できる（コイン・きれいさ・ミッションの かぞえ は なし）
+};
+
+// ---------------- お店の 見出し・すいそうの よびかた（v0.2） ----------------
+export const SHOP_TABS = [           // 魚タブの中を この じゅんの 見出しに わける（fish.kind）
+  { kind: 'fish', label: 'さかな' },
+  { kind: 'shrimp', label: 'エビ' },
+  { kind: 'snail', label: 'かい' },
+];
+export const WATER_LABELS = { fresh: 'かわの すいそう', salt: 'うみの すいそう' };   // 色だけに たよらず かわ・なみ の えも そえる
+export const HEART_LABEL = 'ハート';  // カウンターの よびかた（数字と ハートの え）

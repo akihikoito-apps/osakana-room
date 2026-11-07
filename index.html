@@ -24,6 +24,7 @@
     <div id="hud-time" class="pill time"><span id="hud-phase-ic" class="ic">☀️</span><span id="hud-day">1にちめ</span><span id="hud-phase">あさ</span></div>
     <div class="spacer"></div>
     <button id="btn-menu" class="pill menu-btn" hidden><span class="ic">☰</span><span class="lb">メニュー</span></button>
+    <button id="hud-hearts" class="pill hearts" aria-label="ハート"><span class="heart-ic" aria-hidden="true"></span><span class="hh-body"><span id="hud-heart-n">0</span><span id="hud-heart-day">きょう 0／20</span></span></button>
     <div id="hud-coins" class="pill coins"><span class="coin-ic" aria-hidden="true"></span><span id="hud-coin-n">100</span></div>
   </header>
 
@@ -32,12 +33,7 @@
     <div id="room-stage">
       <img id="room-bg" src="assets/room/room_base.jpg" alt="" draggable="false">
       <div id="room-night"></div>
-      <button id="room-tank" aria-label="すいそうを みる">
-        <div class="glass">
-          <div class="water"><div class="sand"></div><div id="room-tank-decor"></div><div id="room-tank-fish"></div><div class="shine"></div></div>
-        </div>
-        <div class="tank-rim"></div>
-      </button>
+      <div id="room-slots"></div>
       <div id="room-tank-tip" class="tip-bubble">タップ してね</div>
     </div>
     <nav id="room-nav" class="dock">
@@ -50,6 +46,8 @@
   <!-- すいそう -->
   <section id="scr-tank" class="screen" data-screen="tank" hidden>
     <canvas id="aq"></canvas>
+    <canvas id="aq-salt" hidden></canvas>
+    <div id="tank-title"><button class="tt-prev" aria-label="まえの すいそう">◀</button><div class="tt-body"><span class="tt-name"></span><span class="tt-water"></span><span class="tt-dots"></span></div><button class="tt-next" aria-label="つぎの すいそう">▶</button></div>
     <div id="tank-pops"></div>
     <div id="gauges" class="panel">
       <div class="gauge" data-g="temp"><div class="g-top"><span class="g-ic">🌡️</span><span class="g-lb">すいおん</span><span class="g-val"></span></div><div class="g-st"><span class="g-face"></span><span class="g-word"></span></div><div class="bar temp"><div class="band"></div><i hidden></i><div class="mark"></div></div></div>
@@ -80,8 +78,10 @@
         <button class="tab on" data-tab="fish">🐟 さかな</button>
         <button class="tab" data-tab="equip">🪨 きぐ</button>
         <button class="tab" data-tab="food">🍙 えさ</button>
+        <button class="tab tab-tanks" data-tab="tanks" hidden>🫙 すいそう</button>
       </div>
     </div>
+    <div id="shop-tank"><span class="st-lb">いれる すいそう：</span><button class="st-prev" aria-label="まえの すいそう">◀</button><span class="st-name"></span><button class="st-next" aria-label="つぎの すいそう">▶</button></div>
     <div id="shop-guide-slot"></div>
     <div id="shop-list" class="grid"></div>
   </section>
@@ -99,6 +99,9 @@
   <!-- チュートリアルの ふきだし -->
   <div id="guide" hidden><div class="guide-face">🐟</div><div class="guide-text"></div><button class="guide-ok pill" hidden>OK</button></div>
   <div id="guide-arrow" hidden>👇</div>
+
+  <!-- かいほうの おいわい -->
+  <div id="celebrate" hidden><div class="confetti"></div><div class="cel-box"><div class="cel-ic">🌊</div><div class="cel-text"></div><div class="cel-sub"></div><div class="cel-btns"><button class="btn soft cel-ok">やったー！</button><button class="btn primary cel-shop">🛒 おみせへ</button></div></div></div>
 
   <!-- ダイアログ・おしらせ -->
   <div id="dialog" class="modal" hidden><div class="modal-box"><div class="modal-body"></div><div class="modal-btns"></div></div></div>

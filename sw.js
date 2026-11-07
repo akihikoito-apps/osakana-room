@@ -1,6 +1,6 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
@@ -9,15 +9,20 @@ const FILES = [
   'js/main.js', 'js/state.js', 'js/sim.js', 'js/version.js',
   'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js',
   'js/data/fish.js', 'js/data/items.js', 'js/data/compat.js', 'js/data/balance.js', 'js/data/missions.js', 'js/data/hints.js', 'js/data/tutorial.js',
-  'js/aquarium/index.js', 'js/aquarium/tank.js', 'js/aquarium/swim.js', 'js/aquarium/fishModel.js', 'js/aquarium/fx.js', 'js/aquarium/fallbackArt.js',
+  'js/aquarium/index.js', 'js/aquarium/tank.js', 'js/aquarium/swim.js', 'js/aquarium/fishModel.js', 'js/aquarium/fx.js', 'js/aquarium/fallbackArt.js', 'js/aquarium/speciesDefaults.js', 'js/aquarium/clean.js',
   'vendor/three.module.min.js',
-  'assets/room/room_base.jpg', 'assets/room/sand.png', 'assets/room/tank_bg.png', 'assets/room/driftwood.png',
+  'assets/room/room_base.jpg', 'assets/room/room_v2.jpg', 'assets/room/room_v2_night.jpg', 'assets/room/sand.png', 'assets/room/tank_bg.png', 'assets/room/driftwood.png',
   'assets/room/plant1.png', 'assets/room/plant2.png', 'assets/room/plant3.png',
   'assets/room/stone1.png', 'assets/room/stone2.png', 'assets/room/stone3.png',
-  'assets/fish/medaka.png', 'assets/fish/guppy.png', 'assets/fish/neon_tetra.png', 'assets/fish/goldfish.png', 'assets/fish/corydoras.png',
-  'assets/fish/minami_shrimp.png', 'assets/fish/betta.png', 'assets/fish/angelfish.png', 'assets/fish/red_bee_shrimp.png', 'assets/fish/albino_corydoras.png',
-  'assets/items/air_pump.png', 'assets/items/filter.png', 'assets/items/food_flake.png', 'assets/items/heater.png', 'assets/items/light.png',
-  'assets/items/liverock.png', 'assets/items/plant.png', 'assets/items/stone.png', 'assets/items/water_change.png',
+  'assets/fish/albino_corydoras.png', 'assets/fish/angelfish.png', 'assets/fish/betta.png', 'assets/fish/blue_damsel.png', 'assets/fish/blue_tang.png',
+  'assets/fish/cherry_barb.png', 'assets/fish/clownfish.png', 'assets/fish/corydoras.png', 'assets/fish/dwarf_gourami.png', 'assets/fish/firefish.png',
+  'assets/fish/goldfish.png', 'assets/fish/guppy.png', 'assets/fish/ishimaki.png', 'assets/fish/mandarin.png', 'assets/fish/medaka.png',
+  'assets/fish/minami_shrimp.png', 'assets/fish/neon_tetra.png', 'assets/fish/otocinclus.png', 'assets/fish/platy.png', 'assets/fish/ramshorn.png',
+  'assets/fish/red_bee_shrimp.png', 'assets/fish/rummy_nose.png', 'assets/fish/shittaka.png', 'assets/fish/skunk_shrimp.png', 'assets/fish/yellow_tang.png',
+  'assets/items/air_pump.png', 'assets/items/coral.png', 'assets/items/dirt_bits.png', 'assets/items/driftwood.png', 'assets/items/filter.png',
+  'assets/items/food_flake.png', 'assets/items/food_sinking.png', 'assets/items/heart.png', 'assets/items/heater.png', 'assets/items/light.png',
+  'assets/items/liverock.png', 'assets/items/net.png', 'assets/items/plant.png', 'assets/items/stone.png', 'assets/items/tank_fresh.png',
+  'assets/items/tank_salt.png', 'assets/items/water_change.png',
 ];
 
 self.addEventListener('install', (e) => {

@@ -12,6 +12,11 @@ import { SpeciesLibrary, makeFishMaterial } from './fishModel.js';
 import { FishAgent } from './swim.js';
 import { Tank, TANK_H, TANK_D, WATER_TOP } from './tank.js';
 import { FxLayer } from './fx.js';
+import { Cleaner } from './clean.js';
+import { mergeSpec } from './speciesDefaults.js';
+
+// canvas ごとに renderer を使い回す（水槽を何度作り直しても WebGL コンテキストを増やさない）
+const RENDERERS = new WeakMap();
 
 const FOV = 30;
 const REACTIONS = ['heart', 'jump', 'spin', 'happy', 'sad', 'thanks', 'sleepy'];
@@ -22,13 +27,18 @@ const REACTIONS = ['heart', 'jump', 'spin', 'happy', 'sad', 'thanks', 'sleepy'];
  */
 export function createAquarium(canvas, opts = {}) {
   const speciesList = opts.species || FISH;
-  const specOf = (id) => speciesList.find((s) => s.id === id) || { id, name: id, kind: 'fish', look: {}, swim: {} };
+  const specCache = new Map();
+  const specOf = (id) => { if (!specCache.has(id)) specCache.set(id, mergeSpec(id, speciesList.find((s) => s.id === id))); return specCache.get(id); };
   const rootUrl = new URL('../../', import.meta.url).href;
   const autoHeart = opts.autoHeartOnEat !== false;
   const lookEnabled = opts.look !== false;
   const maxDpr = Math.min(2, opts.maxPixelRatio || 2);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, alpha: false, powerPreference: 'high-performance' });
+  let renderer = RENDERERS.get(canvas);
+  if (!renderer) {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, alpha: false, powerPreference: 'high-performance' });
+    RENDERERS.set(canvas, renderer);
+  }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x0d1d24, 1);
   let dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
@@ -38,6 +48,7 @@ export function createAquarium(canvas, opts = {}) {
   const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 80);
   const tank = new Tank(scene, opts.water || 'fresh');
   const fx = new FxLayer(scene);
+  const cleaner = new Cleaner(scene, tank, fx);
   const lib = new SpeciesLibrary(rootUrl);
 
   /** @type {Map<string, {agent: FishAgent, mesh: THREE.Mesh, mat: THREE.Material}>} */
@@ -46,6 +57,7 @@ export function createAquarium(canvas, opts = {}) {
   const emit = (name, data) => { for (const fn of listeners[name] || []) { try { fn(data); } catch (e) { console.error(e); } } };
 
   let camDist = 12;
+  let disposed = false;
   const ctx = { minLen: 0 };
   let cssW = 1, cssH = 1;
   let look = { yaw: 0, pitch: 0, tYaw: 0, tPitch: 0, idle: 0 };
@@ -64,7 +76,7 @@ export function createAquarium(canvas, opts = {}) {
     if (Math.abs(W - tank.W) > 0.01) {
       tank.build(W);
       // 水槽の外に出た魚を中に戻す
-      for (const f of fishes.values()) f.agent.clampToTank(tank.bounds, f.agent.isShrimp);
+      for (const f of fishes.values()) { f.agent.clampToTank(tank.bounds, f.agent.onFloor); if (f.agent.onFloor) { f.agent.surf = 'ground'; f.agent.pos.y = tank.groundHeight(f.agent.pos.x, f.agent.pos.z); } }
     }
     // 前面（W×H）がちょうど画面に入る距離
     const t = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
@@ -104,10 +116,11 @@ export function createAquarium(canvas, opts = {}) {
     const entry = lib.get(spec, upgradeHandler);
     const agent = new FishAgent(info, spec, tank.bounds);
     agent.heightRatio = entry.geometry.userData.heightRatio || 0.3;
-    agent.pos.y = agent.isShrimp ? tank.sandHeight(agent.pos.x, agent.pos.z) : agent.pos.y;
-    agent.clampToTank(tank.bounds, agent.isShrimp);
+    agent.clampToTank(tank.bounds, agent.onFloor);
+    if (agent.onFloor && agent.surf !== 'glass') agent.pos.y = tank.groundHeight(agent.pos.x, agent.pos.z);
     const mat = makeFishMaterial(entry.texture);
     if (agent.isShrimp) mat.userData.u.uK.value = 3;
+    if (agent.isSnail) { mat.userData.u.uAmp.value = 0; mat.userData.u.uRim.value = 0.5; }
     const mesh = new THREE.Mesh(entry.geometry, mat);
     mesh.rotation.order = 'YZX';
     mesh.userData.uid = info.uid;
@@ -243,11 +256,15 @@ export function createAquarium(canvas, opts = {}) {
     ctx.fishes = [...fishes.values()].map((f) => f.agent);
     updateSchools(dt);
     tank.update(dt);
+    cleaner.update(dt, ctx);
     for (const f of fishes.values()) {
       const a = f.agent;
       a.update(dt, ctx);
       const u = f.mat.userData.u;
-      f.mesh.position.set(a.pos.x, a.pos.y + a.oy, a.pos.z + a.oz);
+      // 貝は体の下（あし）が地面・ガラスにつくように持ち上げる
+      const lift = a.isSnail ? a.len * a.heightRatio * 0.42 : 0;
+      if (a.isSnail && a.surf === 'glass') f.mesh.position.set(a.pos.x - Math.sin(a.pitch) * lift * Math.cos(a.yaw), a.pos.y + a.oy + Math.cos(a.pitch) * lift, a.pos.z + a.oz);
+      else f.mesh.position.set(a.pos.x, a.pos.y + a.oy + lift, a.pos.z + a.oz);
       f.mesh.rotation.y = a.renderYaw();
       f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
       f.mesh.rotation.x = 0;
@@ -331,7 +348,18 @@ export function createAquarium(canvas, opts = {}) {
     },
     start() { if (running) return; running = true; last = performance.now(); raf = requestAnimationFrame(frame); },
     stop() { running = false; cancelAnimationFrame(raf); },
-    dispose() {
+    /** 確認用（中身を見るだけ）。 */
+    get _agents() { return [...fishes.values()].map((f) => f.agent); },
+    /** そうじのアニメ（約3秒）。終わると解決する Promise を返す。 */
+    playClean() { return cleaner.play(); },
+    /**
+     * 後片付け。canvas をまた使うなら dispose() のまま（renderer を使い回す）。
+     * canvas ごと捨てるときは dispose({ releaseContext: true }) で WebGL コンテキストも手放す。
+     * 戻り値：片付けたあとに残った GPU の geometry / texture の数（0 なら漏れなし）。
+     */
+    dispose(o = {}) {
+      if (disposed) return null;
+      disposed = true;
       api.stop();
       ro?.disconnect();
       window.removeEventListener('resize', resize);
@@ -340,9 +368,13 @@ export function createAquarium(canvas, opts = {}) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       for (const uid of [...fishes.keys()]) removeFish(uid);
-      fx.dispose(); tank.dispose(); lib.dispose();
-      renderer.dispose();
+      cleaner.dispose(); fx.dispose(); tank.dispose(); lib.dispose();
+      scene.clear();
+      renderer.renderLists.dispose();
+      const left = { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length ?? 0 };
+      if (o.releaseContext) { renderer.dispose(); renderer.forceContextLoss(); RENDERERS.delete(canvas); }
       listeners.eat.clear(); listeners.tapFish.clear();
+      return left;
     },
     /** 確認用：今の fps と解像度倍率。 */
     get stats() {

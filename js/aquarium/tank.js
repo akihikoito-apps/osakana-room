@@ -9,7 +9,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 const WATER_COLORS = {
   fresh: { top: new THREE.Color('#a4e4e8'), mid: new THREE.Color('#3a98ad'), deep: new THREE.Color('#1b5873'), fog: new THREE.Color('#4aa2b4'), sand: new THREE.Color('#d7c7a2') },
-  salt:  { top: new THREE.Color('#a8e6ff'), mid: new THREE.Color('#2f8ec4'), deep: new THREE.Color('#174f86'), fog: new THREE.Color('#3f97c8'), sand: new THREE.Color('#efe8d8') },
+  salt:  { top: new THREE.Color('#b4ecff'), mid: new THREE.Color('#2a8fd6'), deep: new THREE.Color('#123f8a'), fog: new THREE.Color('#3b9be0'), sand: new THREE.Color('#f6f2e8') },
 };
 const MURK = new THREE.Color('#6d8a3c');
 const NIGHT = new THREE.Color('#132a55');
@@ -22,6 +22,39 @@ function vnoise(x, z) {
   const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
   const a = hash2(xi, zi), b = hash2(xi + 1, zi), c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+/** 同じ材質のメッシュを1つにまとめる（描画回数を減らす）。 */
+function mergeMeshes(meshes, material) {
+  const pos = [], nor = [];
+  for (const m of meshes) {
+    m.updateMatrix();
+    const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+    g.dispose(); m.geometry.dispose();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  return new THREE.Mesh(g, material);
+}
+
+/** 底のごみの仮の絵（茶色の葉っぱ）。dirt_bits.png が読めたら差し替える。 */
+function makeDirtTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const g = cv.getContext('2d');
+  const cols = ['#8a4f22', '#a8642c', '#6e3e1c', '#b97a3a'];
+  for (let i = 0; i < 5; i++) {
+    g.save(); g.translate(40 + (i % 3) * 22, 40 + Math.floor(i / 2) * 20); g.rotate(i * 1.3);
+    g.fillStyle = cols[i % 4]; g.beginPath(); g.ellipse(0, 0, 30, 17, 0, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(60,30,10,0.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(-26, 0); g.lineTo(26, 0); g.stroke();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 /** 光の網目（コースティクス）のタイル画像。ボロノイの境目を明るく。 */
@@ -126,7 +159,7 @@ export class Tank {
     this.time = 0;
     this.caustic = makeCausticTexture();
     this.rayTex = rayTexture();
-    this.uniforms = { uTime: { value: 0 }, uCaustic: { value: this.caustic }, uCausticAmt: { value: 0.35 }, uLight: { value: 1 }, uHalfW: { value: 8 } };
+    this.uniforms = { uTime: { value: 0 }, uCaustic: { value: this.caustic }, uCausticAmt: { value: 0.35 }, uLight: { value: 1 }, uHalfW: { value: 8 }, uGrain: { value: waterType === 'salt' ? 22 : 38 } };
     this.sandSeed = Math.random() * 100;
 
     // 光
@@ -136,7 +169,8 @@ export class Tank {
     scene.add(this.hemi, this.sun);
     scene.fog = new THREE.Fog(this.colors.fog.clone(), 10, 40);
 
-    this.bounds = { minX: -7, maxX: 7, minZ: -2.6, maxZ: 2.7, top: WATER_TOP, sandY: (x, z) => this.sandHeight(x, z) };
+    this.rocks = [];
+    this.bounds = { minX: -7, maxX: 7, minZ: -2.6, maxZ: 2.7, top: WATER_TOP, glassZ: -TANK_D / 2 + 0.12, sandY: (x, z) => this.sandHeight(x, z), groundY: (x, z) => this.groundHeight(x, z) };
 
     // 泡
     this.bubbleTex = bubbleTexture();
@@ -161,7 +195,8 @@ export class Tank {
     mg.setAttribute('position', new THREE.BufferAttribute(mp, 3));
     mg.setAttribute('aSize', new THREE.BufferAttribute(ms, 1));
     mg.setAttribute('aAlpha', new THREE.BufferAttribute(ma, 1));
-    this.motes = new THREE.Points(mg, pointsMaterial(moteTexture(), 0xf4fff4, true));
+    this.moteTex = moteTexture();
+    this.motes = new THREE.Points(mg, pointsMaterial(this.moteTex, 0xf4fff4, true));
     this.motes.frustumCulled = false;
     this.motes.renderOrder = 2;
     this.motePh = Array.from({ length: this.moteCount }, () => [Math.random(), Math.random(), Math.random(), Math.random() * 6]);
@@ -186,6 +221,20 @@ export class Tank {
       return new THREE.CanvasTexture(cv);
     })();
 
+    // 底のごみ（にごりに合わせて手前の砂の上に出る。そうじの あみ が すくう）
+    this.dirtTex = makeDirtTexture();
+    this.dirtMat = new THREE.MeshLambertMaterial({ map: this.dirtTex, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    this.dirtMat.userData.shared = true;
+    this.dirtPatches = [];
+    const dimg = new Image();
+    dimg.onload = () => {
+      if (this.disposed) return;
+      // 大きさがちがう絵なので、テクスチャごと作りなおす（同じテクスチャに入れ替えると GL のエラーになる）
+      const t = new THREE.Texture(dimg); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+      this.dirtTex.dispose(); this.dirtTex = t; this.dirtMat.map = t; this.dirtMat.needsUpdate = true;
+    };
+    dimg.onerror = () => {};
+    dimg.src = new URL('../../assets/items/dirt_bits.png', import.meta.url).href;
     this.build(16);
   }
 
@@ -194,6 +243,17 @@ export class Tank {
     const d = (z + TANK_D / 2) / TANK_D;            // 0=奥 1=手前
     const back = 0.75 + (1 - d) * (1 - d) * 0.9;
     return back + (vnoise(x * 0.35 + this.sandSeed, z * 0.35) - 0.5) * 0.3;
+  }
+
+  /** 砂と石・ライブロックの上の高さ（貝・はりつく魚用）。 */
+  groundHeight(x, z) {
+    let y = this.sandHeight(x, z);
+    for (const r of this.rocks) {
+      const u = (x - r.x) / r.rx, v = (z - r.z) / r.rz;
+      const q = 1 - u * u - v * v;
+      if (q > 0) y = Math.max(y, r.base + (r.top - r.base) * Math.sqrt(q));
+    }
+    return y;
   }
 
   /** 横幅 W で水槽を作りなおす（画面の縦横比が変わったとき）。 */
@@ -240,10 +300,10 @@ export class Tank {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;')
         .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWp = (modelMatrix * vec4(transformed,1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-        varying vec3 vWp; uniform float uTime; uniform sampler2D uCaustic; uniform float uCausticAmt; uniform float uLight; uniform float uHalfW;
+        varying vec3 vWp; uniform float uTime; uniform sampler2D uCaustic; uniform float uCausticAmt; uniform float uLight; uniform float uHalfW; uniform float uGrain;
         float sgrain(vec2 p){ return fract(sin(dot(floor(p), vec2(12.9898,78.233))) * 43758.5453); }`)
         .replace('#include <color_fragment>', `#include <color_fragment>
-          float gr = sgrain(vWp.xz * 38.0) * 0.5 + sgrain(vWp.xz * 17.0 + 3.1) * 0.5;
+          float gr = sgrain(vWp.xz * uGrain) * 0.5 + sgrain(vWp.xz * uGrain * 0.45 + 3.1) * 0.5;
           diffuseColor.rgb *= 0.86 + gr * 0.22;`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           vec2 cu = vWp.xz * 0.16;
@@ -347,7 +407,46 @@ export class Tank {
     mp.needsUpdate = true;
 
     this.setDecor(this.decorIds, true);
+    this.buildDirt();
     this.applyWater();
+  }
+
+  /** 底のごみを置きなおす（まんなかの帯 z=-0.5〜0.5 にならべる。手前すぎるとボタンにかくれる）。 */
+  buildDirt() {
+    for (const d of this.dirtPatches) { this.scene.remove(d.mesh); d.mesh.geometry.dispose(); }
+    this.dirtPatches = [];
+    const R = rng(55), W = this.W;
+    const N = 9;
+    for (let i = 0; i < N; i++) {
+      const x = (-0.4 + (0.8 * (i + 0.2 + R() * 0.6)) / N) * W;
+      const z = -0.5 + R() * 1.0;
+      const sz = 0.7 + R() * 0.35;
+      const g = new THREE.PlaneGeometry(sz, sz);
+      const m = new THREE.Mesh(g, this.dirtMat);
+      m.rotation.set(-Math.PI / 2 + 0.55, 0, R() * 6);   // 少し手前に起こして見やすく
+      const y = this.sandHeight(x, z) + 0.06;
+      m.position.set(x, y, z);
+      m.renderOrder = 1;
+      m.visible = false;
+      this.scene.add(m);
+      this.dirtPatches.push({ mesh: m, x, y, z, order: R(), caught: false });
+    }
+    // 出る順番（にごりが少ないときは ちらほら）
+    this.dirtPatches.sort((a, b) => a.order - b.order);
+  }
+
+  /** にごりの見た目に合わせて ごみの数を変える。 */
+  updateDirtPatches() {
+    const d = this.dirtShown ?? this.water.dirt;
+    const n = Math.round(d * this.dirtPatches.length * 1.1);
+    const cleaned = this.cleanedPatches && (this.time < this.cleanedUntil || d > this.water.dirt + 0.01) ? this.cleanedPatches : null;
+    if (!cleaned) this.cleanedPatches = null;
+    this.dirtPatches.forEach((p, i) => {
+      if (p.caught) return;   // あみの中のものは そうじ係が動かす
+      p.mesh.visible = i < n && !(cleaned && cleaned.includes(p));   // すくったごみは にごりが下がりきるまで出さない
+      p.mesh.position.set(p.x, p.y, p.z);
+      p.mesh.scale.setScalar(1);
+    });
   }
 
   // ---------------- 飾り・器具 ----------------
@@ -362,13 +461,14 @@ export class Tank {
     const W = this.W, D = TANK_D;
     const used = {};
     const restFrom = [];
+    const rockFrom = [], coralFrom = [], woodFrom = [];
     const builders = {
       stone: (i) => this.makeStones(i === 0 ? -0.24 * W : 0.12 * W, -1.2 - i * 0.6, 21 + i),
       rock: (i) => this.makeStones(0.1 * W, -1.5, 31 + i),
       plant: (i) => { const s = [[-0.4, -2.5], [0.33, -2.6], [-0.08, -2.7], [0.42, -1.3]][i % 4]; return this.makePlant(s[0] * W, s[1], 5 + i); },
       driftwood: () => this.makeDriftwood(0.02 * W, -1.9),
-      liverock: (i) => this.makeLiverock((0.18 - i * 0.4) * W, -1.6),
-      coral: (i) => this.makeCoral((-0.3 + i * 0.5) * W, -2.0),
+      liverock: (i) => this.makeLiverock([0.16, -0.26, 0.36][i % 3] * W, [-1.6, -1.9, -2.2][i % 3], i),
+      coral: (i) => this.makeCoral([-0.3, 0.05, 0.38][i % 3] * W, [-1.3, -2.4, -1.0][i % 3], i),
       air_pump: () => this.makeAirStone(0.27 * W, -2.5),
       air: () => this.makeAirStone(0.27 * W, -2.5),
       heater: () => this.makeHeater(-0.44 * W, -D / 2 + 0.35),
@@ -382,6 +482,9 @@ export class Tank {
       if (obj) {
         this.decorGroup.add(obj);
         if (['stone', 'rock', 'plant', 'driftwood', 'liverock', 'coral'].includes(id) || !fn) restFrom.push(obj);
+        if (['stone', 'rock', 'liverock'].includes(id) || !fn) rockFrom.push(obj);
+        if (id === 'coral' || id === 'liverock') coralFrom.push(obj);
+        if (id === 'driftwood') woodFrom.push(obj);
       }
     }
     // 休む場所（石・水草・流木の手前、底から少し上）
@@ -395,6 +498,23 @@ export class Tank {
     }
     if (!spots.length) for (const fx of [-0.3, 0.3]) spots.push({ x: fx * W, z: -0.5, y: this.sandHeight(fx * W, -0.5) + 1.3 });
     this.bounds.restSpots = spots;
+    // 石の上の高さ（貝が上を這う）
+    this.rocks = [];
+    for (const g of rockFrom) for (const m of g.children) {
+      if (!m.isMesh || m.userData.noGround) continue;
+      const bx = new THREE.Box3().setFromObject(m);
+      this.rocks.push({ x: (bx.min.x + bx.max.x) / 2, z: (bx.min.z + bx.max.z) / 2, rx: (bx.max.x - bx.min.x) * 0.45, rz: (bx.max.z - bx.min.z) * 0.45, top: bx.max.y, base: this.sandHeight((bx.min.x + bx.max.x) / 2, (bx.min.z + bx.max.z) / 2) });
+    }
+    this.bounds.rocks = this.rocks;
+    // サンゴ・ライブロックのそば（クマノミがいる場所）
+    this.bounds.coralSpots = coralFrom.map((o) => { const bx = new THREE.Box3().setFromObject(o); return { x: (bx.min.x + bx.max.x) / 2, y: bx.max.y, z: Math.min(bx.max.z + 0.3, this.bounds.maxZ - 0.3) }; });
+    // はりつく場所（奥のガラス・流木の手前・石の上）
+    const cs = [];
+    const gz = this.bounds.glassZ;
+    for (let i = 0; i < 6; i++) { const x = (-0.38 + i * 0.15) * W; cs.push({ x, y: this.sandHeight(x, gz) + 0.9 + (i % 3) * 1.1, z: gz, glass: true }); }
+    for (const o of woodFrom) { const bx = new THREE.Box3().setFromObject(o); for (const f of [0.3, 0.6]) cs.push({ x: bx.min.x + (bx.max.x - bx.min.x) * f, y: bx.min.y + (bx.max.y - bx.min.y) * 0.35, z: Math.min(bx.max.z, this.bounds.maxZ - 0.3) }); }
+    for (const r of this.rocks) if (r.top - r.base > 0.4) cs.push({ x: r.x, y: r.top + 0.12, z: r.z + r.rz * 0.4 });
+    this.bounds.clingSpots = cs;
     // setWater で bubbles: true なのに エアポンプが無いときは、エアストーンを自動で置く
     this.autoStone = null;
     this.applyWater();
@@ -437,79 +557,125 @@ export class Tank {
     return grp;
   }
 
-  makeLiverock(x, z) {
+  makeLiverock(x, z, n = 0) {
     const grp = new THREE.Group();
-    const R = rng(91);
-    const cols = ['#9b6c8e', '#b88a77', '#8a6aa0', '#c39a7a'];
-    for (let i = 0; i < 4; i++) {
-      const r = [1.1, 0.8, 0.6, 0.55][i];
-      const m = new THREE.Mesh(this.rockGeometry(200 + i, r, 0.8), new THREE.MeshLambertMaterial({ color: cols[i], flatShading: true }));
-      const px = x + [0, 0.9, -0.8, 0.2][i], pz = z + [0, 0.3, 0.2, -0.3][i];
-      m.position.set(px, this.sandHeight(px, pz) + [0.2, 0.1, 0.1, 1.0][i], pz);
-      m.rotation.set(R(), R() * 6, R());
+    const R = rng(91 + n * 17);
+    const tan = new THREE.Color('#c9a98a'), purple = new THREE.Color('#9a5ca8'), pink = new THREE.Color('#e3829a'), dark = new THREE.Color('#6b5248');
+    const parts = [[0, 0.25, 0, 1.15, 0.8], [1.0, 0.15, 0.35, 0.8, 0.75], [-0.95, 0.1, 0.25, 0.7, 0.8], [0.25, 1.15, -0.1, 0.6, 0.85], [-0.4, 0.95, 0.2, 0.45, 0.9]];
+    for (let i = 0; i < parts.length; i++) {
+      const [ox, oy, oz, r, flat] = parts[i];
+      const g = this.rockGeometry(200 + n * 10 + i, r, flat);
+      const p = g.attributes.position;
+      const col = new Float32Array(p.count * 3);
+      const c = new THREE.Color();
+      for (let k = 0; k < p.count; k++) {
+        const vx = p.getX(k), vy = p.getY(k), vz = p.getZ(k);
+        const m1 = vnoise(vx * 2.2 + i * 3, vz * 2.2 + vy * 1.7);
+        const hole = vnoise(vx * 6.3 + 9, vy * 6.3 + vz * 5.1);
+        c.copy(tan).lerp(purple, clamp((m1 - 0.45) * 2.5, 0, 1)).lerp(pink, clamp((vy / r - 0.3) * m1, 0, 0.5));
+        if (hole > 0.72) c.lerp(dark, 0.7);   // 小さな穴
+        col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      const px = x + ox, pz = z + oz;
+      m.position.set(px, this.sandHeight(px, pz) + oy, pz);
+      m.rotation.set((R() - 0.5) * 0.6, R() * 6, (R() - 0.5) * 0.6);
       grp.add(m);
     }
     return grp;
   }
 
-  makeCoral(x, z) {
+  /** サンゴ：0=えだサンゴ＋のうサンゴ、1=イソギンチャク、2=きいろい えだサンゴ。 */
+  makeCoral(x, z, n = 0) {
     const grp = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ color: '#ff8a8a' });
-    const R = rng(77);
+    const kind = n % 3;
+    const R = rng(77 + n * 5);
     const base = this.sandHeight(x, z);
-    const branch = (px, py, pz, len, ang, depth) => {
-      const g = new THREE.CylinderGeometry(0.06 * (depth + 1) * 0.6, 0.08 * (depth + 1) * 0.6, len, 6);
+    if (kind === 1) {
+      // イソギンチャク（台の石＋ゆれる触手）
+      const rockG = this.rockGeometry(300 + n, 0.7, 0.7);
+      const rock = new THREE.Mesh(rockG, new THREE.MeshLambertMaterial({ color: '#b48f80', flatShading: true }));
+      rock.position.set(x, base + 0.15, z); rock.userData.noGround = true;
+      grp.add(rock);
+      const ane = this.makeBlades(x, z, 400 + n, { y: base + 0.55, blades: 46, hMin: 0.7, hMax: 1.25, w: 0.11, spread: 0.75, cA: '#c86bd8', cB: '#ffd1f0', radial: true, sway: 1.6 });
+      grp.add(ane);
+      return grp;
+    }
+    const mat = new THREE.MeshLambertMaterial({ color: kind === 0 ? '#ff7d9a' : '#ffc93a' });
+    const branch = (px, py, pz, len, ang, tilt, depth) => {
+      const g = new THREE.CylinderGeometry(0.05 * (depth + 1) * 0.55, 0.075 * (depth + 1) * 0.55, len, 7);
       g.translate(0, len / 2, 0);
       const m = new THREE.Mesh(g, mat);
-      m.position.set(px, py, pz); m.rotation.z = ang; m.rotation.x = (R() - 0.5) * 0.6;
+      m.position.set(px, py, pz); m.rotation.z = ang; m.rotation.x = tilt;
       grp.add(m);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05 * (depth + 1) * 0.6, 6, 4), mat);
+      tip.position.set(px - Math.sin(ang) * len, py + Math.cos(ang) * Math.cos(tilt) * len, pz + Math.sin(tilt) * len);
+      grp.add(tip);
       if (depth > 0) {
-        const ex = px - Math.sin(ang) * len, ey = py + Math.cos(ang) * len;
-        branch(ex, ey, pz, len * 0.75, ang - 0.5, depth - 1);
-        branch(ex, ey, pz, len * 0.75, ang + 0.45, depth - 1);
+        const ex = tip.position.x, ey = tip.position.y, ez = tip.position.z;
+        branch(ex, ey, ez, len * 0.78, ang - 0.45 - R() * 0.2, tilt + (R() - 0.5) * 0.5, depth - 1);
+        branch(ex, ey, ez, len * 0.78, ang + 0.4 + R() * 0.2, tilt + (R() - 0.5) * 0.5, depth - 1);
       }
     };
-    branch(x, base, z, 0.9, 0, 3);
+    for (let k = 0; k < 3; k++) branch(x + (k - 1) * 0.5, base - 0.05, z + (R() - 0.5) * 0.4, 0.8 + R() * 0.3, (k - 1) * 0.35, (R() - 0.5) * 0.4, 3);
+    const parts = [...grp.children];
+    grp.clear();
+    grp.add(mergeMeshes(parts, mat));
+    if (kind === 0) {
+      // のうサンゴ（まるい・みぞ）
+      const g = new THREE.SphereGeometry(0.75, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.55);
+      const p = g.attributes.position;
+      const col = new Float32Array(p.count * 3);
+      const c1 = new THREE.Color('#a3c25a'), c2 = new THREE.Color('#5f7d33');
+      for (let k = 0; k < p.count; k++) {
+        const v = Math.sin((p.getX(k) * 9 + Math.sin(p.getZ(k) * 7) * 1.5)) * 0.5 + 0.5;
+        const c = c1.clone().lerp(c2, v > 0.6 ? 1 : 0);
+        col[k * 3] = c.r; col[k * 3 + 1] = c.g; col[k * 3 + 2] = c.b;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const brain = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      brain.position.set(x + 1.4, base - 0.1, z + 0.4); brain.scale.y = 0.8;
+      grp.add(brain);
+    }
     return grp;
   }
 
-  makePlant(x, z, seed) {
-    const grp = new THREE.Group();
+  /** ゆれる葉・触手の束（水草とイソギンチャクで共用）。 */
+  makeBlades(x, z, seed, o) {
     const R = rng(seed * 13);
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     const U = this.uniforms;
+    const sw = (o.sway || 1).toFixed(2);
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = U.uTime;
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime; attribute float aPh;')
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime; attribute float aPh; attribute float aH;')
         .replace('#include <begin_vertex>', `vec3 transformed = vec3(position);
-          float hh = max(position.y, 0.0);
-          transformed.x += sin(uTime * 0.9 + aPh + hh * 0.5) * 0.06 * hh * hh * 0.25;
-          transformed.z += cos(uTime * 0.7 + aPh * 1.3) * 0.04 * hh * hh * 0.25;`);
+          float hh = max(aH, 0.0);
+          transformed.x += sin(uTime * 0.9 * ${sw} + aPh + hh * 0.5) * 0.06 * hh * hh * 0.25 * ${sw};
+          transformed.z += cos(uTime * 0.7 * ${sw} + aPh * 1.3) * 0.04 * hh * hh * 0.25 * ${sw};`);
     };
-    const pos = [], colr = [], ph = [], idx = [];
-    const cA = new THREE.Color('#2f7a2c'), cB = new THREE.Color('#7fcf4a');
-    const blades = 11;
+    mat.customProgramCacheKey = () => 'blades' + sw;
+    const pos = [], colr = [], ph = [], hs = [], idx = [];
+    const cA = new THREE.Color(o.cA), cB = new THREE.Color(o.cB);
     let vi = 0;
-    for (let k = 0; k < blades; k++) {
-      const h = 2.6 + R() * 3.4;
-      const w = 0.16 + R() * 0.12;
-      const lean = (R() - 0.5) * 0.9;
-      const bx = (R() - 0.5) * 0.9, bz = (R() - 0.5) * 0.7;
-      const rot = R() * Math.PI;
-      const p = R() * 6;
-      const segs = 8;
-      for (let s = 0; s <= segs; s++) {
-        const t = s / segs;
-        const y = t * h;
-        const ww = w * (1 - t * 0.75) * (t < 0.08 ? 0.6 : 1);
-        const cx = bx + lean * t * t * h * 0.25;
+    for (let k = 0; k < o.blades; k++) {
+      const h = o.hMin + R() * (o.hMax - o.hMin);
+      const w = o.w * (0.8 + R() * 0.5);
+      let bx, bz, lx, lz;
+      if (o.radial) { const a = R() * Math.PI * 2, rr = Math.sqrt(R()) * o.spread * 0.6; bx = Math.cos(a) * rr; bz = Math.sin(a) * rr * 0.7; lx = Math.cos(a) * 0.5; lz = Math.sin(a) * 0.35; }
+      else { bx = (R() - 0.5) * o.spread; bz = (R() - 0.5) * o.spread * 0.8; lx = (R() - 0.5) * 0.9; lz = 0; }
+      const rot = R() * Math.PI, p = R() * 6, segs = 8;
+      for (let s2 = 0; s2 <= segs; s2++) {
+        const t = s2 / segs, y = t * h;
+        const ww = w * (o.radial ? (1 - t * 0.35) : (1 - t * 0.75) * (t < 0.08 ? 0.6 : 1));
+        const cx = bx + lx * t * t * h * 0.3, cz = bz + lz * t * t * h * 0.3;
         for (const side of [-1, 1]) {
-          pos.push(cx + Math.cos(rot) * ww * side * 0.5, y, bz + Math.sin(rot) * ww * side * 0.5);
-          const c = cA.clone().lerp(cB, t * 0.8 + R() * 0.1);
-          colr.push(c.r, c.g, c.b);
-          ph.push(p);
+          pos.push(cx + Math.cos(rot) * ww * side * 0.5, y, cz + Math.sin(rot) * ww * side * 0.5);
+          const c = cA.clone().lerp(cB, o.radial ? Math.pow(t, 2.5) : t * 0.8 + R() * 0.1);
+          colr.push(c.r, c.g, c.b); ph.push(p); hs.push(y * (o.radial ? 2.2 : 1));
         }
-        if (s < segs) { const a = vi + s * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+        if (s2 < segs) { const a2 = vi + s2 * 2; idx.push(a2, a2 + 1, a2 + 2, a2 + 1, a2 + 3, a2 + 2); }
       }
       vi += (segs + 1) * 2;
     }
@@ -517,11 +683,17 @@ export class Tank {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
     g.setAttribute('aPh', new THREE.Float32BufferAttribute(ph, 1));
+    g.setAttribute('aH', new THREE.Float32BufferAttribute(hs, 1));
     g.setIndex(idx);
     g.computeVertexNormals();
     const m = new THREE.Mesh(g, mat);
-    m.position.set(x, this.sandHeight(x, z) - 0.1, z);
-    grp.add(m);
+    m.position.set(x, o.y ?? this.sandHeight(x, z) - 0.1, z);
+    return m;
+  }
+
+  makePlant(x, z, seed) {
+    const grp = new THREE.Group();
+    grp.add(this.makeBlades(x, z, seed, { blades: 11, hMin: 2.6, hMax: 6.0, w: 0.2, spread: 0.9, cA: '#2f7a2c', cB: '#7fcf4a' }));
     return grp;
   }
 
@@ -621,7 +793,10 @@ export class Tank {
 
   // ---------------- 水のようす ----------------
   setWater(w = {}) {
-    if (w.dirt !== undefined) this.water.dirt = clamp(+w.dirt || 0, 0, 1);
+    if (w.dirt !== undefined) {
+      this.water.dirt = clamp(+w.dirt || 0, 0, 1);
+      if (!this.dirtInit) { this.dirtShown = this.water.dirt; this.dirtInit = true; }
+    }
     if (w.light !== undefined) this.water.light = clamp(+w.light, 0, 1);
     if (w.bubbles !== undefined) this.water.bubbles = w.bubbles;
     this.applyWater();
@@ -630,7 +805,8 @@ export class Tank {
   get hasLightDecor() { return this.decorIds.includes('light'); }
 
   applyWater() {
-    const { dirt } = this.water;
+    const dirt = this.dirtShown ?? this.water.dirt;
+    if (this.dirtPatches) this.updateDirtPatches();
     const light = clamp(this.water.light * (this.hasLightDecor ? 1.12 : 1), 0, 1.15);
     const lf = 0.2 + 0.8 * light;
     if (this.water.bubbles === true) this._ensureAutoStone();
@@ -654,7 +830,8 @@ export class Tank {
 
   /** 霧の距離はカメラとの距離で決める。 */
   setFogRange(camDist) {
-    const d = this.water.dirt;
+    this.camDist = camDist;
+    const d = this.dirtShown ?? this.water.dirt;
     this.scene.fog.near = camDist - 1 - d * 6;
     this.scene.fog.far = camDist + TANK_D + 14 - d * (TANK_D + 9);
   }
@@ -707,7 +884,8 @@ export class Tank {
         if (f.pos.y <= sand) { f.pos.y = sand; f.landed = true; f.landT = 0; }
       } else {
         f.landT += dt;
-        if (f.landT > 30) { f.fade -= dt * 0.5; if (f.fade <= 0) { f.alive = false; f.gone = true; continue; } }
+        // 底の粒は 貝やエビが来るまで しばらく残る
+        if (f.landT > 90) { f.fade -= dt * 0.5; if (f.fade <= 0) { f.alive = false; f.gone = true; continue; } }
       }
       q.setFromEuler(_e.set(f.sway, f.age * 0.6 + f.sway, 0));
       s.setScalar(Math.min(1, f.fade) * Math.min(1, (f.age + 0.2) * 3));
@@ -731,6 +909,14 @@ export class Tank {
   // ---------------- 毎フレーム ----------------
   update(dt) {
     this.time += dt;
+    if (this.cleanedPatches) { if (this.cleanedUntil === undefined || this.cleanedUntil < 0) this.cleanedUntil = this.time + 3; this.updateDirtPatches(); if (!this.cleanedPatches) this.cleanedUntil = -1; }
+    // にごりの見た目は少しずつ変える（そうじ中は あみが出ていくまで待つ）
+    const ds = this.dirtShown ?? this.water.dirt;
+    if (!this.holdDirt && Math.abs(ds - this.water.dirt) > 0.001) {
+      this.dirtShown = ds + clamp(this.water.dirt - ds, -dt * 0.9, dt * 0.9);
+      this.applyWater();
+      if (this.camDist) this.setFogRange(this.camDist);
+    }
     this.uniforms.uTime.value = this.time;
     // 光の筋
     for (const r of this.rays) {
@@ -788,9 +974,12 @@ export class Tank {
   dispose() {
     const kill = (o) => o.traverse((c) => { c.geometry?.dispose(); if (c.material) { c.material.map?.dispose(); c.material.dispose(); } });
     kill(this.group); kill(this.decorGroup);
+    this.disposed = true;
+    for (const d of this.dirtPatches) { this.scene.remove(d.mesh); d.mesh.geometry.dispose(); }
+    this.dirtMat.dispose(); this.dirtTex.dispose();
     kill(this.bubblePoints); kill(this.motes); kill(this.foodMesh);
     for (const r of this.ripples) kill(r.m);
-    this.caustic.dispose(); this.rayTex.dispose(); this.bubbleTex.dispose(); this.rippleTex.dispose();
+    this.caustic.dispose(); this.rayTex.dispose(); this.bubbleTex.dispose(); this.rippleTex.dispose(); this.moteTex.dispose();
     this.scene.remove(this.group, this.decorGroup, this.bubblePoints, this.motes, this.foodMesh, this.hemi, this.sun);
   }
 }

@@ -131,6 +131,7 @@ function finish() {
   G.saveNow();
   G.handleEvents(G.sim.checkMissions(G.state));
   G.emit('changed');
+  G.emit('tutorialDone');
 }
 
 function hideGuide() {

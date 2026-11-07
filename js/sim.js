@@ -28,6 +28,14 @@ const FALLBACK = {
   NAKAYOSHI: { value: { 0: 20, 1: 60, 2: 100 }, alone: 50, aloneSchool: 40 },
   GROW: { goodHour: { onaka: 20, health: 60, tempInRange: true }, feedBonusHours: 2, feedBonusPerDay: 4, hoursPerGrowDay: 20 },
   COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, thanks: { chancePerHour: 0.1, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
+  UNLOCK: { tank6: { tankIndex: 0, count: 6, banner: ['うみの すいそうが かえるように なったよ！'], lockedLine: '1つめの すいそうに 6ぴき いると あえるよ' } },
+  TANKS: { max: 6, newTank: { temp: 25, clean: 100, air: 70, leftover: 0 } },
+  MULTI_TANK: { careDailyCapPerExtraTank: 25, thanksAllTanksBase: 4, thanksAllTanksPerExtra: 3, emptyTankNoCareCoin: true },
+  SNAIL: { cleanPerHour: 0.15, leftoverPerHour: 0.06 },
+  HEART: { perPet: 1, perFishEveryGameHours: 1, perDay: 20, need: { health: 40 }, max: 99999 },
+  SCOOP: { animRealSec: 2.0, allowWhenEmpty: true },
+  WATER_LABELS: { fresh: 'みずの すいそう', salt: 'うみの すいそう' },
+  SHOP_TABS: [{ kind: 'fish', label: 'さかな' }, { kind: 'shrimp', label: 'エビ' }, { kind: 'snail', label: 'かい' }],
   REACTION: { petCooldownRealSec: 3, idleEveryHours: 4, sadEveryHours: 3, sleepyEveryHours: 5, nightSleepy: { from: 22, to: 6, chancePerHour: 0.2 } },
   LABELS: {
     temp: { good: 'ちょうどいい', ok: 'まあまあ', cold: 'さむい', hot: 'あつい' },
@@ -51,6 +59,14 @@ function merge(base, over) {
 export function setup({ FISH, ITEMS, compatOf, balance = {}, missions = {}, hints = {}, tutorial = {} }) {
   B = {};
   for (const k of Object.keys(FALLBACK)) B[k] = merge(FALLBACK[k], balance[k]);
+  // 水槽そのもの（tank_fresh / tank_salt）。items.js に 無ければ 仮の しなもの を 足す
+  ITEMS = ITEMS.slice();
+  const tankFallback = [
+    { id: 'tank_fresh', name: 'すいそう', type: 'tank', water: 'fresh', price: 800, inTank: false, max: 5, unlock: 'tank6', includes: ['heater', 'air_pump'], icon: 'assets/items/tank_fresh.png', desc: 'あたらしい みずの すいそう。' },
+    { id: 'tank_salt', name: 'うみの すいそう', type: 'tank', water: 'salt', price: 1000, inTank: false, max: 5, unlock: 'tank6', includes: ['heater', 'air_pump'], icon: 'assets/items/tank_salt.png', desc: 'うみの みずの すいそう。' },
+  ];
+  for (const t of tankFallback) if (!ITEMS.some((i) => i.id === t.id)) ITEMS.push(t);
+  for (const it of ITEMS) if (/^tank_/.test(it.id) && !it.type) it.type = 'tank';
   D = {
     FISH, ITEMS, B,
     fishById: Object.fromEntries(FISH.map((f) => [f.id, f])),
@@ -67,6 +83,9 @@ export function setup({ FISH, ITEMS, compatOf, balance = {}, missions = {}, hint
       nigateConfirm: hints.SHOP_NIGATE_CONFIRM || '{name}は いまの なかまが すこし にがて みたい。それでも むかえる？',
       full: hints.FULL_LINE || 'みんな おなか いっぱい みたい。また あとで あげてね。',
     },
+    SHOP_LINES: { locked: '1つめの すいそうに 6ぴき いると あえるよ', tankMax: 'へやに すいそうが いっぱいだよ。', newTank: 'あたらしい すいそうが へやに きたよ！',
+      wrongWater: '{name}は うみの すいそうで くらすよ。うみの すいそうを えらんでね。', wrongWaterFresh: '{name}は みずの すいそうで くらすよ。みずの すいそうを えらんでね。',
+      needs: '{name}は {item}が ある すいそうで くらすよ。さきに {item}を いれてね。', ...(hints.SHOP_LINES || {}) },
     TUTORIAL: tutorial.TUTORIAL || null,
     tutorialModule: tutorial,
   };
@@ -106,6 +125,20 @@ export function normalize(state) {
   state.daily.careBy ||= {};
   state.inv ||= {};
   state.hints = { closed: {}, ...(state.hints || {}) };
+  state.hearts = Math.max(0, Math.floor(num(state.hearts, 0)));
+  state.heartsTotal = Math.max(state.hearts, Math.floor(num(state.heartsTotal, state.hearts)));
+  state.daily.hearts = Math.max(0, num(state.daily.hearts, 0));
+  state.daily.careByTank ||= {};
+  state.daily.thanksAll = num(state.daily.thanksAll, 0);
+  state.unlocks = { ...(state.unlocks || {}) };
+  // v0.2 の とちゅうの 形（unlock.open）からの 読み替え
+  if (state.unlock?.open && !state.unlocks.tank6) state.unlocks.tank6 = state.unlock.day || state.daily.day;
+  delete state.unlock;
+  state.notices = { ...(state.notices || {}) };       // まだ 見せていない お知らせ（tank6 など）
+  delete state.heartDay;
+  state.ui ||= {};
+  if (!state.tanks.some((t) => t.id === state.ui.tankId)) state.ui.tankId = state.tanks[0]?.id;
+  checkUnlock(state);          // 読み込んだ 直後にも しらべる（v0.1 で もう 6ぴき なら ここで ひらく）
   return state;
 }
 
@@ -122,6 +155,7 @@ function normFish(f) {
   f.okHours = num(f.okHours, 0);              // 今日 ありがとうの 条件を みたした 時間
   f.weak = f.health < B.HEALTH.weak;
   f.day = { d: 0, feedBond: 0, petBond: 0, waterBond: 0, thanks: 0, feedGrow: 0, ...(f.day || {}) };
+  f.lastHeartMin = Number.isFinite(f.lastHeartMin) ? f.lastHeartMin : -1e9;   // さいごに ハートを くれた ゲーム時刻
 }
 
 // ---------------- まとめて 見るもの ----------------
@@ -222,7 +256,7 @@ function flow(state, dt, events) {
   state.clock.min += dt;
   const day = gameDay(state.clock.min);
   if (day !== state.daily.day) {
-    state.daily = { day, care: 0, careBy: {} };
+    state.daily = { day, care: 0, careBy: {}, careByTank: {}, thanksAll: 0, hearts: 0 };
     state.stats.days = (state.stats.days || 0) + 1;
     for (const t of state.tanks) { t.thanksToday = 0; for (const f of t.fish) { f.okHours = 0; dayBucket(state, f); } }
     events.push({ type: 'newDay', day });
@@ -248,12 +282,17 @@ function flowTank(state, t, h, events) {
   let dLeft = 0;
   for (const id of t.decor) {
     const e = items[id]?.effect || {};
-    const k = id === 'plant' ? L : 1;
+    const k = id === 'plant' || id === 'coral' ? L : 1;      // ライトで 1.5ばい（みずくさ・サンゴ）
     if (e.cleanPerHour) dClean += e.cleanPerHour * k;
     if (e.airPerHour) dAir += e.airPerHour * k;
     if (e.leftoverPerHour) dLeft -= e.leftoverPerHour;
   }
   dLeft -= t.fish.filter((f) => (B.CLEAN.cleanerIds || []).includes(f.speciesId)).length * B.CLEAN.cleanerLeftoverPerHour;
+  // かい：こけを たべて すこし きれいに・たべのこしも すこし へらす
+  const snails = t.fish.filter((f) => D.fishById[f.speciesId]?.kind === 'snail').length;
+  const algae = t.fish.filter((f) => (B.SNAIL.algaeEaterIds || []).includes(f.speciesId)).length;   // オトシンクルス など
+  dClean += (snails + algae) * (B.SNAIL.cleanPerHour || 0);
+  dLeft -= snails * (B.SNAIL.leftoverPerHour || 0);
   t.clean = clamp(t.clean + dClean * h, 0, 100);
   t.air = clamp(t.air + dAir * h, 0, 100);
   t.leftover = clamp(t.leftover + dLeft * h, 0, B.CLEAN.leftoverMax);
@@ -340,6 +379,9 @@ function thanksRoll(state, t, events, rnd) {
   const T = B.COIN.thanks;
   t.timers.thanksGap += 1;
   if (!state.tutorial.done || t.timers.thanksGap < T.minGapHours || t.thanksToday >= T.perTankPerDay) return;
+  const M = B.MULTI_TANK;
+  const allCap = M.thanksAllTanksBase != null ? M.thanksAllTanksBase + (M.thanksAllTanksPerExtra || 0) * Math.max(0, livedTanks(state) - 1) : (M.thanksPerDayAllTanks ?? 1e9);
+  if ((state.daily.thanksAll || 0) >= allCap) return;
   const cand = t.fish.filter((f) => {
     const d = dayBucket(state, f);
     return d.thanks < T.perFishPerDay && f.health >= T.need.health && f.mood >= T.need.mood && f.onaka >= T.need.onaka;
@@ -353,6 +395,7 @@ function thanksRoll(state, t, events, rnd) {
   const coin = addCoin(state, T.coinBase + T.coinPerRarity * (sp?.rarity ?? 1));
   dayBucket(state, who).thanks++;
   t.thanksToday++; t.timers.thanksGap = 0;
+  state.daily.thanksAll = (state.daily.thanksAll || 0) + 1;
   inc(state, 'thanks');
   events.push({ type: 'thanks', uid: who.uid, coin });
 }
@@ -389,14 +432,20 @@ export function addCoin(state, n) {
 }
 
 /** お世話の ごほうび（1日の かいすうと 1日の 合計の 上限つき） */
-function careCoin(state, kind) {
+/** 生きものが いる 水槽の 数（上限を ふやす ときに 数える） */
+export const livedTanks = (state) => state.tanks.filter((x) => x.fish.length > 0).length;
+function careCoin(state, kind, t = state.tanks[0]) {
   const c = B.COIN.care[kind];
   if (!c) return 0;
-  const by = state.daily.careBy;
+  if (B.MULTI_TANK.emptyTankNoCareCoin && t && !t.fish.length) return 0;   // からの 水槽の お世話は コインなし
+  state.daily.careByTank ||= {};
+  const by = (state.daily.careByTank[t?.id || 't1'] ||= {});
   if ((by[kind] || 0) >= c.perDay) return 0;
-  const n = Math.min(c.coin, B.COIN.careDailyCap - state.daily.care);
+  const cap = B.COIN.careDailyCap + (B.MULTI_TANK.careDailyCapPerExtraTank || 0) * Math.max(0, livedTanks(state) - 1);
+  const n = Math.min(c.coin, cap - state.daily.care);
   if (n <= 0) return 0;
   by[kind] = (by[kind] || 0) + 1;
+  state.daily.careBy[kind] = (state.daily.careBy[kind] || 0) + 1;
   state.daily.care += n;
   return addCoin(state, n);
 }
@@ -449,7 +498,7 @@ export function feedEat(state, uid, now = Date.now()) {
   if (d.feedGrow < B.GROW.feedBonusPerDay) { d.feedGrow++; addGrow(state, f, B.GROW.feedBonusHours, events); }
   let coin = 0;
   if (!session.counted) { session.counted = true; inc(state, 'feed'); }
-  if (hungry && !session.rewarded) { session.rewarded = true; coin = careCoin(state, 'feed'); session.coin = coin; }
+  if (hungry && !session.rewarded) { session.rewarded = true; coin = careCoin(state, 'feed', session.tank); session.coin = coin; }
   checkMissions(state, events);
   return { uid, coin, hungry, events };
 }
@@ -470,7 +519,7 @@ export function waterChange(state, t = state.tanks[0]) {
   if (e.clearLeftover) t.leftover = 0;
   let coin = 0;
   if (dirty) {
-    coin = careCoin(state, 'waterChange');
+    coin = careCoin(state, 'waterChange', t);
     inc(state, 'waterChange');                      // ミッションは よごれているときだけ 数える
     for (const f of t.fish) { const d = dayBucket(state, f); if (d.waterBond < B.BOND.waterChangePerDay) { d.waterBond++; f.natsuki = clamp(f.natsuki + B.BOND.waterChange, 0, 100); } }
   }
@@ -503,8 +552,23 @@ export function pet(state, uid, now = Date.now(), t = state.tanks[0]) {
     f.natsuki = clamp(f.natsuki + B.BOND.pet, 0, 100); bond = B.BOND.pet;
   }
   inc(state, 'pet');
-  const react = f.health < B.HEALTH.weak ? 'sleepy' : f.natsuki < 40 ? 'happy' : f.natsuki < 80 ? 'heart' : 'spin';
-  return { ok: true, react, bond, events: done(state) };
+  // ハート：おなじ 魚からは ゲーム内1時間に 1こ・1日 20こ まで・げんきが ない 魚からは もらわない
+  const H = B.HEART;
+  let heart = false;
+  if (f.health >= (H.need?.health ?? B.HEALTH.weak) && state.clock.min - f.lastHeartMin >= (H.perFishEveryGameMinutes ?? (H.perFishEveryGameHours ?? 1) * 60)
+      && (state.daily.hearts || 0) < (H.perDay ?? 1e9)) {
+    const n = H.perPet ?? 1;
+    heart = true;
+    f.lastHeartMin = state.clock.min;
+    state.daily.hearts = (state.daily.hearts || 0) + n;
+    state.hearts = Math.min(H.max ?? 99999, (state.hearts || 0) + n);
+    state.heartsTotal = (state.heartsTotal || 0) + n;
+  }
+  // ハートが 出ない とき（まち時間・きょうの 上限）は ハート以外で よろこぶ（ハートが 出たと まちがえない ように）
+  const react = f.health < B.HEALTH.weak ? 'sleepy' : heart ? (H.react || 'heart') : f.natsuki < 80 ? 'happy' : 'spin';
+  const dayFull = !heart && (state.daily.hearts || 0) >= (H.perDay ?? 1e9);
+  const justFull = heart && (state.daily.hearts || 0) >= (H.perDay ?? 1e9);
+  return { ok: true, react, bond, heart, dayFull, justFull, weak: f.health < (H.need?.health ?? B.HEALTH.weak), events: done(state) };
 }
 
 // ---------------- お店 ----------------
@@ -515,11 +579,22 @@ export function priceOf(state, id) {
   return it.price;
 }
 
-/** 魚が買えるか。{ ok, reason: 'coins'|'full'|'water'|'notSold' } */
+/** 解放ずみか（'tank6' など）。キーが 無ければ はじめから */
+export const isUnlocked = (state, key) => !key || !!state.unlocks?.[key];
+/** お店に 出すか（値段が ある もの。解放前は かぎつきで 出す） */
+export const fishOnSale = (state, sp) => !!sp && sp.price != null;
+/** その 魚を 入れられる 水槽（水が あう もの） */
+export const tanksFor = (state, sp) => state.tanks.filter((t) => t.water === sp.water);
+
+/** 魚が買えるか。{ ok, reason: 'coins'|'full'|'water'|'notSold'|'locked'|'needs', item } */
 export function canBuyFish(state, id, t = state.tanks[0]) {
   const sp = D.fishById[id];
   if (!sp || sp.price == null) return { ok: false, reason: 'notSold' };
+  if (!isUnlocked(state, sp.unlock)) return { ok: false, reason: 'locked' };
+  if (!t) return { ok: false, reason: 'water' };
   if (sp.water !== t.water) return { ok: false, reason: 'water' };
+  const need = (sp.needs || []).find((id2) => !t.decor.includes(id2));
+  if (need) return { ok: false, reason: 'needs', item: need };
   if (spaceUsed(t) + (sp.space ?? 1) > B.TANK.capacity + 1e-9) return { ok: false, reason: 'full' };
   if (state.coins < priceOf(state, id)) return { ok: false, reason: 'coins' };
   return { ok: true };
@@ -539,13 +614,22 @@ export function buyFish(state, id, t = state.tanks[0]) {
   const first = !state.dex[id];
   state.dex[id] = { first: state.daily.day, count: (state.dex[id]?.count || 0) + 1 };
   inc(state, 'buyFish');
-  return { ok: true, fish: f, first, price, spec: D.fishById[id], friends, events: done(state) };
+  const events = [];
+  checkUnlock(state, events);
+  checkMissions(state, events);
+  return { ok: true, fish: f, first, price, spec: D.fishById[id], friends, events };
 }
 
-/** 器具・飾り・道具が買えるか。{ ok, reason: 'coins'|'max'|'water'|'notSold'|'have' } */
+/** 器具・飾り・道具・水槽が買えるか。{ ok, reason: 'coins'|'max'|'water'|'notSold'|'have'|'locked'|'roomFull' } */
 export function canBuyItem(state, id, t = state.tanks[0]) {
   const it = D.itemById[id];
   if (!it || it.price == null) return { ok: false, reason: 'notSold' };
+  if (!isUnlocked(state, it.unlock)) return { ok: false, reason: 'locked' };
+  if (it.type === 'tank') {
+    if (state.tanks.length >= (B.TANKS.max ?? 6)) return { ok: false, reason: 'tankMax' };
+    if (state.coins < it.price) return { ok: false, reason: 'coins' };
+    return { ok: true };
+  }
   if (it.water !== 'both' && it.water !== t.water) return { ok: false, reason: 'water' };
   if (it.inTank) { if (countItem(t, id) >= (it.max ?? 1)) return { ok: false, reason: 'max' }; }
   else if (ownsTool(state, id)) return { ok: false, reason: 'have' };
@@ -560,6 +644,12 @@ export function buyItem(state, id, t = state.tanks[0]) {
   const it = D.itemById[id];
   state.coins -= price;
   if (price === 0) state.stats['free_' + id] = 1;
+  if (it.type === 'tank') {
+    const tank = addTank(state, it.water === 'salt' ? 'salt' : 'fresh', it.includes || []);
+    state.owned[id] = true;
+    inc(state, 'buyTank');
+    return { ok: true, item: it, price, tank, fans: [], events: done(state) };
+  }
   if (it.inTank) t.decor.push(id); else state.inv[id] = 1;
   state.owned[id] = true;
   inc(state, 'buyItem');
@@ -571,13 +661,15 @@ export function buyItem(state, id, t = state.tanks[0]) {
 // ---------------- ミッション ----------------
 export function missionProgress(state, m) {
   const g = m.goal || {};
-  const t = state.tanks[0];
+  // 水槽が いくつ あっても、ぜんぶ まとめて かぞえる（なかよし・みんな げんき は どれか 1つの 水槽で）
+  const allFish = state.tanks.flatMap((x) => x.fish);
+  const t = { fish: allFish, decor: state.tanks.flatMap((x) => x.decor) };
   const st = state.stats;
   const cnt = (k) => ({ now: Math.min(st[k] || 0, g.count), need: g.count });
   switch (g.type) {
     case 'buyFish': return cnt('buyFish');
-    case 'fishCount': return { now: Math.min(t.fish.length, g.count), need: g.count };
-    case 'speciesCount': return { now: Math.min(new Set(t.fish.map((f) => f.speciesId)).size, g.count), need: g.count };
+    case 'fishCount': return { now: Math.min(state.tanks[0].fish.length, g.count), need: g.count };
+    case 'speciesCount': return { now: Math.min(new Set(state.tanks[0].fish.map((f) => f.speciesId)).size, g.count), need: g.count };
     case 'placeItem': return { now: t.decor.includes(g.id) || state.inv[g.id] ? 1 : 0, need: 1 };
     case 'feed': return cnt('feed');
     case 'waterChange': return cnt('waterChange');
@@ -588,15 +680,26 @@ export function missionProgress(state, m) {
     case 'natsuki': { const v = Math.max(0, ...t.fish.map((f) => f.natsuki)); return { now: Math.min(Math.floor(v), g.value), need: g.value }; }
     case 'friends': {
       let ok = 0;
-      for (let i = 0; i < t.fish.length && !ok; i++) for (let j = i + 1; j < t.fish.length; j++) if (D.compatOf(t.fish[i].speciesId, t.fish[j].speciesId) === 2) { ok = 1; break; }
+      for (const tk of state.tanks) for (let i = 0; i < tk.fish.length && !ok; i++) for (let j = i + 1; j < tk.fish.length; j++) if (D.compatOf(tk.fish[i].speciesId, tk.fish[j].speciesId) === 2) { ok = 1; break; }
       return { now: ok, need: 1 };
     }
     case 'allHealthy': {
       const need = g.minFish ?? 2;
-      const good = t.fish.filter((f) => f.health >= g.value).length;
-      return { now: t.fish.length >= need && good === t.fish.length ? need : Math.min(good, need - 1), need };
+      let best = 0;
+      for (const tk of state.tanks) {
+        const good = tk.fish.filter((f) => f.health >= g.value).length;
+        best = Math.max(best, tk.fish.length >= need && good === tk.fish.length ? need : Math.min(good, need - 1));
+      }
+      return { now: best, need };
     }
     case 'days': return cnt('days');
+    case 'tankCreatures': { const tk = state.tanks[g.tankIndex ?? 0]; return { now: Math.min(tk ? tk.fish.length : 0, g.count), need: g.count }; }
+    case 'kindCount': return { now: Math.min(allFish.filter((f) => (D.fishById[f.speciesId]?.kind || 'fish') === g.kind).length, g.count), need: g.count };
+    case 'tankCount': return { now: Math.min(state.tanks.length, g.count), need: g.count };
+    case 'hasTankWater': return { now: state.tanks.some((x) => x.water === g.water) ? 1 : 0, need: 1 };
+    case 'waterFishCount': return { now: Math.min(allFish.filter((f) => D.fishById[f.speciesId]?.water === g.water).length, g.count), need: g.count };
+    case 'hearts': return { now: Math.min(state.heartsTotal || 0, g.count), need: g.count };
+    case 'unlock': return { now: state.unlocks?.[g.id] ? 1 : 0, need: 1 };
     case 'zukan': return { now: Math.min(Object.keys(state.dex).length, g.count), need: g.count };
     default: return { now: 0, need: 1 };
   }
@@ -632,7 +735,11 @@ export function claimMission(state, id) {
  * げんきが ない魚が いれば WEAK_PREFIX を まえに つける。とじた ヒントは ゲーム3時間 出さない。
  */
 export function currentHint(state, t = state.tanks[0]) {
-  if (!t.fish.length || !state.tutorial.done) return null;
+  if (!state.tutorial.done) return null;
+  if (!t.fish.length) {
+    const h = D.HINTS.find((x) => x.when?.type === 'tankEmpty');
+    return h && t !== state.tanks[0] ? { key: h.id, text: h.text, action: h.action, uid: null, kind: 'hint' } : null;
+  }
   const has = (id) => hasItem(t, id);
   const sp = (f) => D.fishById[f.speciesId] || {};
   const find = (pred) => t.fish.find((f) => pred(f, sp(f)));
@@ -648,7 +755,10 @@ export function currentHint(state, t = state.tanks[0]) {
     veryDirty: () => t.clean < 20 && any,
     dirty: () => find((f, s) => t.clean < (s.cleanMin ?? 40)),
     noPumpAirLow: () => !has('air_pump') && t.air < 30 && any,
-    airLow: () => has('air_pump') && t.air < 30 && any,
+    airLow: () => t.water !== 'salt' && has('air_pump') && t.air < 30 && any,
+    airLowSalt: () => t.water === 'salt' && has('air_pump') && t.air < 30 && any,
+    saltNoLiverock: () => t.water === 'salt' && !has('liverock') && t.clean < 70 && any,
+    unlockNear: () => { if (isUnlocked(state, 'tank6')) return null; const n = (B.UNLOCK.tank6?.count ?? 6) - state.tanks[0].fish.length; return t === state.tanks[0] && n >= 1 && n <= 2 ? any : null; },
     hungry: () => find((f) => f.onaka < 30),
     leftover: () => t.leftover >= 1 && any,
     lonelySchool: () => find((f, s) => s.swim?.school && !t.fish.some((g) => g !== f && g.speciesId === f.speciesId)),
@@ -664,7 +774,8 @@ export function currentHint(state, t = state.tanks[0]) {
     const f = fn();
     if (!f) continue;
     if ((closed[h.id] ?? -1e9) > state.clock.min) continue;   // とじてから 3時間は 出さない
-    let text = (h.text || '').replaceAll('{name}', nameOf(f)).replaceAll('{like}', likeName(f));
+    const left = (B.UNLOCK.tank6?.count ?? 6) - state.tanks[0].fish.length;
+    let text = (h.text || '').replaceAll('{name}', nameOf(f)).replaceAll('{like}', likeName(f)).replaceAll('{n}', String(left));
     if (weak) text = D.TEXT.weakPrefix.replaceAll('{name}', nameOf(weak)) + text;
     return { key: h.id, text, action: h.action, uid: f.uid, kind: 'hint' };
   }
@@ -683,3 +794,48 @@ export function hintText(type, name = '') {
   return h ? h.text.replaceAll('{name}', name) : '';
 }
 export const text = (k, name = '') => (D.TEXT[k] || '').replaceAll('{name}', name);
+
+// ---------------- 水槽を ふやす・かいほう ----------------
+/** 解放 tank6：1つめの 水槽の 生きもの（1ぴき＝1）が 6 いじょう。いちど ひらいたら もどさない。
+ *  ひらいたら state.notices.tank6 = true（画面が 大きな お知らせを 出したら 消す）と events に { type:'unlock', key } */
+export function checkUnlock(state, events = []) {
+  const U = B.UNLOCK.tank6 || {};
+  if (state.unlocks?.tank6) return events;
+  const tk = state.tanks[U.tankIndex ?? 0];
+  // 6ぴき（1ぴき＝1）または その すいそうが いっぱい（orFull）
+  if (tk && (tk.fish.length >= (U.count ?? 6) || (U.orFull && spaceUsed(tk) >= B.TANK.capacity - 1e-9))) {
+    state.unlocks = { ...(state.unlocks || {}), tank6: state.daily?.day || 1 };
+    state.notices = { ...(state.notices || {}), tank6: true };
+    events.push({ type: 'unlock', key: 'tank6' });
+  }
+  return events;
+}
+
+/** あいている わく（0〜5）。なければ -1 */
+export function freeSlot(state) {
+  for (let k = 0; k < (B.TANKS.max ?? 6); k++) if (!state.tanks.some((t) => t.slot === k)) return k;
+  return -1;
+}
+
+/** 水槽の なまえ（名前が なければ「みずの すいそう 1」「うみの すいそう」など） */
+export function tankName(state, t) {
+  if (t.name) return t.name;
+  const base = B.WATER_LABELS?.[t.water] || (t.water === 'salt' ? 'うみの すいそう' : 'みずの すいそう');
+  const same = state.tanks.filter((x) => x.water === t.water).sort((a, b) => a.slot - b.slot);
+  return same.length > 1 ? `${base} ${same.indexOf(t) + 1}` : base;
+}
+
+/** あたらしい 水槽を あいている わくに おく */
+export function addTank(state, water = 'fresh', includes = []) {
+  const slot = freeSlot(state);
+  if (slot < 0) return null;
+  const N = { temp: 25, clean: 100, air: 70, leftover: 0, ...(B.TANKS.newTank || {}) };
+  let k = state.tanks.length + 1;
+  while (state.tanks.some((t) => t.id === 't' + k)) k++;
+  const t = { id: 't' + k, water, slot, name: '', temp: N.temp, clean: N.clean, air: N.air, leftover: N.leftover, decor: includes.filter((id) => D.itemById[id]?.inTank), equip: [], fish: [] };
+  t.timers = { idle: 0, sad: 0, sleepy: 0, thanksGap: 99 };
+  t.thanksToday = 0;
+  state.tanks.push(t);
+  return t;
+}
+export const tankById = (state, id) => state.tanks.find((t) => t.id === id) || state.tanks[0];

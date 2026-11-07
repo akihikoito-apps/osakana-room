@@ -4,7 +4,10 @@ import { $, $$, el, toast, popAt, bumpCoins } from './common.js';
 import { lightOf } from '../state.js';
 
 let G = null;
-let aq = null;
+let aq = null;                // いま 見ている 水槽の 3D
+const aqs = {};               // 水の しゅるいごとに 1つだけ 作って つかいまわす（ズームで 出入りしても 作りなおさない）
+let shownTankId = null;
+let cleaning = false;         // そうじの アニメ中
 let selected = null;          // カードを出している魚の uid
 let tagUid = null, tagTimer = 0, tagEl = null;
 let busy = {};                // ボタンの 連打よけ（実時間）
@@ -43,7 +46,10 @@ export function init(g) {
     clearTimeout(gaugeTimer);
     if (g.classList.contains('open') && !tutorialOn()) gaugeTimer = setTimeout(() => g.classList.remove('open'), GAUGE_CLOSE_MS);
   });
-  $('#aq').addEventListener('pointerdown', () => { if (!tutorialOn()) $('#gauges').classList.remove('open'); });
+  for (const c of ['#aq', '#aq-salt']) $(c).addEventListener('pointerdown', () => { if (!tutorialOn()) $('#gauges').classList.remove('open'); });
+  // ほかの 水槽へ（へやに もどらずに じゅんばんに）
+  $('#tank-title .tt-prev').addEventListener('click', () => step(-1));
+  $('#tank-title .tt-next').addEventListener('click', () => step(1));
   $('#fish-card').addEventListener('pointerdown', () => armCardClose());
   // なにも しない 時間が つづいたら ボタンを うすく（さわれば もどる。うすい ときの タップも そのまま きく：agy の いけん）
   const wake = () => {
@@ -87,36 +93,78 @@ function armCardClose() {
   cardTimer = setTimeout(() => { selected = null; renderCard(); }, CARD_CLOSE_MS);
 }
 
+/** いまの 水槽の 水に あう 3D を えらぶ（まみず・うみ で 1つずつ。作るのは さいしょの 1かい だけ） */
 function ensureAq() {
-  if (aq) return aq;
   const t = G.tank();
-  aq = createAquarium($('#aq'), { water: t.water, species: G.data.FISH });
+  const water = t.water === 'salt' ? 'salt' : 'fresh';
+  if (!aqs[water]) {
+    const canvas = $(water === 'salt' ? '#aq-salt' : '#aq');
+    const a = createAquarium(canvas, { water, species: G.data.FISH });
+    a.on('tapFish', ({ uid }) => { if (a === aq) onTapFish(uid); });
+    a.on('eat', ({ uid }) => { if (a === aq) onEat(uid); });
+    // 魚の いない ところを タップしたら カードを とじる（見回しの ドラッグは のぞく）
+    let downAt = null;
+    canvas.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; justTapped = false; });
+    canvas.addEventListener('pointerup', (e) => {
+      const moved = !downAt || Math.abs(e.clientX - downAt.x) + Math.abs(e.clientY - downAt.y) > 10;
+      setTimeout(() => { if (!moved && !justTapped && selected) { selected = null; renderCard(); } justTapped = false; }, 0);
+    });
+    aqs[water] = a;
+  }
+  if (aq && aq !== aqs[water]) aq.stop();
+  aq = aqs[water];
   G.aq = aq;
-  aq.on('tapFish', ({ uid }) => onTapFish(uid));
-  aq.on('eat', ({ uid }) => onEat(uid));
-  // 魚の いない ところを タップしたら カードを とじる（見回しの ドラッグは のぞく）
-  let downAt = null;
-  $('#aq').addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; justTapped = false; });
-  $('#aq').addEventListener('pointerup', (e) => {
-    const moved = !downAt || Math.abs(e.clientX - downAt.x) + Math.abs(e.clientY - downAt.y) > 10;
-    setTimeout(() => { if (!moved && !justTapped && selected) { selected = null; renderCard(); } justTapped = false; }, 0);
-  });
+  $('#aq').hidden = water !== 'fresh';
+  $('#aq-salt').hidden = water !== 'salt';
   syncDecor(); syncWater(); syncFish();
   return aq;
+}
+
+/** となりの 水槽へ（へやの わくの じゅん） */
+function step(dir) {
+  const list = G.state.tanks.slice().sort((a, b) => a.slot - b.slot);
+  if (list.length < 2) return;
+  const i = list.findIndex((t) => t.id === G.tank().id);
+  const next = list[(i + dir + list.length) % list.length];
+  hide();
+  G.setTank(next.id);
+  const body = $('#scr-tank');
+  body.classList.remove('slide-l', 'slide-r'); void body.offsetWidth;
+  body.classList.add(dir > 0 ? 'slide-l' : 'slide-r');
+  show(G);
+  G.emit('action', { type: 'openTank', tankId: next.id });
+}
+
+function renderTitle() {
+  const s = G.state, t = G.tank();
+  const box = $('#tank-title');
+  box.querySelector('.tt-name').textContent = G.sim.tankName(s, t);
+  const w = box.querySelector('.tt-water');
+  w.textContent = t.water === 'salt' ? 'うみ' : 'かわ';
+  w.className = 'tt-water water-tag ' + t.water;
+  const list = s.tanks.slice().sort((a, b) => a.slot - b.slot);
+  const many = list.length > 1;
+  box.querySelector('.tt-prev').hidden = !many;
+  box.querySelector('.tt-next').hidden = !many;
+  box.querySelector('.tt-dots').replaceChildren(...(many ? list.map((x) => el('i', { class: x.id === t.id ? 'on ' + x.water : x.water })) : []));
+  box.hidden = !!G.tutorialBusy?.() && list.length < 2;
 }
 let justTapped = false;
 
 export function show(g) {
   G = g;
+  if (shownTankId !== G.tank().id) { selected = null; hint = null; shownTankId = G.tank().id; }
   ensureAq();
   syncFish(); syncDecor(); syncWater();
   aq.start();
+  renderTitle();
   renderGauges(); renderCareState(); renderCard(); renderHint(true); renderEmpty();
   // 見えていない ときに たまった リアクション
   const list = pending.splice(0);
   list.forEach(([uid, kind, delay], i) => setTimeout(() => aq?.react(uid, kind), 600 + i * 250 + delay));
 }
 export function hide() {
+  cleanDone?.();
   aq?.stop();
   if (feedTimer) { clearTimeout(feedTimer); feedTimer = 0; G.handleEvents(G.sim.feedEnd(G.state)?.events); }
 }
@@ -174,9 +222,10 @@ function renderCareState() {
   const s = G.state, t = G.tank(), sim = G.sim;
   const btn = (k) => $(`#care [data-care="${k}"]`);
   const fb = btn('feed'), wb = btn('water'), cb = btn('clean');
-  fb.classList.toggle('cool', !sim.ownsTool(s, 'food_flake') || sim.feedBusy());
-  wb.classList.toggle('cool', !sim.ownsTool(s, 'water_change'));
-  cb.classList.toggle('cool', !(t.leftover > 0));
+  fb.classList.toggle('cool', !sim.ownsTool(s, 'food_flake') || sim.feedBusy() || cleaning);
+  wb.classList.toggle('cool', !sim.ownsTool(s, 'water_change') || cleaning);
+  cb.classList.toggle('cool', cleaning);      // たべのこし 0 でも あみは つかえる（仕様 v0.2 7章）
+  cb.classList.toggle('busy', cleaning);
   const show = G.tutorialShows || (() => true);
   fb.hidden = !show('feed'); wb.hidden = !show('water'); cb.hidden = !show('clean'); btn('photo').hidden = !show('photo');
 }
@@ -194,6 +243,7 @@ function onCare(kind, b) {
   if (busy[kind] && now < busy[kind]) return;
   const s = G.state, t = G.tank(), sim = G.sim;
   if (kind === 'photo') { G.emit('photo'); return; }
+  if (cleaning) return;                 // あみの アニメ中は えさ・みずかえ・そうじ を おせない
   if (kind === 'feed') {
     if (!sim.ownsTool(s, 'food_flake')) { toast('えさは おみせに あるよ'); return; }
     const r = sim.feedStart(s, t);
@@ -237,17 +287,42 @@ function onCare(kind, b) {
     G.emit('action', { type: 'waterChange', result: r });
     G.handleEvents(r.events);
   } else if (kind === 'clean') {
-    const r = sim.scoop(s, t);
-    if (!r.ok) { toast('たべのこしは ないよ。ピカピカ！'); return; }
-    busy.clean = now + 1200;
-    toast('たべのこしを すくったよ');
-    G.emit('action', { type: 'scoop', result: r });
-    G.handleEvents(r.events);
+    startClean(b, t);
+    return;
   }
   G.markDirty(); G.saveNow();
   G.emit('changed');
   G.refreshHud();
 }
+
+/** そうじ：あみで すくう アニメ（aq.playClean。仕様 v0.2 7章：2びょう）→ おわりに たべのこし 0 */
+let cleanDone = null;
+function startClean(b, t) {
+  cleaning = true;
+  renderCareState();
+  const sec = G.sim.balance().SCOOP?.animRealSec ?? 2;
+  const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+  // 3D の あみ（aq.playClean）。おそい 端末でも かならず おわる ように 2びょう＋2びょう で しめる
+  const anim = Promise.race([typeof aq?.playClean === 'function' ? Promise.resolve(aq.playClean()).catch(() => {}) : wait(sec * 1000), wait(sec * 1000 + 2000)]);
+  let finished = false;
+  cleanDone = () => {
+    if (finished) return;
+    finished = true; cleanDone = null; cleaning = false;
+    const tank = G.state.tanks.find((x) => x.id === t.id) || t;
+    const r = G.sim.scoop(G.state, tank);
+    if (r.ok) {
+      toast('たべのこしを すくったよ');
+      G.emit('action', { type: 'scoop', result: r });
+      G.handleEvents(r.events);
+    } else toast('ピカピカだね！');
+    G.markDirty(); G.saveNow();
+    G.emit('changed');
+    G.refreshHud();
+  };
+  Promise.resolve(anim).catch(() => {}).then(() => cleanDone?.());
+}
+// とちゅうで 裏に まわったら、そこで おわった ことに する
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') cleanDone?.(); });
 
 function onEat(uid) {
   const r = G.sim.feedEat(G.state, uid);
@@ -277,9 +352,12 @@ function flashWater() {
 // ---------- 魚を タップ ----------
 function onTapFish(uid) {
   justTapped = true;
-  const r = G.sim.pet(G.state, uid, Date.now());
+  const r = G.sim.pet(G.state, uid, Date.now(), G.tank());
   if (r.ok && r.react) {
     aq.react(uid, r.react);
+    if (r.heart) { flyHeart(uid); plusOne(uid); }
+    if (r.justFull || (r.dayFull && !heartDoneShown)) { heartDoneShown = true; toast(G.sim.balance().HEART?.doneLine || 'また あしたね'); }
+    else if (r.weak && !r.heart) toast(G.sim.balance().HEART?.restLine || 'いまは やすんでいるよ');
     G.emit('action', { type: 'pet', uid });
     G.handleEvents(r.events);
     G.markDirty();
@@ -288,6 +366,29 @@ function onTapFish(uid) {
   showTag(uid);
   renderCard();
   armCardClose();
+}
+
+/** 出た ハートを 上の帯の ハートへ とばして かぞえる */
+function flyHeart(uid) {
+  const p = aq?.screenPosOf(uid);
+  const dst = $('#hud-hearts').getBoundingClientRect();
+  const n = G.state.hearts;
+  if (!p || matchMedia('(prefers-reduced-motion: reduce)').matches) { G.refreshHud(); bumpHearts(); return; }
+  const h = el('div', { class: 'fly-heart' }, el('span', { class: 'heart-ic' }));
+  h.style.left = p.x + 'px'; h.style.top = (p.y - 20) + 'px';
+  document.getElementById('app').append(h);
+  requestAnimationFrame(() => { h.style.transform = `translate(${dst.left + 20 - p.x}px, ${dst.top + dst.height / 2 - p.y + 20}px) scale(0.7)`; h.style.opacity = '0.9'; });
+  setTimeout(() => { h.remove(); G.refreshHud(); bumpHearts(); }, 470);
+}
+let heartDoneShown = false;
+/** なでた ところに「＋1」 */
+function plusOne(uid) {
+  const p = aq?.screenPosOf(uid);
+  if (p) popAt(p.x, p.y - 34, '<span class="heart-ic sm"></span>＋1', 'pop-coin pop-heart');
+}
+function bumpHearts() {
+  const c = $('#hud-hearts');
+  c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
 }
 
 function showTag(uid) {
@@ -352,7 +453,7 @@ function renderHint(force) {
   const box = $('#hint');
   const mini = $('#hint-mini');
   if (G.tutorialBusy?.()) { box.hidden = true; mini.hidden = true; glow(null); return; }
-  const h = G.sim.currentHint(G.state);
+  const h = G.sim.currentHint(G.state, G.tank());
   if (h) {
     const fresh = !hint || hint.key !== h.key;
     hint = h; happyUntil = 0;
@@ -380,7 +481,7 @@ function renderHint(force) {
 function renderEmpty() {
   const t = G.tank();
   const m = $('#tank-empty');
-  if (t.fish.length || G.screen !== 'tank' || G.tutorialBusy?.()) { m.hidden = true; return; }
+  if (t.fish.length || G.screen !== 'tank' || G.tutorialBusy?.() || G.sim.currentHint(G.state, t)) { m.hidden = true; return; }
   m.replaceChildren(el('div', { text: 'まだ さかなが いないよ' }), el('button', { class: 'btn primary', text: '🛒 おみせへ', style: { marginTop: '8px' }, onclick: () => G.go('shop', { tab: 'fish' }) }));
   m.hidden = false;
 }
@@ -388,9 +489,10 @@ function renderEmpty() {
 // ---------- できごと ----------
 function onSimEvent(ev) {
   const t = G.tank();
-  const f = ev.uid && t.fish.find((x) => x.uid === ev.uid);
+  // ほかの 水槽の 魚の できごとも ある（なまえは ぜんぶの 水槽から さがす）
+  const f = ev.uid && G.state.tanks.flatMap((x) => x.fish).find((x) => x.uid === ev.uid);
   const name = (f && G.data.fishById[f.speciesId]?.name) || '';
-  const visible = G.screen === 'tank' && aq;
+  const visible = G.screen === 'tank' && aq && !!t.fish.find((x) => x.uid === ev.uid);
   if (ev.type === 'thanks') {
     if (visible) {
       aq.react(ev.uid, 'thanks');

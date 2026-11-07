@@ -16,6 +16,11 @@
 //   'nigate'         : にがて（相性0）の くみあわせが いる
 //   'tankFull'       : space の合計が TANK.capacity（お店で 魚を えらんだ とき）
 //   'noCoins'        : かいたい ものの コインが たりない（お店で）
+//   --- v0.2（ヒントは いま 見ている すいそう ごとに 判定する）---
+//   'airLowSalt'     : うみの すいそうで くうき < 30（ブクブクは ある）。airLow の かわりに 出す（みずくさ が 入れられないため）
+//   'saltNoLiverock' : うみの すいそうに 生きものが いて、ライブロックが 1つも なく、きれいさ < 70
+//   'unlockNear'     : UNLOCK.tank6 が まだで、1つめの すいそうの 生きものが 4〜5ひき（{n} は のこりの かず）
+//   'tankEmpty'      : 生きものが 1ぴきも いない すいそう（2つめ いこう）
 //
 // priority が 小さいほど さきに 出す。いちどに 出すのは 1つだけ。
 // 魚が「げんきが ない」（けんこう < 40）ときは、えらばれた ヒントの まえに WEAK_PREFIX を つける（action は そのヒントの もの）。
@@ -37,18 +42,26 @@ export const HINTS = [
     text: 'みずの くうきが すくないよ。おみせの ブクブクを いれてあげよう。', action: 'shop' },
   { id: 'h_air',         priority: 4,  when: { type: 'airLow' },
     text: 'みずの くうきが すくないよ。みずくさを いれると くうきが ふえるよ。', action: 'shop' },
+  { id: 'h_air_salt',    priority: 4,  when: { type: 'airLowSalt' },
+    text: 'みずの くうきが すくないよ。サンゴを いれると くうきが すこし ふえるよ。', action: 'shop' },
+  { id: 'h_salt_rock',   priority: 5.5, when: { type: 'saltNoLiverock' },
+    text: 'うみの すいそうには ライブロックが おすすめ。みずを きれいに して くれるよ。', action: 'shop' },
   { id: 'h_dirty',       priority: 5,  when: { type: 'dirty' },
     text: 'みずが すこし よごれてきたよ。「みずかえ」を すると ピカピカに なるよ。', action: 'water_change' },
   { id: 'h_hungry',      priority: 6,  when: { type: 'hungry' },
     text: '{name}の おなかが すいたみたい。「えさ」で ごはんを あげよう。', action: 'feed' },
   { id: 'h_leftover',    priority: 7,  when: { type: 'leftover' },
-    text: 'そこに たべのこしが あるよ。「そうじ」で すくって あげよう。', action: 'scoop' },
+    text: 'すいそうの そこに たべのこしが あるよ。「そうじ」で すくって あげよう。', action: 'scoop' },
   { id: 'h_lonely',      priority: 8,  when: { type: 'lonelySchool' },
     text: '{name}は なかまと およぐのが すきだよ。おなじ さかなを むかえて あげると よろこぶよ。', action: 'shop' },
   { id: 'h_like',        priority: 9,  when: { type: 'noLikedDecor' },
     text: '{name}は {like}が すきだよ。すいそうに いれて あげると よろこぶよ。', action: 'shop' },
   { id: 'h_nigate',      priority: 10, when: { type: 'nigate' },
     text: '{name}は いっしょの なかまが すこし にがて みたい。すきな かざりを いれると きげんが なおるよ。', action: 'shop' },
+  { id: 'h_unlock_near', priority: 15, when: { type: 'unlockNear' },
+    text: 'あと {n}ひきで あたらしい なかまに あえるよ。エビや かいも かぞえるよ。', action: 'shop' },
+  { id: 'h_tank_empty',  priority: 16, when: { type: 'tankEmpty' },
+    text: 'あたらしい すいそうだね。おみせで いきものを むかえよう。', action: 'shop' },
   { id: 'h_full',        priority: 20, when: { type: 'tankFull' },
     text: 'すいそうが いっぱいだよ。いまの さかなを たいせつに そだてよう。', action: null },
   { id: 'h_nocoin',      priority: 21, when: { type: 'noCoins' },
@@ -57,6 +70,17 @@ export const HINTS = [
 
 // お店で 魚を えらんだとき、すいそうに 相性0 の 魚が いたら 出す（かうのは とめない）
 export const SHOP_NIGATE_CONFIRM = '{name}は いまの なかまが すこし にがて みたい。それでも むかえる？';
+
+// ---- v0.2：お店で かえない ときの ことば（ボタンを 灰色に して、おしたら 出す）----
+export const SHOP_LINES = {
+  wrongWater: '{name}は うみで くらすよ。うみの すいそうを えらんでね。',               // うみの いきものを かわの すいそうで えらんだ
+  wrongWaterFresh: '{name}は かわで くらすよ。かわの すいそうを えらんでね。',            // かわの いきものを うみの すいそうで えらんだ
+  noSaltTank: '{name}は うみで くらすよ。おみせで うみの すいそうが かえるよ。',          // うみの すいそうを まだ もっていない
+  needs: '{name}は {item}が ある すいそうで くらすよ。さきに {item}を いれてね。',      // fish.needs が すいそうに ない（{item} は items.js の name）
+  locked: '1つめの すいそうに 6ぴき いると あえるよ（エビも かいも かぞえるよ）',                                   // unlock 前の かぎつき カード（balance.js UNLOCK.tank6.lockedLine と おなじ）
+  tankMax: 'へやに すいそうが いっぱいだよ。いまの すいそうを たいせつに そだてよう。',     // すいそうが TANKS.max（6）
+  newTank: 'あたらしい すいそうが へやに きたよ！',                                       // すいそうを かった とき
+};
 
 // えさボタンを おしたが 全員 おなか いっぱい（≥ 90）のとき
 export const FULL_LINE = 'みんな おなか いっぱい みたい。また あとで あげてね。';

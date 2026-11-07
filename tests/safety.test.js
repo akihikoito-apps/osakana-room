@@ -75,6 +75,10 @@ function allScreenTexts() {
   walkVal(FISH, 'FISH'); walkVal(ITEMS, 'ITEMS'); walkVal(balance.LABELS, 'LABELS');
   walkVal(missions.MISSIONS, 'MISSIONS'); walkVal(tutorial.TUTORIAL, 'TUTORIAL');
   for (const [k, v] of Object.entries(hints)) walkVal(v, k);
+  // v0.2：解放の お知らせ・ハートの ことば・見出し・すいそうの よびかた
+  walkVal(balance.UNLOCK.tank6.banner, 'UNLOCK.banner'); walkVal(balance.UNLOCK.tank6.lockedLine, 'UNLOCK.lockedLine');
+  walkVal([balance.HEART.doneLine, balance.HEART.restLine], 'HEART'); walkVal(balance.SHOP_TABS, 'SHOP_TABS');
+  walkVal(balance.WATER_LABELS, 'WATER_LABELS'); walkVal(balance.HEART_LABEL, 'HEART_LABEL');
   for (const f of [...walk('js/ui'), 'js/main.js', 'js/sim.js', 'js/state.js', ...walk('js/aquarium')]) for (const s of uiStrings(read(f))) out.push([`${f}:${s.line}`, s.text]);
   for (const s of htmlTexts(read('index.html'))) out.push(['index.html', s]);
   const m = JSON.parse(read('manifest.json'));
@@ -118,8 +122,18 @@ test('aquarium：180°（Math.PI）で ひっくりかえす・上下を 反転�
   for (const f of walk('js/aquarium')) {
     const src = stripComments(read(f), f);
     src.split('\n').forEach((l, i) => {
-      // rotation.z / rotateZ / rotation.x に まるごとの π（π/2 などの わり算は のぞく）
-      if (/(?:rotation\.[zx]\s*[+\-]?=|rotate[ZX]\s*\(|rotation\.set\()[^;\n]*Math\.PI(?!\s*[/*]\s*[\d.])/.test(l) && !/rotateX\(-?Math\.PI\s*\/\s*2\)/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
+      // rotation.z / rotateZ / rotation.x に まるごとの π（π/2 などの わり算は のぞく）。
+      // y じく（左右の むきを かえる。うらがえし では ない）は たいしょうがい
+      const fullPi = /Math\.PI(?!\s*[/*]\s*[\d.])/;
+      if (/(?:rotation\.[zx]\s*[+\-]?=|rotate[ZX]\s*\()[^;\n]*Math\.PI(?!\s*[/*]\s*[\d.])/.test(l) && !/rotateX\(-?Math\.PI\s*\/\s*2\)/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
+      const set = l.match(/rotation\.set\((.*)\)/);
+      if (set) {
+        // かっこの そとの カンマで x, y, z に わけて、x と z だけ みる
+        const args = []; let depth = 0, cur = '';
+        for (const ch of set[1]) { if ('([{'.includes(ch)) depth++; if (')]}'.includes(ch)) depth--; if (ch === ',' && depth === 0) { args.push(cur); cur = ''; } else cur += ch; }
+        args.push(cur);
+        if (fullPi.test(args[0] || '') || fullPi.test(args[2] || '')) bad.push(`${f}:${i + 1}: ${l.trim()}`);
+      }
       if (/rotation\.[zx]\s*[+\-]?=\s*-?3\.14/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
       if (/\.scale\.y\s*=\s*-|\.scale\.set\([^,]+,\s*-/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
       if (/rotation\.z\s*\+=/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}（たしつづけると まわりきる）`);

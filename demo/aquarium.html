@@ -33,6 +33,9 @@
   <button data-a="weak">げんきがない</button>
   <button data-a="light">あかり</button>
   <button data-a="grow">おおきさ</button>
+  <button data-a="salt">うみ／かわ</button>
+  <button data-a="snail">かい</button>
+  <button data-a="clean">そうじ</button>
 </div>
 <script type="module">
 import { createAquarium } from '../js/aquarium/index.js';
@@ -42,14 +45,27 @@ const q = new URLSearchParams(location.search);
 const aq = createAquarium(document.getElementById('aq'), { water: q.get('water') || 'fresh' });
 window.aq = aq;
 
+const salt = q.get('water') === 'salt';
+if (q.get('ui') === '0') document.getElementById('ui').style.display = 'none';   // スクショ用
+// データ（fish.js）にまだ無い v0.2 の種も、水槽の予備の値で泳がせる
+const NEW_FRESH = ['platy', 'cherry_barb', 'otocinclus', 'dwarf_gourami', 'rummy_nose'];
+const NEW_SALT = ['clownfish', 'blue_tang', 'skunk_shrimp', 'yellow_tang', 'blue_damsel', 'firefish', 'mandarin'];
+const SNAILS = salt ? ['shittaka', 'shittaka'] : ['ishimaki', 'ramshorn'];
+const SCHOOL = new Set(['cherry_barb', 'rummy_nose']);
+const ids = salt ? NEW_SALT : [...FISH.filter((s) => s.water !== 'salt').map((s) => s.id), ...NEW_FRESH];
 const fish = [];
 let n = 0;
-for (const s of FISH) {
-  const cnt = s.swim?.school ? 3 : 2;
-  for (let i = 0; i < cnt; i++) fish.push({ uid: 'f' + (n++), speciesId: s.id, stage: i === 0 ? 2 : 1, health: 90, happy: 70 });
+for (const id of [...new Set(ids)]) {
+  const s = FISH.find((x) => x.id === id);
+  const cnt = (s?.swim?.school || SCHOOL.has(id)) ? 3 : salt ? 2 : 1;
+  for (let i = 0; i < cnt; i++) fish.push({ uid: 'f' + (n++), speciesId: id, stage: i === 0 ? 2 : 1, health: 90, happy: 70 });
 }
-aq.setFish(fish);
-let decor = ['stone', 'plant', 'plant', 'driftwood', 'heater', 'filter', 'air_pump', 'light'];
+const snails = SNAILS.map((id, i) => ({ uid: 's' + i, speciesId: id, stage: 2, health: 90, happy: 70 }));
+let showSnail = q.get('snail') !== '0';
+const allFish = () => (showSnail ? [...fish, ...snails] : fish);
+aq.setFish(allFish());
+let decor = salt ? ['liverock', 'liverock', 'coral', 'coral', 'coral', 'heater', 'filter', 'air_pump', 'light']
+  : ['stone', 'plant', 'plant', 'driftwood', 'heater', 'filter', 'air_pump', 'light'];
 aq.setDecor(decor);
 const water = { dirt: 0, bubbles: true, light: 1 };
 aq.setWater(water);
@@ -60,8 +76,9 @@ aq.on('eat', ({ uid }) => { last = uid; });
 const tip = document.getElementById('tap');
 aq.on('tapFish', ({ uid }) => {
   last = uid;
-  const f = fish.find((x) => x.uid === uid);
-  tip.textContent = FISH.find((s) => s.id === f.speciesId).name;
+  const f = allFish().find((x) => x.uid === uid);
+  const sp = FISH.find((s) => s.id === f.speciesId);
+  tip.textContent = sp ? sp.name : f.speciesId;
   tip.style.display = 'block';
   aq.react(uid, 'heart');
   clearTimeout(tip._t); tip._t = setTimeout(() => (tip.style.display = 'none'), 1500);
@@ -89,10 +106,19 @@ document.getElementById('ui').addEventListener('click', (e) => {
       const weak = !b.classList.contains('on');
       b.classList.toggle('on', weak);
       fish.forEach((f, i) => { if (i % 2 === 0) f.health = weak ? 15 : 90; });
-      aq.setFish(fish);
+      aq.setFish(allFish());
       break;
     }
-    case 'grow': fish.forEach((f) => (f.stage = (f.stage + 1) % 3)); aq.setFish(fish); break;
+    case 'salt': location.search = salt ? '' : '?water=salt'; break;
+    case 'snail': showSnail = !showSnail; aq.setFish(allFish()); b.classList.toggle('on', !showSnail); break;
+    case 'clean': {
+      // ゲームと同じ流れ：にごりを下げる指示と同時に あみ を出す（見た目はあみが出ていくときに変わる）
+      water.dirt = 0.05; aq.setWater(water);
+      document.querySelector('[data-a="dirt"]').classList.remove('on');
+      b.disabled = true; aq.playClean().then(() => { b.disabled = false; });
+      break;
+    }
+    case 'grow': fish.forEach((f) => (f.stage = (f.stage + 1) % 3)); aq.setFish(allFish()); break;
   }
 });
 setInterval(() => { const s = aq.stats; document.getElementById('stats').textContent = `${s.fps}fps  dpr${s.pixelRatio}  ${s.fish}ひき  draw${s.calls}  tri${s.triangles}`; }, 500);
@@ -102,8 +128,9 @@ const shot = q.get('shot');
 if (shot === 'feed') setTimeout(() => { aq.feed(0.5, 0.1); aq.feed(0.3, 0.1); }, 300);
 if (shot === 'react') setTimeout(() => { ['heart', 'thanks', 'sleepy', 'sad', 'happy', 'spin'].forEach((r, i) => aq.react('f' + (i * 4), r)); }, 300);
 if (shot === 'dirt') { water.dirt = 0.8; aq.setWater(water); }
-if (shot === 'weak') { fish.forEach((f, i) => { if (i % 2 === 0) f.health = 10; }); aq.setFish(fish); }
+if (shot === 'weak') { fish.forEach((f, i) => { if (i % 2 === 0) f.health = 10; }); aq.setFish(allFish()); }
 if (shot === 'dark') { water.light = 0.2; aq.setWater(water); }
+if (shot === 'clean') { water.dirt = 0.7; aq.setWater(water); setTimeout(() => { water.dirt = 0.05; aq.setWater(water); aq.playClean(); }, 1500); }
 </script>
 </body>
 </html>

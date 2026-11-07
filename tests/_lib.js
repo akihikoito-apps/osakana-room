@@ -148,13 +148,26 @@ export function seeded(seed = 1) {
   return () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
 }
 
-/** 魚を 入れる（コインは 気にしない） */
-export function addFish(st, id) {
+/**
+ * 魚を 入れる（コインは 気にしない）。
+ * v0.2：解放が いる 生きものは 解放ずみに し、水が ちがえば その水の 水槽を つくって 入れる。
+ * t を わたせば その水槽に 入れる。
+ */
+export function addFish(st, id, t) {
   st.coins = Math.max(st.coins, 99999);
-  const r = sim.buyFish(st, id);
+  const sp = FISH.find((f) => f.id === id);
+  if (sp?.unlock) st.unlocks = { ...(st.unlocks || {}), [sp.unlock]: st.unlocks?.[sp.unlock] || 1 };
+  if (!t) {
+    t = st.tanks.find((x) => x.water === sp.water && sim.spaceUsed(x) + (sp.space ?? 1) <= balance.TANK.capacity + 1e-9);
+    if (!t) t = sim.addTank(st, sp.water, ['heater', 'air_pump']);
+  }
+  for (const need of sp?.needs || []) if (!t.decor.includes(need)) t.decor.push(need);
+  const r = sim.buyFish(st, id, t);
   if (!r.ok) throw new Error('buyFish ' + id + ' ' + r.reason);
   return r.fish;
 }
 
 export const SOLD_FISH = FISH.filter((f) => f.price != null);
 export const SOLD_ITEMS = ITEMS.filter((i) => i.price != null);
+export const FRESH_FISH = SOLD_FISH.filter((f) => f.water === 'fresh');
+export const SALT_FISH = SOLD_FISH.filter((f) => f.water === 'salt');
