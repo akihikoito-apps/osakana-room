@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>すいそう テスト</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d1d24; overflow: hidden; font-family: system-ui, sans-serif; }
+  #aq { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #ui { position: fixed; left: 8px; right: 8px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; pointer-events: none; }
+  #ui button { pointer-events: auto; font-size: 13px; padding: 6px 10px; border-radius: 16px; border: 0; background: rgba(255,255,255,0.85); color: #134; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+  #ui button.on { background: #ffd34d; }
+  #stats { position: fixed; top: 6px; left: 8px; color: #fff; font: 12px monospace; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #tap { position: fixed; padding: 3px 8px; background: #fff; border-radius: 10px; font-size: 13px; pointer-events: none; transform: translate(-50%, -130%); display: none; }
+</style>
+</head>
+<body>
+<canvas id="aq"></canvas>
+<div id="stats"></div>
+<div id="tap"></div>
+<div id="ui">
+  <button data-a="feed">えさ</button>
+  <button data-r="heart">ハート</button>
+  <button data-r="jump">ジャンプ</button>
+  <button data-r="spin">くるっ</button>
+  <button data-r="happy">うれしい</button>
+  <button data-r="thanks">ありがとう</button>
+  <button data-r="sad">かなしい</button>
+  <button data-r="sleepy">ねむい</button>
+  <button data-a="dirt">にごり</button>
+  <button data-a="bubbles">ブクブク</button>
+  <button data-a="weak">げんきがない</button>
+  <button data-a="light">あかり</button>
+  <button data-a="grow">おおきさ</button>
+</div>
+<script type="module">
+import { createAquarium } from '../js/aquarium/index.js';
+import { FISH } from '../js/data/fish.js';
+
+const q = new URLSearchParams(location.search);
+const aq = createAquarium(document.getElementById('aq'), { water: q.get('water') || 'fresh' });
+window.aq = aq;
+
+const fish = [];
+let n = 0;
+for (const s of FISH) {
+  const cnt = s.swim?.school ? 3 : 2;
+  for (let i = 0; i < cnt; i++) fish.push({ uid: 'f' + (n++), speciesId: s.id, stage: i === 0 ? 2 : 1, health: 90, happy: 70 });
+}
+aq.setFish(fish);
+let decor = ['stone', 'plant', 'plant', 'driftwood', 'heater', 'filter', 'air_pump', 'light'];
+aq.setDecor(decor);
+const water = { dirt: 0, bubbles: true, light: 1 };
+aq.setWater(water);
+aq.start();
+
+let last = 0;
+aq.on('eat', ({ uid }) => { last = uid; });
+const tip = document.getElementById('tap');
+aq.on('tapFish', ({ uid }) => {
+  last = uid;
+  const f = fish.find((x) => x.uid === uid);
+  tip.textContent = FISH.find((s) => s.id === f.speciesId).name;
+  tip.style.display = 'block';
+  aq.react(uid, 'heart');
+  clearTimeout(tip._t); tip._t = setTimeout(() => (tip.style.display = 'none'), 1500);
+});
+(function follow() {
+  if (tip.style.display === 'block' && last) { const p = aq.screenPosOf(last); if (p) { tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px'; } }
+  requestAnimationFrame(follow);
+})();
+
+const pickFish = () => fish[Math.floor(Math.random() * fish.length)].uid;
+document.getElementById('ui').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.r) {
+    // 1回で 3匹 に出す（見やすく）
+    const ids = new Set(); while (ids.size < 3) ids.add(pickFish());
+    for (const id of ids) aq.react(id, b.dataset.r);
+    return;
+  }
+  switch (b.dataset.a) {
+    case 'feed': aq.feed(0.3 + Math.random() * 0.4, 0.1); break;
+    case 'dirt': water.dirt = water.dirt > 0 ? 0 : 0.8; aq.setWater(water); b.classList.toggle('on', water.dirt > 0); break;
+    case 'bubbles': water.bubbles = !water.bubbles; aq.setWater(water); b.classList.toggle('on', !water.bubbles); break;
+    case 'light': water.light = water.light > 0.5 ? 0.25 : 1; aq.setWater(water); b.classList.toggle('on', water.light < 0.5); break;
+    case 'weak': {
+      const weak = !b.classList.contains('on');
+      b.classList.toggle('on', weak);
+      fish.forEach((f, i) => { if (i % 2 === 0) f.health = weak ? 15 : 90; });
+      aq.setFish(fish);
+      break;
+    }
+    case 'grow': fish.forEach((f) => (f.stage = (f.stage + 1) % 3)); aq.setFish(fish); break;
+  }
+});
+setInterval(() => { const s = aq.stats; document.getElementById('stats').textContent = `${s.fps}fps  dpr${s.pixelRatio}  ${s.fish}ひき  draw${s.calls}  tri${s.triangles}`; }, 500);
+
+// 確認用：?shot=feed などで自動で動かす
+const shot = q.get('shot');
+if (shot === 'feed') setTimeout(() => { aq.feed(0.5, 0.1); aq.feed(0.3, 0.1); }, 300);
+if (shot === 'react') setTimeout(() => { ['heart', 'thanks', 'sleepy', 'sad', 'happy', 'spin'].forEach((r, i) => aq.react('f' + (i * 4), r)); }, 300);
+if (shot === 'dirt') { water.dirt = 0.8; aq.setWater(water); }
+if (shot === 'weak') { fish.forEach((f, i) => { if (i % 2 === 0) f.health = 10; }); aq.setFish(fish); }
+if (shot === 'dark') { water.light = 0.2; aq.setWater(water); }
+</script>
+</body>
+</html>
