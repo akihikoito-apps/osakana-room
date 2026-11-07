@@ -17,7 +17,7 @@ const DAY = 1440;
 const FALLBACK = {
   TIME: { realSecPerGameDay: 600, dayStartHour: 6, stopDuringTutorial: true },
   START: { coins: 200, roomTemp: 20, waterTemp: 20, clean: 100, air: 70, leftover: 0, fish: { onaka: 60, health: 80, mood: 60, natsuki: 0 } },
-  TANK: { capacity: 6 },
+  TANK: { capacity: 6, fishMax: 6, snailMax: 2 },
   TEMP: { towardRoomPerHour: 0.5, bestRange: 2, farOut: 3 },
   CLEAN: { basePerHour: -0.3, perSpacePerHour: -0.4, perLeftoverPerHour: -1.5, leftoverMax: 5, cleanerIds: [], cleanerLeftoverPerHour: 0.125, scoopClean: 0 },
   AIR: { naturalPerHour: 0.6, naturalCap: 60, perSpacePerHour: -0.5 },
@@ -34,6 +34,9 @@ const FALLBACK = {
   SNAIL: { cleanPerHour: 0.15, leftoverPerHour: 0.06 },
   HEART: { perPet: 1, perFishEveryGameHours: 1, perDay: 20, need: { health: 40 }, max: 99999 },
   SCOOP: { animRealSec: 2.0, allowWhenEmpty: true },
+  THERMO: { steps: [{ id: 'cool', label: 'すずしい', temp: 23 }, { id: 'normal', label: 'ふつう', temp: 25 }, { id: 'warm', label: 'あたたかい', temp: 27 }], perfectRange: 1, perfectMood: 5, defaultStep: 'normal', perHour: 1, safeOnly: true, resetOnUnsafe: true },
+  CLEAN_FLOOR: { minNetDirtPerHour: 0.4 },
+  VITAMIN: { perTankPerDay: 1, usesPerBuy: 5, eatEvenIfFull: true, effect: { love: { health: 15, growHours: 6, mood: 10, natsuki: 3, react: ['jump', 'heart'] }, ok: { health: 10, growHours: 4, mood: 5, natsuki: 1, react: ['happy'] }, dislike: { react: ['turn'] } } },
   WATER_LABELS: { fresh: 'みずの すいそう', salt: 'うみの すいそう' },
   SHOP_TABS: [{ kind: 'fish', label: 'さかな' }, { kind: 'shrimp', label: 'エビ' }, { kind: 'snail', label: 'かい' }],
   REACTION: { petCooldownRealSec: 3, idleEveryHours: 4, sadEveryHours: 3, sleepyEveryHours: 5, nightSleepy: { from: 22, to: 6, chancePerHour: 0.2 } },
@@ -83,6 +86,9 @@ export function setup({ FISH, ITEMS, compatOf, balance = {}, missions = {}, hint
       nigateConfirm: hints.SHOP_NIGATE_CONFIRM || '{name}は いまの なかまが すこし にがて みたい。それでも むかえる？',
       full: hints.FULL_LINE || 'みんな おなか いっぱい みたい。また あとで あげてね。',
     },
+    VITAMIN_LINES: { love: '{name}は ビタミンが だいすき！', ok: '{name}が ビタミンを たべたよ。', dislike: '{name}は ビタミンが すきじゃない みたい。', allDislike: 'この すいそうの みんなは ビタミンが すきじゃない みたい。', doneToday: 'ビタミンは 1にち 1かい。また あしたね。', empty: 'ビタミンが なくなったよ。おみせで かえるよ。', ...(hints.VITAMIN_LINES || {}) },
+    VITAMIN_DEX: { love: 'だいすき', ok: 'たべる', dislike: 'にがて', ...(hints.VITAMIN_DEX || {}) },
+    THERMO_LINES: { title: 'おんど ダイヤル', outOfRange: '{name}には ちょっと あわない あたたかさ みたい。', ...(hints.THERMO_LINES || {}) },
     SHOP_LINES: { locked: '1つめの すいそうに 6ぴき いると あえるよ', tankMax: 'へやに すいそうが いっぱいだよ。', newTank: 'あたらしい すいそうが へやに きたよ！',
       wrongWater: '{name}は うみの すいそうで くらすよ。うみの すいそうを えらんでね。', wrongWaterFresh: '{name}は みずの すいそうで くらすよ。みずの すいそうを えらんでね。',
       needs: '{name}は {item}が ある すいそうで くらすよ。さきに {item}を いれてね。', ...(hints.SHOP_LINES || {}) },
@@ -115,6 +121,8 @@ export function normalize(state) {
     t.leftover = clamp(num(t.leftover, S0.leftover), 0, B.CLEAN.leftoverMax);
     t.timers = { idle: 0, sad: 0, sleepy: 0, thanksGap: 99, ...(t.timers || {}) };
     t.thanksToday = num(t.thanksToday, 0);
+    if (!(B.THERMO.steps || []).some((x) => x.id === t.thermo)) t.thermo = B.THERMO.defaultStep || 'normal';   // おんど ダイヤル
+    if (typeof t.feederOn !== 'boolean') t.feederOn = true;                     // じどう えさやりの スイッチ（はじめは いり）
     t.decor = (t.decor || []).filter((id) => D.itemById[id]?.inTank);
     t.fish = t.fish.filter((f) => D.fishById[f.speciesId]);
     for (const f of t.fish) normFish(f);
@@ -135,6 +143,9 @@ export function normalize(state) {
   if (state.unlock?.open && !state.unlocks.tank6) state.unlocks.tank6 = state.unlock.day || state.daily.day;
   delete state.unlock;
   state.notices = { ...(state.notices || {}) };       // まだ 見せていない お知らせ（tank6 など）
+  state.inv.food_vitamin = Math.max(0, Math.floor(num(state.inv.food_vitamin, 0)));   // ビタミンの のこり かいすう
+  state.daily.vitamin = { ...(state.daily.vitamin || {}) };                          // きょう ビタミンを あげた 水槽 { tankId: かず }
+  state.vitaminSeen = { ...(state.vitaminSeen || {}) };                              // すききらいが わかった しゅるい（ぷいっ の ふきだしも 1かいだけ）
   delete state.heartDay;
   state.ui ||= {};
   if (!state.tanks.some((t) => t.id === state.ui.tankId)) state.ui.tankId = state.tanks[0]?.id;
@@ -159,6 +170,12 @@ function normFish(f) {
 }
 
 // ---------------- まとめて 見るもの ----------------
+export const snailCount = (t) => t.fish.filter((f) => D.fishById[f.speciesId]?.kind === 'snail').length;
+/** 定員の 表示用：{ fish: 魚・エビの かず, fishMax, space, snail, snailMax } */
+export function capacityOf(t) {
+  const fish = t.fish.length - snailCount(t);
+  return { fish, fishMax: B.TANK.fishMax ?? 6, space: spaceUsed(t), capacity: B.TANK.capacity, full: fish >= (B.TANK.fishMax ?? 1e9) || spaceUsed(t) >= B.TANK.capacity - 1e-9, snail: snailCount(t), snailMax: B.TANK.snailMax ?? 2 };
+}
 export function spaceUsed(t) { return t.fish.reduce((a, f) => a + (D.fishById[f.speciesId]?.space ?? 1), 0); }
 export const hasItem = (t, id) => t.decor.includes(id);
 export const countItem = (t, id) => t.decor.filter((x) => x === id).length;
@@ -171,6 +188,43 @@ function tempJudge(t, sp) {
   const out = t.temp < r.min ? r.min - t.temp : t.temp > r.max ? t.temp - r.max : 0;
   return { out, best: Math.abs(t.temp - r.best) <= B.TEMP.bestRange, side: t.temp < r.min ? -1 : t.temp > r.max ? 1 : 0 };
 }
+/** 水温の むかう先（仕様 v0.3 2-2）：ヒーター／ファン／りょうほう（おんど ダイヤル）／なし */
+export function tempTarget(t) {
+  const items = D.itemById;
+  const heater = hasItem(t, 'heater') ? items.heater?.effect : null;
+  const fan = hasItem(t, 'fan') ? (items.fan?.effect || {}) : null;
+  if (heater && fan) {
+    const st = (B.THERMO.steps || []).find((x) => x.id === t.thermo) || (B.THERMO.steps || []).find((x) => x.id === B.THERMO.defaultStep) || { temp: 25 };
+    return { target: st.temp, rate: B.THERMO.perHour ?? 1, dial: true };
+  }
+  if (heater) return { target: heater.targetTemp, rate: heater.tempPerHour };
+  if (fan && fan.towardRoomMinus != null && !fan.needsHeater) return { target: B.START.roomTemp - fan.towardRoomMinus, rate: B.TEMP.towardRoomPerHour };
+  // ファンだけ：なにも しない（ヒーターと いっしょに はたらく）
+  return { target: B.START.roomTemp, rate: B.TEMP.towardRoomPerHour };
+}
+/** おんど ダイヤルが つかえるか（ヒーターと ファンが りょうほう） */
+export const hasThermo = (t) => hasItem(t, 'heater') && hasItem(t, 'fan');
+/** その だんの おんどで はんい外に なる 魚 */
+export function thermoOutFish(t, stepId) {
+  const st = (B.THERMO.steps || []).find((x) => x.id === stepId);
+  if (!st) return [];
+  return t.fish.filter((f) => { const r = D.fishById[f.speciesId]?.temp; return r && (st.temp < r.min || st.temp > r.max); });
+}
+export function setThermo(state, t, stepId) {
+  if (!(B.THERMO.steps || []).some((x) => x.id === stepId)) return { ok: false, reason: 'unknown' };
+  const out = thermoOutFish(t, stepId);
+  if (B.THERMO.safeOnly && out.length) return { ok: false, reason: 'unsafe', out };    // あわない 段は えらべない
+  t.thermo = stepId;
+  return { ok: true, out };
+}
+/** あわない 魚が いる 段に なっていたら ふつうに もどす（resetOnUnsafe）。もどしたら true */
+export function fixThermo(t) {
+  if (!B.THERMO.resetOnUnsafe || !t.thermo || t.thermo === (B.THERMO.defaultStep || 'normal')) return false;
+  if (!thermoOutFish(t, t.thermo).length) return false;
+  t.thermo = B.THERMO.defaultStep || 'normal';
+  return true;
+}
+
 /** すいおん の ようす：'good'|'ok'|'cold'|'hot'（いちばん わるい魚に あわせる） */
 export function tempState(t) {
   if (!t.fish.length) return 'ok';
@@ -256,7 +310,7 @@ function flow(state, dt, events) {
   state.clock.min += dt;
   const day = gameDay(state.clock.min);
   if (day !== state.daily.day) {
-    state.daily = { day, care: 0, careBy: {}, careByTank: {}, thanksAll: 0, hearts: 0 };
+    state.daily = { day, care: 0, careBy: {}, careByTank: {}, thanksAll: 0, hearts: 0, vitamin: {} };
     state.stats.days = (state.stats.days || 0) + 1;
     for (const t of state.tanks) { t.thanksToday = 0; for (const f of t.fish) { f.okHours = 0; dayBucket(state, f); } }
     events.push({ type: 'newDay', day });
@@ -267,15 +321,14 @@ function flow(state, dt, events) {
 function flowTank(state, t, h, events) {
   const items = D.itemById;
   // すいおん
-  const heater = hasItem(t, 'heater') ? items.heater?.effect : null;
-  const target = heater ? heater.targetTemp : B.START.roomTemp;
-  const rate = heater ? heater.tempPerHour : B.TEMP.towardRoomPerHour;
+  const { target, rate } = tempTarget(t);
   if (t.temp < target) t.temp = Math.min(target, t.temp + rate * h);
   else if (t.temp > target) t.temp = Math.max(target, t.temp - rate * h);
 
   const S = spaceUsed(t);
   const L = hasItem(t, 'light') ? (items.light?.effect?.plantBoost ?? 1.5) : 1;
-  const F = hasItem(t, 'filter') ? (items.filter?.effect?.dirtMultiplier ?? 0.5) : 1;
+  const C = hasItem(t, 'co2_kit') ? (items.co2_kit?.effect?.plantAirBoost ?? items.co2_kit?.effect?.plantBoost ?? 1.5) : 1;     // シーオーツー：みずくさの くうき だけ（ライトと かけあわせ）
+  const F = (hasItem(t, 'filter') ? (items.filter?.effect?.dirtMultiplier ?? 0.5) : 1) * (hasItem(t, 'skimmer') ? (items.skimmer?.effect?.dirtMultiplier ?? 0.8) : 1);
   // きれいさ：よごれ（フィルターで 半分）＋ みずくさ
   let dClean = (B.CLEAN.basePerHour + B.CLEAN.perSpacePerHour * S + B.CLEAN.perLeftoverPerHour * t.leftover) * F;
   let dAir = (t.air < B.AIR.naturalCap ? B.AIR.naturalPerHour : 0) + B.AIR.perSpacePerHour * S;
@@ -284,7 +337,7 @@ function flowTank(state, t, h, events) {
     const e = items[id]?.effect || {};
     const k = id === 'plant' || id === 'coral' ? L : 1;      // ライトで 1.5ばい（みずくさ・サンゴ）
     if (e.cleanPerHour) dClean += e.cleanPerHour * k;
-    if (e.airPerHour) dAir += e.airPerHour * k;
+    if (e.airPerHour) dAir += e.airPerHour * k * (id === 'plant' ? C : 1);   // シーオーツーは くうき だけ
     if (e.leftoverPerHour) dLeft -= e.leftoverPerHour;
   }
   dLeft -= t.fish.filter((f) => (B.CLEAN.cleanerIds || []).includes(f.speciesId)).length * B.CLEAN.cleanerLeftoverPerHour;
@@ -293,6 +346,7 @@ function flowTank(state, t, h, events) {
   const algae = t.fish.filter((f) => (B.SNAIL.algaeEaterIds || []).includes(f.speciesId)).length;   // オトシンクルス など
   dClean += (snails + algae) * (B.SNAIL.cleanPerHour || 0);
   dLeft -= snails * (B.SNAIL.leftoverPerHour || 0);
+  if (t.fish.length - snailCount(t) > 0) dClean = Math.min(dClean, -(B.CLEAN_FLOOR?.minNetDirtPerHour ?? 0));
   t.clean = clamp(t.clean + dClean * h, 0, 100);
   t.air = clamp(t.air + dAir * h, 0, 100);
   t.leftover = clamp(t.leftover + dLeft * h, 0, B.CLEAN.leftoverMax);
@@ -328,6 +382,7 @@ function flowTank(state, t, h, events) {
     // ごきげん（目標に 近づく）
     let target = M.base;
     target += tj.out > 0 ? M.temp.out : tj.best ? M.temp.best : M.temp.ok;
+    if (sp.temp && Math.abs(t.temp - sp.temp.best) <= (B.THERMO.perfectRange ?? -1)) target += B.THERMO.perfectMood || 0;   // とても ぴったり
     target += t.clean >= M.clean.high ? M.clean.highBonus : t.clean < M.clean.low ? M.clean.lowPenalty : 0;
     target += t.air >= M.air.high ? M.air.highBonus : t.air < M.air.low ? M.air.lowPenalty : 0;
     target += f.onaka >= M.onaka.high ? M.onaka.highBonus : f.onaka < M.onaka.low ? M.onaka.lowPenalty : 0;
@@ -335,6 +390,8 @@ function flowTank(state, t, h, events) {
     target += Math.min(M.friendMax, friends * M.friendPerMate);
     target += Math.max(M.nigateMin ?? -999, nigate * M.nigatePerMate);
     if (hasItem(t, 'light')) target += M.light;
+    // シーオーツー：みずくさが すきな 魚は +5（みずくさが 1こ いじょう）
+    if (hasItem(t, 'co2_kit') && hasItem(t, 'plant') && (sp.likes || []).includes('plant')) target += D.itemById.co2_kit?.effect?.moodBonusPlantLovers ?? 5;
     target = clamp(target, 0, 100);
     const st = M.approachPerHour * h;
     if (f.mood < target) f.mood = Math.min(target, f.mood + st);
@@ -358,9 +415,20 @@ function hourly(state, hourIndex, events, rnd) {
       const T = B.COIN.thanks;
       if (f.health >= T.need.health && f.mood >= T.need.mood && f.onaka >= T.need.onaka) f.okHours++;
     }
+    autoFeed(t, hour, events);
     thanksRoll(state, t, events, rnd);
     reactions(state, t, hour, events, rnd);
   }
+}
+
+/** じどう えさやり：おなか < 90 の 魚へ おなか +15（コイン・なつき・そだち・ハートは なし） */
+function autoFeed(t, hour, events) {
+  if (!hasItem(t, 'auto_feeder') || t.feederOn === false) return;     // スイッチ きり なら うごかない
+  const e = D.itemById.auto_feeder?.effect || { atHours: [8, 18], below: 50, fill: 15 };
+  if (!(e.atHours || []).includes(hour)) return;
+  let n = 0;
+  for (const f of t.fish) if (f.onaka < (e.below ?? B.HUNGER.full)) { f.onaka = Math.min(100, f.onaka + (e.fill ?? 15)); n++; }
+  events.push({ type: 'autoFeed', tankId: t.id, count: n });
 }
 
 function addGrow(state, f, n, events) {
@@ -595,7 +663,9 @@ export function canBuyFish(state, id, t = state.tanks[0]) {
   if (sp.water !== t.water) return { ok: false, reason: 'water' };
   const need = (sp.needs || []).find((id2) => !t.decor.includes(id2));
   if (need) return { ok: false, reason: 'needs', item: need };
-  if (spaceUsed(t) + (sp.space ?? 1) > B.TANK.capacity + 1e-9) return { ok: false, reason: 'full' };
+  if (sp.kind === 'snail') {
+    if (snailCount(t) >= (B.TANK.snailMax ?? 2)) return { ok: false, reason: 'snailFull' };
+  } else if (spaceUsed(t) + (sp.space ?? 1) > B.TANK.capacity + 1e-9 || (t.fish.length - snailCount(t)) >= (B.TANK.fishMax ?? 1e9)) return { ok: false, reason: 'full' };
   if (state.coins < priceOf(state, id)) return { ok: false, reason: 'coins' };
   return { ok: true };
 }
@@ -615,6 +685,7 @@ export function buyFish(state, id, t = state.tanks[0]) {
   state.dex[id] = { first: state.daily.day, count: (state.dex[id]?.count || 0) + 1 };
   inc(state, 'buyFish');
   const events = [];
+  if (fixThermo(t)) events.push({ type: 'thermoReset', tankId: t.id });
   checkUnlock(state, events);
   checkMissions(state, events);
   return { ok: true, fish: f, first, price, spec: D.fishById[id], friends, events };
@@ -630,8 +701,9 @@ export function canBuyItem(state, id, t = state.tanks[0]) {
     if (state.coins < it.price) return { ok: false, reason: 'coins' };
     return { ok: true };
   }
-  if (it.water !== 'both' && it.water !== t.water) return { ok: false, reason: 'water' };
+  if (it.water !== 'both' && it.water !== t.water) return { ok: false, reason: id === 'co2_kit' ? 'co2Salt' : id === 'skimmer' ? 'skimmerFresh' : 'water' };
   if (it.inTank) { if (countItem(t, id) >= (it.max ?? 1)) return { ok: false, reason: 'max' }; }
+  else if (it.uses) { if ((state.inv[id] || 0) > 0) return { ok: false, reason: 'vitaminFull' }; }    // ビタミン：つかいおわってから
   else if (ownsTool(state, id)) return { ok: false, reason: 'have' };
   if (state.coins < priceOf(state, id)) return { ok: false, reason: 'coins' };
   return { ok: true };
@@ -650,7 +722,9 @@ export function buyItem(state, id, t = state.tanks[0]) {
     inc(state, 'buyTank');
     return { ok: true, item: it, price, tank, fans: [], events: done(state) };
   }
-  if (it.inTank) t.decor.push(id); else state.inv[id] = 1;
+  if (it.inTank) t.decor.push(id);
+  else if (it.uses) state.inv[id] = Math.min(it.uses, (state.inv[id] || 0) + it.uses);   // ビタミン：5かいぶん
+  else state.inv[id] = 1;
   state.owned[id] = true;
   inc(state, 'buyItem');
   // その飾りが すきな魚
@@ -700,6 +774,8 @@ export function missionProgress(state, m) {
     case 'waterFishCount': return { now: Math.min(allFish.filter((f) => D.fishById[f.speciesId]?.water === g.water).length, g.count), need: g.count };
     case 'hearts': return { now: Math.min(state.heartsTotal || 0, g.count), need: g.count };
     case 'unlock': return { now: state.unlocks?.[g.id] ? 1 : 0, need: 1 };
+    case 'vitaminEat': return cnt(g.love ? 'vitaminLove' : 'vitaminEat');
+    case 'gadgetCount': return { now: Math.min(state.tanks.reduce((a, tk) => a + tk.decor.filter((id) => (g.ids || []).includes(id)).length, 0), g.count), need: g.count };
     case 'zukan': return { now: Math.min(Object.keys(state.dex).length, g.count), need: g.count };
     default: return { now: 0, need: 1 };
   }
@@ -749,8 +825,11 @@ export function currentHint(state, t = state.tanks[0]) {
     return D.ITEMS.find((i) => i.tag === tag && i.price != null)?.name || '';
   };
   const checks = {
-    noHeaterCold: () => !has('heater') && find((f, s) => t.temp < (s.temp?.min ?? -99)),
-    tempLow: () => has('heater') && find((f, s) => t.temp < (s.temp?.min ?? -99)),
+    fanCold: () => has('fan') && find((f, s) => t.temp < (s.temp?.min ?? -99)),
+    noHeaterCold: () => !has('heater') && !has('fan') && find((f, s) => t.temp < (s.temp?.min ?? -99)),
+    tempLow: () => has('heater') && !has('fan') && find((f, s) => t.temp < (s.temp?.min ?? -99)),
+    co2NoPlant: () => has('co2_kit') && !has('plant') && any,
+    weakVitamin: () => (state.inv.food_vitamin || 0) > 0 && find((f, s) => f.health < B.HEALTH.weak && s.vitamin !== 'dislike'),
     tempHigh: () => find((f, s) => t.temp > (s.temp?.max ?? 99)),
     veryDirty: () => t.clean < 20 && any,
     dirty: () => find((f, s) => t.clean < (s.cleanMin ?? 40)),
@@ -832,10 +911,68 @@ export function addTank(state, water = 'fresh', includes = []) {
   const N = { temp: 25, clean: 100, air: 70, leftover: 0, ...(B.TANKS.newTank || {}) };
   let k = state.tanks.length + 1;
   while (state.tanks.some((t) => t.id === 't' + k)) k++;
-  const t = { id: 't' + k, water, slot, name: '', temp: N.temp, clean: N.clean, air: N.air, leftover: N.leftover, decor: includes.filter((id) => D.itemById[id]?.inTank), equip: [], fish: [] };
+  const t = { id: 't' + k, water, slot, name: '', thermo: B.THERMO.defaultStep || 'normal', feederOn: true, temp: N.temp, clean: N.clean, air: N.air, leftover: N.leftover, decor: includes.filter((id) => D.itemById[id]?.inTank), equip: [], fish: [] };
   t.timers = { idle: 0, sad: 0, sleepy: 0, thanksGap: 99 };
   t.thanksToday = 0;
   state.tanks.push(t);
   return t;
 }
 export const tankById = (state, id) => state.tanks.find((t) => t.id === id) || state.tanks[0];
+
+// ---------------- ビタミン（仕様 v0.3 3章） ----------------
+// vitaminStart → （水槽の eat ごとに）vitaminEat → vitaminEnd。ふつうの えさとは べつの かぞえ。
+let vsession = null;
+/** ビタミンを おとせるか。{ ok, reason: 'noTool'|'empty'|'doneToday'|'allDislike'|'noFish'|'busy', text } */
+export function vitaminStart(state, t = state.tanks[0], now = Date.now()) {
+  const L = D.TEXT.VITAMIN_LINES || D.VITAMIN_LINES || {};
+  if (!t.fish.length) return { ok: false, reason: 'noFish' };
+  if (!((state.inv.food_vitamin || 0) > 0)) return { ok: false, reason: 'empty', text: D.VITAMIN_LINES.empty };
+  state.daily.vitamin ||= {};
+  if ((state.daily.vitamin[t.id] || 0) >= (B.VITAMIN.perTankPerDay ?? 1)) return { ok: false, reason: 'doneToday', text: D.VITAMIN_LINES.doneToday };
+  if (t.fish.every((f) => D.fishById[f.speciesId]?.vitamin === 'dislike')) return { ok: false, reason: 'allDislike', text: D.VITAMIN_LINES.allDislike };
+  if (vsession && now < vsession.until) return { ok: false, reason: 'busy' };
+  void L;
+  state.inv.food_vitamin = Math.max(0, state.inv.food_vitamin - 1);
+  state.daily.vitamin[t.id] = (state.daily.vitamin[t.id] || 0) + 1;
+  vsession = { tank: t, ate: new Set(), turned: new Set(), love: false, counted: false, until: now + (B.HUNGER.feedLockRealSec ?? 5) * 1000, expire: now + FEED_WINDOW_MS };
+  return { ok: true, lockMs: (B.HUNGER.feedLockRealSec ?? 5) * 1000, windowMs: FEED_WINDOW_MS, left: state.inv.food_vitamin };
+}
+/** ビタミンの eat（その魚の すききらいで きまる）。{ uid, pref, react: [...], line } か null */
+export function vitaminEat(state, uid, now = Date.now()) {
+  if (!vsession || now > vsession.expire) return null;
+  const t = vsession.tank;
+  const f = t.fish.find((x) => x.uid === uid);
+  if (!f || vsession.ate.has(uid) || vsession.turned.has(uid)) return null;
+  const sp = D.fishById[f.speciesId] || {};
+  const pref = sp.vitamin || 'ok';
+  const E = (B.VITAMIN.effect || {})[pref] || {};
+  const firstSeen = !state.vitaminSeen[f.speciesId];
+  state.vitaminSeen[f.speciesId] = true;
+  if (state.dex[f.speciesId]) state.dex[f.speciesId].vitaminTried = true;
+  if (pref === 'dislike') {
+    vsession.turned.add(uid);
+    return { uid, pref, react: E.react || ['turn'], line: firstSeen ? D.VITAMIN_LINES.dislike.replaceAll('{name}', sp.name || '') : null, events: [] };
+  }
+  vsession.ate.add(uid);
+  const events = [];
+  f.health = clamp(f.health + (E.health || 0), B.HEALTH.min, B.HEALTH.max);
+  f.mood = clamp(f.mood + (E.mood || 0), 0, 100);
+  f.natsuki = clamp(f.natsuki + (E.natsuki || 0), 0, 100);
+  f.onaka = Math.min(100, f.onaka + (D.itemById.food_vitamin?.effect?.fill ?? 10));
+  if (E.growHours) addGrow(state, f, E.growHours, events);
+  if (!vsession.counted) { vsession.counted = true; inc(state, 'vitaminEat'); }
+  if (pref === 'love' && !vsession.love) { vsession.love = true; inc(state, 'vitaminLove'); }
+  checkMissions(state, events);
+  return { uid, pref, react: E.react || ['happy'], line: (pref === 'love' ? D.VITAMIN_LINES.love : D.VITAMIN_LINES.ok).replaceAll('{name}', sp.name || ''), events };
+}
+export function vitaminEnd(state) {
+  const s = vsession; vsession = null;
+  if (!s) return null;
+  return { ate: [...s.ate], turned: [...s.turned], events: done(state) };
+}
+export const vitaminBusy = (now = Date.now()) => !!vsession && now < vsession.until;
+/** いま ビタミンを まいて いるか（eat を ビタミンとして あつかう） */
+export const vitaminActive = (now = Date.now()) => !!vsession && now <= vsession.expire;
+
+/** じどう えさやりの いり／きり */
+export function setFeeder(t, on) { t.feederOn = !!on; return t.feederOn; }

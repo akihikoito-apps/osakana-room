@@ -318,12 +318,11 @@ test('かい と オトシンクルスは きれいさを すこし あげる（
     tick(st, 10 * HOUR);
     return 50 - st.tanks[0].clean;
   };
-  const sp = (id) => FISH.find((f) => f.id === id).space;
-  // おなじ space どうしで くらべる
-  const snail = drop(['ishimaki', 'ishimaki']);           // space 1
+  // v0.3：かい は space 0。かい だけの すいそう と からの すいそう を くらべる（魚が いないので CLEAN_FLOOR は かからない）
+  const snail = drop(['ishimaki', 'ishimaki']);
+  const empty = drop([]);
+  assert.ok(Math.abs((empty - snail) - 2 * B.SNAIL.cleanPerHour * 10) < 0.05, `かい: ${empty - snail}`);
   const fish = drop(['medaka']);                           // space 1
-  assert.ok(sp('ishimaki') * 2 === sp('medaka'));
-  assert.ok(Math.abs((fish - snail) - 2 * B.SNAIL.cleanPerHour * 10) < 0.05, `かい: ${fish - snail}`);
   const oto = drop(['otocinclus']);
   assert.ok(Math.abs((fish - oto) - B.SNAIL.cleanPerHour * 10) < 0.05, `オトシンクルスが こけを たべていない（さ ${(fish - oto).toFixed(2)}）`);
 });

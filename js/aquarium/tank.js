@@ -214,6 +214,14 @@ export class Tank {
     for (let i = 0; i < this.maxFood; i++) this.foodMesh.setColorAt(i, fc[i % 4]);
     this.foodMesh.count = 0;
     scene.add(this.foodMesh);
+    const vgeo = new THREE.IcosahedronGeometry(0.085, 1);
+    this.vitMesh = new THREE.InstancedMesh(vgeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), this.maxFood);
+    this.vitMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.vitMesh.frustumCulled = false;
+    const vc = ['#ff6fb5', '#ffd23f', '#5ce1ff', '#9dff5c', '#c38bff'].map((c) => new THREE.Color(c));
+    for (let i = 0; i < this.maxFood; i++) this.vitMesh.setColorAt(i, vc[i % vc.length]);
+    this.vitMesh.count = 0;
+    scene.add(this.vitMesh);
     this.ripples = [];
     this.rippleTex = (() => {
       const cv = document.createElement('canvas'); cv.width = cv.height = 64;
@@ -458,6 +466,7 @@ export class Tank {
     this.emitters = [];
     this.swayMats = [];
     this.heaterGlow = null;
+    this.feeder = null; this.fanBlades = null;
     const W = this.W, D = TANK_D;
     const used = {};
     const restFrom = [];
@@ -474,6 +483,10 @@ export class Tank {
       heater: () => this.makeHeater(-0.44 * W, -D / 2 + 0.35),
       filter: () => this.makeFilter(0.45 * W, -D / 2 + 0.45),
       light: () => this.makeLight(),
+      auto_feeder: () => this.makeAutoFeeder(-0.3 * W),
+      fan: () => this.makeFan(0.3 * W),
+      co2_kit: () => this.makeCo2(-0.36 * W, -2.4),
+      skimmer: () => (this.waterType === 'salt' ? this.makeSkimmer(-0.45 * W, -D / 2 + 0.5) : null),
     };
     for (const id of ids) {
       const n = used[id] = (used[id] ?? -1) + 1;
@@ -783,6 +796,99 @@ export class Tank {
     return grp;
   }
 
+  /** 自動えさやり機：前のふち（左）に のっている箱。ドラムが回って えさが落ちる。 */
+  makeAutoFeeder(x) {
+    const grp = new THREE.Group();
+    const z = TANK_D / 2 - 0.55;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.9, 0.9), new THREE.MeshLambertMaterial({ color: '#f2f4f2' }));
+    body.position.set(x, TANK_H - 0.12, z);
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.7, 14), new THREE.MeshLambertMaterial({ color: '#9fd9f0', transparent: true, opacity: 0.85 }));
+    drum.rotation.x = Math.PI / 2;
+    drum.position.set(x + 0.15, WATER_TOP + 0.12, z);
+    const inside = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 10), new THREE.MeshLambertMaterial({ color: '#c8742e' }));
+    inside.rotation.x = Math.PI / 2; inside.position.copy(drum.position);
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 0.25), new THREE.MeshLambertMaterial({ color: '#8a9399' }));
+    clip.position.set(x - 0.45, TANK_H - 0.3, z + 0.3);
+    grp.add(body, drum, inside, clip);
+    this.feeder = { drum, x: x + 0.15, z, spin: 0 };
+    return grp;
+  }
+
+  /** クリップ式ファン：前のふち（右）。羽根が回る。 */
+  makeFan(x) {
+    const grp = new THREE.Group();
+    const z = TANK_D / 2 - 0.6;
+    const gray = new THREE.MeshLambertMaterial({ color: '#e9ecef' });
+    const guard = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 6, 24), gray);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.18, 12), new THREE.MeshLambertMaterial({ color: '#7fc8ff' }));
+    hub.rotation.x = Math.PI / 2;
+    const blades = new THREE.Group();
+    const bladeMat = new THREE.MeshLambertMaterial({ color: '#7fc8ff', side: THREE.DoubleSide });
+    for (let i = 0; i < 4; i++) {
+      const bl = new THREE.Mesh(new THREE.CircleGeometry(0.28, 10), bladeMat);
+      bl.scale.set(1, 0.45, 1);
+      bl.position.set(Math.cos(i * Math.PI / 2) * 0.3, Math.sin(i * Math.PI / 2) * 0.3, 0);
+      bl.rotation.z = i * Math.PI / 2; bl.rotation.y = 0.4;
+      blades.add(bl);
+    }
+    const head = new THREE.Group();
+    head.add(guard, hub, blades);
+    head.position.set(x, TANK_H - 0.05, z);
+    head.rotation.x = 0.9;   // 水面のほうへ向ける
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 8), gray);
+    arm.position.set(x, TANK_H - 0.25, z + 0.25);
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.3), new THREE.MeshLambertMaterial({ color: '#8a9399' }));
+    clip.position.set(x, TANK_H - 0.55, z + 0.35);
+    grp.add(head, arm, clip);
+    this.fanBlades = blades;
+    this.fanRipple = { x, z: z - 1.2, t: 0 };
+    return grp;
+  }
+
+  /** CO2：水中の小さな筒（ディフューザー）から細かい泡。ボンベは水槽の外。 */
+  makeCo2(x, z) {
+    const grp = new THREE.Group();
+    const y = this.sandHeight(x, z) + 1.1;
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.7, 12), new THREE.MeshLambertMaterial({ color: '#e8f6ff', transparent: true, opacity: 0.5 }));
+    glass.position.set(x, y, z);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 12), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
+    disc.position.set(x, y + 0.3, z);
+    const tubeMat = new THREE.MeshLambertMaterial({ color: '#e8f4f4', transparent: true, opacity: 0.45 });
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, TANK_H - y, 6), tubeMat);
+    tube.position.set(x - 0.1, y + (TANK_H - y) / 2, z - 0.1);
+    grp.add(glass, disc, tube);
+    this.emitters.push({ kind: 'co2', x, y: y + 0.35, z, rate: 14, spread: 0.18, size: [0.03, 0.06], acc: 0 });
+    return grp;
+  }
+
+  /** プロテインスキマー（海水だけ）：うしろの角の筒。中で白い泡がのぼる。 */
+  makeSkimmer(x, z) {
+    const grp = new THREE.Group();
+    const base = this.sandHeight(x, z);
+    const dark = new THREE.MeshLambertMaterial({ color: '#2f3a40' });
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.7), dark);
+    foot.position.set(x, base + 0.3, z);
+    const tubeH = 5.2;
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, tubeH, 16, 1, true), new THREE.MeshLambertMaterial({ color: '#dff4ff', transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+    tube.position.set(x, base + 0.6 + tubeH / 2, z);
+    const foam = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.9, 14), new THREE.MeshLambertMaterial({ color: '#f6f1e2' }));
+    foam.position.set(x, base + 0.6 + tubeH - 0.9, z);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.25, 16), dark);
+    cap.position.set(x, base + 0.6 + tubeH + 0.1, z);
+    grp.add(foot, tube, foam, cap);
+    this.emitters.push({ kind: 'skimmer', x, y: base + 0.7, z, rate: 40, spread: 0.45, size: [0.04, 0.09], acc: 0, maxY: base + 0.6 + tubeH - 1.3 });
+    return grp;
+  }
+
+  /** 自動えさやり機のドラムを回して、少しえさを落とす。機械が無ければ右上から。 */
+  autoFeed(kind = 'flake') {
+    const fd = this.feeder;
+    const x = fd ? fd.x : 0.3 * this.W, z = fd ? fd.z - 0.4 : 0.5;
+    if (fd) fd.spin = 1.2;
+    setTimeout(() => { if (!this.disposed) this.dropFood(x, clamp(z, this.bounds.minZ, this.bounds.maxZ), kind, 3, WATER_TOP - 0.05); }, fd ? 450 : 0);
+    return { x, z };
+  }
+
   makeLight() {
     const grp = new THREE.Group();
     const bar = new THREE.Mesh(new THREE.BoxGeometry(this.W * 0.7, 0.1, 0.8), new THREE.MeshBasicMaterial({ color: '#fffbe8', fog: false }));
@@ -842,13 +948,22 @@ export class Tank {
   }
 
   // ---------------- 餌 ----------------
-  dropFood(x, z) {
-    const n = 5;
+  /**
+   * 粒を落とす。kind: 'flake'（ふつう）| 'vitamin'（カラフル・きらきら）| 'sinking'（早く沈む）
+   * y を渡すと水面ではなくその高さから（自動えさやり機の口など）。
+   */
+  dropFood(x, z, kind = 'flake', n = 0, y = WATER_TOP - 0.05) {
+    // 粒の数は 生きものの数に合わせる（みんなに行きわたるように。5〜12粒）
+    if (!n) n = clamp((this.creatures || 4) + 1, 5, 12);
+    // 底の生きもの（エビ・貝・コリドラスなど）がいるときは、何粒かを「底のぶん」にする。
+    // 底のぶんは少し早く沈み、ふつうの魚は追わない（魚が先に全部食べてしまわないように）。
+    const reserve = Math.min(n - 2, this.bottomEaters || 0);
+    const snailOnly = Math.min(reserve, this.snails || 0);   // 貝はとてもゆっくりなので、貝だけの粒も（底で90秒まつ）
     for (let i = 0; i < n; i++) {
       let f = this.foods.find((q) => !q.alive && q.gone);
       if (!f) { if (this.foods.length >= this.maxFood) { f = this.foods.find((q) => q.landed) || this.foods[0]; } else { f = { pos: new THREE.Vector3() }; this.foods.push(f); } }
-      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: 0.6 + Math.random() * 0.15, fade: 1 });
-      f.pos.set(clamp(x + (Math.random() - 0.5) * 0.9, this.bounds.minX + 0.3, this.bounds.maxX - 0.3), WATER_TOP - 0.05, clamp(z + (Math.random() - 0.5) * 0.9, this.bounds.minZ, this.bounds.maxZ));
+      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: (kind === 'sinking' ? 1.3 : 0.6) + Math.random() * 0.15 + (i < reserve ? 0.35 : 0), fade: 1, kind, reserved: i < reserve, snailOnly: i < snailOnly });
+      f.pos.set(clamp(x + (Math.random() - 0.5) * 0.9, this.bounds.minX + 0.3, this.bounds.maxX - 0.3), y, clamp(z + (Math.random() - 0.5) * 0.9, this.bounds.minZ, this.bounds.maxZ));
     }
     this.addRipple(x, z);
   }
@@ -868,7 +983,7 @@ export class Tank {
 
   updateFood(dt) {
     const m4 = _m4, q = _q, s = _s;
-    let n = 0;
+    let n = 0, nv = 0;
     for (const f of this.foods) {
       if (f.gone) continue;
       if (!f.alive) { f.gone = true; continue; }
@@ -889,12 +1004,19 @@ export class Tank {
       }
       q.setFromEuler(_e.set(f.sway, f.age * 0.6 + f.sway, 0));
       s.setScalar(Math.min(1, f.fade) * Math.min(1, (f.age + 0.2) * 3));
-      m4.compose(f.pos, q, s);
-      this.foodMesh.setMatrixAt(n, m4);
-      n++;
+      if (f.kind === 'vitamin') {
+        s.multiplyScalar(0.85 + 0.3 * Math.abs(Math.sin(this.time * 6 + f.sway * 3)));   // きらきら
+        m4.compose(f.pos, q, s);
+        this.vitMesh.setMatrixAt(nv++, m4);
+      } else {
+        m4.compose(f.pos, q, s);
+        this.foodMesh.setMatrixAt(n++, m4);
+      }
     }
     this.foodMesh.count = n;
     this.foodMesh.instanceMatrix.needsUpdate = true;
+    this.vitMesh.count = nv;
+    this.vitMesh.instanceMatrix.needsUpdate = true;
     for (const r of this.ripples) {
       if (!r.alive) continue;
       r.t += dt;
@@ -925,6 +1047,12 @@ export class Tank {
       r.material.opacity = (u.base + Math.sin(this.time * 0.5 + u.ph) * 0.04) * (u.amt ?? 1);
     }
     if (this.heaterGlow) this.heaterGlow.emissiveIntensity = 0.45 + Math.sin(this.time * 1.3) * 0.15;
+    if (this.fanBlades) {
+      this.fanBlades.rotation.z += dt * 14;
+      const fr = this.fanRipple; fr.t -= dt;
+      if (fr.t <= 0) { fr.t = 0.7; this.addRipple(fr.x + (Math.random() - 0.5) * 1.2, clamp(fr.z + (Math.random() - 0.5), this.bounds.minZ, this.bounds.maxZ)); }   // 風で水面がゆれる
+    }
+    if (this.feeder && this.feeder.spin > 0) { this.feeder.spin -= dt; this.feeder.drum.rotation.y += dt * 6; }
     // 浮遊物
     const mp = this.motes.geometry.attributes.position;
     for (let i = 0; i < this.moteCount; i++) {
@@ -946,6 +1074,8 @@ export class Tank {
         bb.s = e.size[0] + Math.random() * (e.size[1] - e.size[0]);
         bb.vy = 1.4 + bb.s * 4 + Math.random() * 0.6; bb.ph = Math.random() * 6; bb.kind = e.kind;
         if (e.kind === 'filter') { bb.vx = -0.8 - Math.random() * 0.6; bb.vy = 0.1; } else bb.vx = 0;
+        if (e.kind === 'co2') bb.vy = 0.8 + Math.random() * 0.3;
+        bb.maxY = e.maxY ?? WATER_TOP - 0.05; bb.cx = e.x; bb.inTube = e.kind === 'skimmer';
       }
     }
     const bp = this.bubblePoints.geometry.attributes;
@@ -956,7 +1086,8 @@ export class Tank {
         bb.y += bb.vy * dt;
         bb.x += (Math.sin(bb.ph) * 0.25 + (bb.vx || 0)) * dt;
         if (bb.kind === 'filter') { bb.vx *= 1 - dt * 0.8; bb.vy += dt * 0.6; }
-        if (bb.y > WATER_TOP - 0.05 || bb.x < this.bounds.minX) bb.alive = false;
+        if (bb.inTube) bb.x = bb.cx + clamp(bb.x - bb.cx, -0.25, 0.25);
+        if (bb.y > bb.maxY || bb.x < this.bounds.minX) bb.alive = false;
       }
       bp.position.setXYZ(i, bb.x, bb.y, bb.z);
       bp.aSize.setX(i, bb.alive ? bb.s : 0);
@@ -977,10 +1108,10 @@ export class Tank {
     this.disposed = true;
     for (const d of this.dirtPatches) { this.scene.remove(d.mesh); d.mesh.geometry.dispose(); }
     this.dirtMat.dispose(); this.dirtTex.dispose();
-    kill(this.bubblePoints); kill(this.motes); kill(this.foodMesh);
+    kill(this.bubblePoints); kill(this.motes); kill(this.foodMesh); kill(this.vitMesh);
     for (const r of this.ripples) kill(r.m);
     this.caustic.dispose(); this.rayTex.dispose(); this.bubbleTex.dispose(); this.rippleTex.dispose(); this.moteTex.dispose();
-    this.scene.remove(this.group, this.decorGroup, this.bubblePoints, this.motes, this.foodMesh, this.hemi, this.sun);
+    this.scene.remove(this.group, this.decorGroup, this.bubblePoints, this.motes, this.foodMesh, this.vitMesh, this.hemi, this.sun);
   }
 }
 

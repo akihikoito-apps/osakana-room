@@ -19,7 +19,8 @@ test('魚と どうぐの id が かぶらない・形が そろっている', (
     assert.ok(['fresh', 'salt'].includes(f.water), f.id);
     assert.ok(f.temp.min < f.temp.max && f.temp.best >= f.temp.min && f.temp.best <= f.temp.max, `${f.id} temp`);
     assert.ok(Array.isArray(f.growDays) && f.growDays.length === 2 && f.growDays.every((d) => d > 0), `${f.id} growDays`);
-    assert.ok(f.space > 0 && f.space <= balance.TANK.capacity, `${f.id} space`);
+    // v0.3：かい は space 0（べつ枠）。さかな・エビは 0 より 大きい
+    if (f.kind === 'snail') assert.equal(f.space, 0, `${f.id} space`); else assert.ok(f.space > 0 && f.space <= balance.TANK.capacity, `${f.id} space`);
     assert.ok(f.rarity >= 1 && f.rarity <= 5, `${f.id} rarity`);
   }
   for (const i of ITEMS) assert.ok(['both', 'fresh', 'salt'].includes(i.water), i.id);
@@ -117,7 +118,8 @@ test('texture の パスは assets/fish/<id>.png の 形', () => {
 
 test('ミッション：id・order が かぶらない、goal の type が わかる もの、placeItem の id が 売っている', () => {
   const KNOWN = ['buyFish', 'fishCount', 'speciesCount', 'placeItem', 'feed', 'waterChange', 'scoop', 'pet', 'thanks', 'grow', 'natsuki', 'friends', 'allHealthy', 'days', 'zukan',
-    'tankCreatures', 'unlock', 'kindCount', 'tankCount', 'hasTankWater', 'waterFishCount', 'hearts'];
+    'tankCreatures', 'unlock', 'kindCount', 'tankCount', 'hasTankWater', 'waterFishCount', 'hearts',
+    'vitaminEat', 'gadgetCount'];
   const M = missions.MISSIONS;
   assert.equal(new Set(M.map((m) => m.id)).size, M.length);
   assert.equal(new Set(M.map((m) => m.order)).size, M.length);
@@ -136,8 +138,9 @@ test('ミッション：id・order が かぶらない、goal の type が わ�
 
 test('ヒント：when.type と action が わかる もの・{like} は 飾りの なまえに なる', () => {
   const TYPES = ['noHeaterCold', 'tempLow', 'tempHigh', 'veryDirty', 'dirty', 'noPumpAirLow', 'airLow', 'hungry', 'leftover', 'lonelySchool', 'noLikedDecor', 'nigate', 'tankFull', 'noCoins',
-    'airLowSalt', 'saltNoLiverock', 'unlockNear', 'tankEmpty'];
-  const ACTIONS = [null, 'shop', 'water_change', 'feed', 'scoop'];
+    'airLowSalt', 'saltNoLiverock', 'unlockNear', 'tankEmpty',
+    'fanCold', 'co2NoPlant', 'weakVitamin'];
+  const ACTIONS = [null, 'shop', 'water_change', 'feed', 'scoop', 'thermo', 'vitamin'];
   assert.equal(new Set(hints.HINTS.map((h) => h.id)).size, hints.HINTS.length);
   for (const h of hints.HINTS) {
     assert.ok(TYPES.includes(h.when.type), `${h.id} ${h.when.type}`);
@@ -211,7 +214,7 @@ test('index.html の 画面の 文字に 漢字が ない', () => {
 });
 
 test('js/ui・main.js・sim.js・state.js・aquarium の 文字列（console を のぞく）に 漢字が ない', () => {
-  const files = [...walk('js/ui'), 'js/main.js', 'js/sim.js', 'js/state.js', ...walk('js/aquarium')];
+  const files = [...walk('js/ui'), 'js/main.js', 'js/sim.js', 'js/state.js', ...walk('js/aquarium'), ...(exists('js/bgm.js') ? ['js/bgm.js'] : [])];
   const bad = [];
   for (const f of files) for (const s of uiStrings(read(f))) if (KANJI.test(s.text)) bad.push(`${f}:${s.line}: ${s.text}`);
   assert.deepEqual(bad, []);

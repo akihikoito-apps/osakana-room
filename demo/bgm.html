@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BGM の かくにん</title>
+<link rel="icon" href="../icon-192.png">
+<style>
+  :root { --bg: #e8f6fb; --card: #ffffff; --ink: #24465a; --accent: #3aa6c9; --on: #ffb347; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p.note { margin: 0 0 14px; font-size: 13px; opacity: .8; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  button.track { text-align: left; border: 3px solid transparent; background: var(--card); color: var(--ink); border-radius: 16px; padding: 12px 14px; font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  button.track small { display: block; font-weight: 400; font-size: 12px; margin-top: 4px; opacity: .75; }
+  button.track.now { border-color: var(--on); background: #fff7ea; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+  .bar button { font-size: 16px; border: 0; border-radius: 999px; padding: 10px 18px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+  .bar label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  input[type=range] { width: 180px; }
+  #state { font-size: 13px; font-family: ui-monospace, monospace; background: #fff; border-radius: 10px; padding: 8px 10px; }
+</style>
+</head>
+<body>
+  <h1>BGM の かくにん（5きょく）</h1>
+  <p class="note">きょくを タップすると ながれます（iPhone・iPad は マナーモードだと なりません）。ループの つなぎめも きいて みてね。</p>
+  <div class="grid" id="list"></div>
+  <div class="bar">
+    <button id="stop">とめる</button>
+    <label>おとの おおきさ <input id="vol" type="range" min="0" max="1" step="0.05"></label>
+  </div>
+  <div id="state"></div>
+<script type="module">
+  import { TRACKS, initBgm, play, stop, setVolume, current, onBgmChange } from '../js/bgm.js';
+  const list = document.getElementById('list');
+  const vol = document.getElementById('vol');
+  const st = document.getElementById('state');
+  const fmt = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  for (const t of TRACKS) {
+    const b = document.createElement('button');
+    b.className = 'track'; b.dataset.id = t.id;
+    b.innerHTML = `${t.name}<small>${t.mood}・${fmt(t.loop)} で ループ</small>`;
+    b.addEventListener('click', () => play(t.id));
+    list.appendChild(b);
+  }
+  document.getElementById('stop').addEventListener('click', () => stop());
+  vol.addEventListener('input', () => setVolume(vol.value));
+  function show(c) {
+    for (const b of list.children) b.classList.toggle('now', c.on && b.dataset.id === c.id);
+    vol.value = c.volume;
+    st.textContent = JSON.stringify(c);
+  }
+  show(initBgm());
+  onBgmChange(show);
+  setInterval(() => show(current()), 1000);
+</script>
+</body>
+</html>

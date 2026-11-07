@@ -133,7 +133,7 @@ export class FishAgent {
 
   /** リアクションを始める。 */
   startReact(type) {
-    const dur = { heart: 1.2, happy: 1.8, jump: 1.25, spin: 1.15, thanks: 2.6, sad: 2.6, sleepy: 4.2 }[type] || 1.2;
+    const dur = { heart: 1.2, happy: 1.8, jump: 1.25, spin: 1.15, thanks: 2.6, sad: 2.6, sleepy: 4.2, pui: 1.4 }[type] || 1.2;
     const prevFace = Math.cos(this.yaw) >= 0 ? 1 : -1;
     this.react = { type, t: 0, dur, dir: prevFace, startYaw: this.yaw };
     if (type !== 'heart' && type !== 'happy') this.food = null;
@@ -142,6 +142,7 @@ export class FishAgent {
 
   update(dt, ctx) {
     const b = ctx.bounds;
+    this.clock = ctx.time;
     const want = Math.max(this.targetLen, ctx.minLen || 0);   // 画面で小さくなりすぎないよう下限
     this.len += (want - this.len) * Math.min(1, dt * 1.5);
     const r = this.react;
@@ -326,7 +327,7 @@ export class FishAgent {
       const rate = clamp(diff * 2, -1.6, 1.6);
       this.yawRate += (rate - this.yawRate) * Math.min(1, dt * 4);
       this.yaw = wrap(this.yaw + this.yawRate * dt);
-      const want = this.food ? (Math.abs(diff) > 0.9 ? 0.25 : 1.0) * Math.max(0.8, sp) * (holdStill ? 0 : 1)   // えさのときは急いで歩く
+      const want = this.food ? (Math.abs(diff) > 0.9 ? 0.3 : dist > 3 ? 1.6 : 1.0) * Math.max(0.8, sp) * (holdStill ? 0 : 1)   // えさのときは急いで歩く（遠いときは もっと急ぐ）
         : (Math.abs(diff) > 0.6 ? 0.08 : 0.35) * this.speedMul * sp * (holdStill ? 0 : 1);
       this.speed += (want - this.speed) * Math.min(1, dt * 3);
       this.pos.x += Math.cos(this.yaw) * this.speed * dt;
@@ -366,7 +367,11 @@ export class FishAgent {
   canTake(f, b) {
     if (!f.alive || f.age < 0) return false;
     if (this.skipFood && this.skipFood.has(f)) return false;
+    if (this.puiUntil && this.puiUntil[f.kind] > (this.clock || 0)) return false;   // ぷいっ のあと しばらく その種類は追わない
     const nearBottom = f.landed || f.pos.y < b.sandY(f.pos.x, f.pos.z) + 0.6;
+    if (f.reserved && !this.eatsFromBottom) return false;   // 底の生きもののぶんは 魚は追わない
+    if (f.snailOnly && !this.isSnail) return false;          // 貝のぶん
+    if (this.fullUntil > (this.clock || 0)) return false;   // 食べた直後は少し休む（1匹がひとりじめしない）
     if (this.isShrimp) return true;   // エビは粒の真下まで歩き、低くなったら跳ねて取る
     if (this.isSnail) return f.landed;  // 貝は底に落ちた粒だけ
     if (nearBottom && !this.eatsFromBottom) return false;
@@ -413,6 +418,18 @@ export class FishAgent {
     // 口の近くまで来たら、粒を吸いこむ（小さい魚でも届くように、体の大きさに合わせた距離で）
     const suck = 0.45 + this.len * 0.55;
     const reach = Math.max(0.18, this.len * 0.16);
+    // きらいな えさ：口の手前で においをかいで「ぷいっ」
+    if (ctx.foodPref && ctx.foodPref(this, f.kind) === 'dislike') {
+      if (d < suck * 1.1) {
+        (this.skipFood ||= new WeakSet()).add(f);
+        f.claims = Math.max(0, f.claims - 1);
+        (this.puiUntil ||= {})[f.kind] = (this.clock || 0) + 8;
+        this.food = null;
+        this.startReact('pui');
+        ctx.onPui && ctx.onPui(this, f.kind);
+      }
+      return;
+    }
     if (d < suck) {
       const step = Math.min(d, (1.2 + this.len) * dt);
       f.pos.addScaledVector(_v5.subVectors(m, f.pos).normalize(), step);
@@ -422,7 +439,8 @@ export class FishAgent {
       f.alive = false;
       this.food = null;
       this.sx = 0.86; this.flash = 0.5;
-      ctx.onEat(this);
+      this.fullUntil = (this.clock || 0) + 4;
+      ctx.onEat(this, f.kind || 'flake');
     }
   }
 
@@ -602,6 +620,34 @@ export class FishAgent {
         this.opitch = -0.1 * Math.sin(Math.min(1, k * 3) * Math.PI * 0.5) * (k > 0.85 ? (1 - k) / 0.15 : 1) * this.facing();
         speedScale = 0.35; ampScale = 0.5;
         break;
+      case 'pui': {
+        // ① くんくん（0.28秒、ひれは小さく動かす）→ ② 鼻を上げて 130°ほど くるりと向きを変える → ③ ななめに すいーっと離れる
+        const t = r.t;
+        if (t < 0.28) { holdStill = true; ampScale = 0.5; this.opitch = 0.08 * Math.sin(t * 40) * 0.5 + 0.06; this.sx = 0.97; }
+        else if (t < 0.7) {
+          if (r.to === undefined) {
+            const s = this.pos.z > (b.minZ + b.maxZ) / 2 ? -1 : 1;   // 奥か手前の空いているほうへ
+            r.to = this.yaw + (Math.cos(this.yaw) >= 0 ? -s : s) * 2.3;
+          }
+          holdStill = true;
+          this.faceYaw = r.to;
+          const q = (t - 0.28) / 0.42;
+          this.opitch = 0.32 * Math.sin(q * Math.PI);   // つーん
+          this.sx = 1;
+          ampScale = 1.6;
+        } else {
+          if (this.faceYaw !== null) {
+            this.faceYaw = null;
+            // 向いた方へ少し先に目標を置く
+            const dx = Math.cos(this.yaw), dz = -Math.sin(this.yaw);
+            this.target.set(clamp(this.pos.x + dx * 3, b.minX + 1, b.maxX - 1), this.pos.y + 0.4, clamp(this.pos.z + dz * 3, b.minZ, b.maxZ));
+            this.retarget = 3; this.burst = 0.5;
+          }
+          this.opitch *= 0.9;
+          speedScale = 1.7;
+        }
+        break;
+      }
       case 'sleepy':
         // 水平のまま、ゆっくりひれを動かして休む（沈まない・傾けない）
         this.oy = 0; this.opitch = 0;
@@ -613,7 +659,7 @@ export class FishAgent {
       this.oz = 0; this.faceYaw = null;
       if (r.type === 'jump' || r.type === 'happy' || r.type === 'heart') { this.oy = Math.abs(Math.sin(k * Math.PI * 3)) * 0.1 * (1 - k); this.sx = 1 + Math.sin(k * Math.PI * 6) * 0.05 * (1 - k); }
       else this.oy = 0;
-      this.oyaw = r.type === 'spin' || r.type === 'thanks' ? Math.sin(k * Math.PI * 4) * 0.25 * (1 - k) : 0;
+      this.oyaw = r.type === 'spin' || r.type === 'thanks' || r.type === 'pui' ? Math.sin(k * Math.PI * 4) * 0.25 * (1 - k) : 0;
       this.opitch = r.type === 'thanks' ? -0.15 * Math.sin(k * Math.PI * 2) : 0;
       return { speedScale: 0, ampScale: 0, holdStill: true };
     }

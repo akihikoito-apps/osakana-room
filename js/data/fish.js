@@ -10,11 +10,13 @@
 //   kind     : 'fish' | 'shrimp' | 'snail'。お店の 見出し（さかな／エビ／かい）にも つかう
 //   unlock   : （v0.2）お店に ならぶ 条件。無い＝はじめから。'tank6'＝balance.js UNLOCK.tank6 を たっせい したあと
 //   needs    : （v0.2）その すいそうに これが 入っていないと かえない（items.js の id）
+//   vitamin  : （v0.3）ビタミン剤（food_vitamin）の すききらい。'love'＝だいすき／'ok'＝たべる／'dislike'＝たべない（ぷいっ）
+//   かい（kind 'snail'）は v0.3 から space 0。かずは balance.js TANK.snailMax（2ひき）で べつに かぞえる
 export const FISH = [
   {
     id: 'medaka', name: 'メダカ', kind: 'fish', water: 'fresh', rarity: 1, price: 50,
     temp: { min: 15, max: 30, best: 24 }, food: ['food_flake'],
-    growDays: [2, 4], sizeCm: [1.5, 3, 4], appetite: 0.8, space: 1, likes: ['plant'], cleanMin: 40,
+    growDays: [2, 4], sizeCm: [1.5, 3, 4], appetite: 0.8, space: 1, likes: ['plant'], cleanMin: 40, vitamin: 'ok',
     look: { lengthToHeight: 4.2, thickness: 0.17, finStyle: 'normal' }, swim: { layer: 'top', speed: 1.0, school: true },
     texture: 'assets/fish/medaka.png',
     intro: 'にほんの おがわや たんぼに すむ ちいさな さかな。みんなで むれて およぐよ。',
@@ -23,7 +25,7 @@ export const FISH = [
   {
     id: 'guppy', name: 'グッピー', kind: 'fish', water: 'fresh', rarity: 1, price: 80,
     temp: { min: 20, max: 28, best: 25 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 1.0, space: 1, likes: ['plant'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 1.0, space: 1, likes: ['plant'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 3.2, thickness: 0.16, finStyle: 'fan' }, swim: { layer: 'top', speed: 1.0, school: true },
     texture: 'assets/fish/guppy.png',
     intro: 'しっぽが おうぎのように ひろがる、カラフルな さかな。',
@@ -32,7 +34,7 @@ export const FISH = [
   {
     id: 'neon_tetra', name: 'ネオンテトラ', kind: 'fish', water: 'fresh', rarity: 1, price: 60,
     temp: { min: 21, max: 28, best: 25 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [1.2, 3, 4], appetite: 0.8, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [1.2, 3, 4], appetite: 0.8, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40, vitamin: 'ok',
     look: { lengthToHeight: 4.0, thickness: 0.17, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.1, school: true },
     texture: 'assets/fish/neon_tetra.png',
     intro: 'あおと あかに ひかる ちいさな さかな。なかまと むれて およぐよ。',
@@ -41,7 +43,7 @@ export const FISH = [
   {
     id: 'goldfish', name: 'キンギョ', kind: 'fish', water: 'fresh', rarity: 1, price: 100,
     temp: { min: 10, max: 28, best: 23 }, food: ['food_flake'],
-    growDays: [3, 7], sizeCm: [3, 8, 12], appetite: 1.1, space: 2, likes: ['stone', 'plant'], cleanMin: 40,
+    growDays: [3, 7], sizeCm: [3, 8, 12], appetite: 1.1, space: 2, likes: ['stone', 'plant'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 2.6, thickness: 0.30, finStyle: 'long' }, swim: { layer: 'any', speed: 0.7, school: false },
     texture: 'assets/fish/goldfish.png',
     intro: 'ながい しっぽで ゆったり およぐ、むかしから にんきの さかな。',
@@ -50,7 +52,7 @@ export const FISH = [
   {
     id: 'corydoras', name: 'コリドラス', kind: 'fish', water: 'fresh', rarity: 2, price: 150,
     temp: { min: 21, max: 28, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [3, 6], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['stone', 'driftwood'], cleanMin: 40,
+    growDays: [3, 6], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['stone', 'driftwood'], cleanMin: 40, vitamin: 'ok',
     look: { lengthToHeight: 2.8, thickness: 0.28, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.8, school: true },
     texture: 'assets/fish/corydoras.png',
     intro: 'そこの すなを ほりほりしながら およぐ、ひげの ある さかな。',
@@ -59,7 +61,7 @@ export const FISH = [
   {
     id: 'minami_shrimp', name: 'ミナミヌマエビ', kind: 'shrimp', water: 'fresh', rarity: 1, price: 60,
     temp: { min: 12, max: 28, best: 23 }, food: ['food_flake', 'food_sinking'],
-    growDays: [2, 5], sizeCm: [0.8, 2, 3], appetite: 0.5, space: 0.5, likes: ['plant', 'stone'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [0.8, 2, 3], appetite: 0.5, space: 0.5, likes: ['plant', 'stone'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 4.0, thickness: 0.20, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.5, school: false },
     texture: 'assets/fish/minami_shrimp.png',
     intro: 'すきとおった からだの ちいさな エビ。こけを つまんで たべるよ。',
@@ -68,7 +70,7 @@ export const FISH = [
   {
     id: 'betta', name: 'ベタ', kind: 'fish', water: 'fresh', rarity: 2, price: 250,
     temp: { min: 24, max: 30, best: 27 }, food: ['food_flake'],
-    growDays: [3, 7], sizeCm: [2, 5, 7], appetite: 0.9, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40,
+    growDays: [3, 7], sizeCm: [2, 5, 7], appetite: 0.9, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 2.2, thickness: 0.16, finStyle: 'long' }, swim: { layer: 'top', speed: 0.6, school: false },
     texture: 'assets/fish/betta.png',
     intro: 'ドレスのような ひれを ひろげる、うつくしい さかな。',
@@ -77,7 +79,7 @@ export const FISH = [
   {
     id: 'angelfish', name: 'エンゼルフィッシュ', kind: 'fish', water: 'fresh', rarity: 2, price: 300,
     temp: { min: 24, max: 29, best: 26 }, food: ['food_flake'],
-    growDays: [4, 8], sizeCm: [3, 8, 12], appetite: 1.2, space: 2, likes: ['plant', 'driftwood'], cleanMin: 40,
+    growDays: [4, 8], sizeCm: [3, 8, 12], appetite: 1.2, space: 2, likes: ['plant', 'driftwood'], cleanMin: 40, vitamin: 'ok',
     look: { lengthToHeight: 1.0, thickness: 0.12, finStyle: 'tall' }, swim: { layer: 'middle', speed: 0.6, school: false },
     texture: 'assets/fish/angelfish.png',
     intro: 'たかい ひれで ゆうがに およぐ、てんしの なまえの さかな。',
@@ -86,7 +88,7 @@ export const FISH = [
   {
     id: 'red_bee_shrimp', name: 'レッドビーシュリンプ', kind: 'shrimp', water: 'fresh', rarity: 4, price: 600,
     temp: { min: 18, max: 26, best: 23 }, food: ['food_flake', 'food_sinking'],
-    growDays: [3, 7], sizeCm: [0.8, 2, 3], appetite: 0.5, space: 0.5, likes: ['plant', 'driftwood', 'stone'], cleanMin: 60,
+    growDays: [3, 7], sizeCm: [0.8, 2, 3], appetite: 0.5, space: 0.5, likes: ['plant', 'driftwood', 'stone'], cleanMin: 60, vitamin: 'love',
     look: { lengthToHeight: 4.0, thickness: 0.20, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.5, school: false },
     texture: 'assets/fish/red_bee_shrimp.png',
     intro: 'あかと しろの しまもようが きれいな、めずらしい エビ。',
@@ -95,7 +97,7 @@ export const FISH = [
   {
     id: 'albino_corydoras', name: 'アルビノコリドラス', kind: 'fish', water: 'fresh', rarity: 3, price: 300,
     temp: { min: 21, max: 28, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [3, 6], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['stone', 'driftwood'], cleanMin: 40,
+    growDays: [3, 6], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['stone', 'driftwood'], cleanMin: 40, vitamin: 'ok',
     look: { lengthToHeight: 2.8, thickness: 0.28, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.8, school: true },
     texture: 'assets/fish/albino_corydoras.png',
     intro: 'からだが しろっぽい ピンクいろの、めずらしい コリドラス。',
@@ -106,7 +108,7 @@ export const FISH = [
   {
     id: 'ishimaki', name: 'イシマキガイ', kind: 'snail', water: 'fresh', rarity: 1, price: 40,
     temp: { min: 15, max: 30, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [2, 4], sizeCm: [1, 2, 2.5], appetite: 0.3, space: 0.5, likes: ['stone', 'driftwood'], cleanMin: 30,
+    growDays: [2, 4], sizeCm: [1, 2, 2.5], appetite: 0.3, space: 0, likes: ['stone', 'driftwood'], cleanMin: 30, vitamin: 'dislike',
     look: { lengthToHeight: 1.3, thickness: 0.6, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.15, school: false },
     texture: 'assets/fish/ishimaki.png',
     intro: 'くろくて まるい からの まきがい。ガラスや いしの こけを たべて くれるよ。',
@@ -117,7 +119,7 @@ export const FISH = [
   {
     id: 'ramshorn', name: 'ラムズホーン', kind: 'snail', water: 'fresh', rarity: 2, price: 50, unlock: 'tank6',
     temp: { min: 15, max: 30, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [2, 4], sizeCm: [0.8, 1.5, 2], appetite: 0.3, space: 0.5, likes: ['plant', 'stone'], cleanMin: 30,
+    growDays: [2, 4], sizeCm: [0.8, 1.5, 2], appetite: 0.3, space: 0, likes: ['plant', 'stone'], cleanMin: 30, vitamin: 'ok',
     look: { lengthToHeight: 1.1, thickness: 0.6, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.15, school: false },
     texture: 'assets/fish/ramshorn.png',
     intro: 'うずまきの からが かわいい ピンクいろの まきがい。',
@@ -126,7 +128,7 @@ export const FISH = [
   {
     id: 'platy', name: 'プラティ', kind: 'fish', water: 'fresh', rarity: 1, price: 90, unlock: 'tank6',
     temp: { min: 20, max: 28, best: 24 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 1.0, space: 1, likes: ['plant'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 1.0, space: 1, likes: ['plant'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 2.8, thickness: 0.20, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.9, school: false },
     texture: 'assets/fish/platy.png',
     intro: 'まるっこい からだの オレンジいろの さかな。おとなしい せいかくだよ。',
@@ -135,7 +137,7 @@ export const FISH = [
   {
     id: 'cherry_barb', name: 'チェリーバルブ', kind: 'fish', water: 'fresh', rarity: 2, price: 100, unlock: 'tank6',
     temp: { min: 22, max: 28, best: 25 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 0.9, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [1.5, 3.5, 5], appetite: 0.9, space: 1, likes: ['plant', 'driftwood'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 3.0, thickness: 0.18, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.0, school: true },
     texture: 'assets/fish/cherry_barb.png',
     intro: 'さくらんぼの ような あかい いろの さかな。なかまと いっしょに およぐよ。',
@@ -144,7 +146,7 @@ export const FISH = [
   {
     id: 'otocinclus', name: 'オトシンクルス', kind: 'fish', water: 'fresh', rarity: 2, price: 120, unlock: 'tank6',
     temp: { min: 21, max: 28, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [3, 6], sizeCm: [1.5, 3, 4], appetite: 0.6, space: 1, likes: ['plant', 'driftwood'], cleanMin: 50,
+    growDays: [3, 6], sizeCm: [1.5, 3, 4], appetite: 0.6, space: 1, likes: ['plant', 'driftwood'], cleanMin: 50, vitamin: 'dislike',
     look: { lengthToHeight: 4.0, thickness: 0.20, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false },
     texture: 'assets/fish/otocinclus.png',
     intro: 'ガラスや はっぱに くっついて こけを たべる、ちいさな さかな。',
@@ -153,7 +155,7 @@ export const FISH = [
   {
     id: 'dwarf_gourami', name: 'ドワーフグラミー', kind: 'fish', water: 'fresh', rarity: 2, price: 200, unlock: 'tank6',
     temp: { min: 24, max: 29, best: 26 }, food: ['food_flake'],
-    growDays: [3, 6], sizeCm: [2, 4.5, 6], appetite: 0.9, space: 1, likes: ['plant'], cleanMin: 40,
+    growDays: [3, 6], sizeCm: [2, 4.5, 6], appetite: 0.9, space: 1, likes: ['plant'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 2.2, thickness: 0.15, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.6, school: false },
     texture: 'assets/fish/dwarf_gourami.png',
     intro: 'あおと あかの しまもようが きれいな さかな。ほそい ひれで さわって しらべるよ。',
@@ -162,7 +164,7 @@ export const FISH = [
   {
     id: 'rummy_nose', name: 'ラミーノーズテトラ', kind: 'fish', water: 'fresh', rarity: 2, price: 150, unlock: 'tank6',
     temp: { min: 22, max: 28, best: 25 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [1.5, 3.5, 4.5], appetite: 0.8, space: 1, likes: ['plant', 'driftwood'], cleanMin: 50,
+    growDays: [2, 5], sizeCm: [1.5, 3.5, 4.5], appetite: 0.8, space: 1, likes: ['plant', 'driftwood'], cleanMin: 50, vitamin: 'ok',
     look: { lengthToHeight: 4.0, thickness: 0.17, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.2, school: true },
     texture: 'assets/fish/rummy_nose.png',
     intro: 'はなが あかい ちいさな さかな。みんなで ぴったり そろって およぐよ。',
@@ -173,7 +175,7 @@ export const FISH = [
   {
     id: 'blue_damsel', name: 'ルリスズメダイ', kind: 'fish', water: 'salt', rarity: 1, price: 120, unlock: 'tank6',
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake'],
-    growDays: [2, 5], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['coral', 'liverock'], cleanMin: 40,
+    growDays: [2, 5], sizeCm: [2, 4, 6], appetite: 1.0, space: 1, likes: ['coral', 'liverock'], cleanMin: 40, vitamin: 'love',
     look: { lengthToHeight: 2.6, thickness: 0.20, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.0, school: false },
     texture: 'assets/fish/blue_damsel.png',
     intro: 'るりいろに かがやく あおい さかな。げんきいっぱいで つよいよ。',
@@ -182,7 +184,7 @@ export const FISH = [
   {
     id: 'clownfish', name: 'カクレクマノミ', kind: 'fish', water: 'salt', rarity: 2, price: 200, unlock: 'tank6',
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake'],
-    growDays: [3, 6], sizeCm: [2, 5, 8], appetite: 1.0, space: 1, likes: ['coral', 'liverock'], cleanMin: 50,
+    growDays: [3, 6], sizeCm: [2, 5, 8], appetite: 1.0, space: 1, likes: ['coral', 'liverock'], cleanMin: 50, vitamin: 'love',
     look: { lengthToHeight: 2.6, thickness: 0.24, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.8, school: false },
     texture: 'assets/fish/clownfish.png',
     intro: 'オレンジと しろの しまもよう。サンゴの そばが おきにいり。',
@@ -191,7 +193,7 @@ export const FISH = [
   {
     id: 'skunk_shrimp', name: 'スカンクシュリンプ', kind: 'shrimp', water: 'salt', rarity: 3, price: 250, unlock: 'tank6',
     temp: { min: 23, max: 28, best: 25 }, food: ['food_flake', 'food_sinking'],
-    growDays: [3, 6], sizeCm: [1.5, 3.5, 5], appetite: 0.6, space: 0.5, likes: ['liverock'], cleanMin: 50,
+    growDays: [3, 6], sizeCm: [1.5, 3.5, 5], appetite: 0.6, space: 0.5, likes: ['liverock'], cleanMin: 50, vitamin: 'love',
     look: { lengthToHeight: 4.0, thickness: 0.20, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.5, school: false },
     texture: 'assets/fish/skunk_shrimp.png',
     intro: 'せなかに しろい せんが ある、うみの おそうじエビ。',
@@ -200,7 +202,7 @@ export const FISH = [
   {
     id: 'shittaka', name: 'シッタカガイ', kind: 'snail', water: 'salt', rarity: 1, price: 60, unlock: 'tank6',
     temp: { min: 18, max: 28, best: 24 }, food: ['food_flake', 'food_sinking'],
-    growDays: [2, 4], sizeCm: [1, 2, 3], appetite: 0.3, space: 0.5, likes: ['liverock'], cleanMin: 30,
+    growDays: [2, 4], sizeCm: [1, 2, 3], appetite: 0.3, space: 0, likes: ['liverock'], cleanMin: 30, vitamin: 'dislike',
     look: { lengthToHeight: 1.0, thickness: 0.7, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.15, school: false },
     texture: 'assets/fish/shittaka.png',
     intro: 'とんがり ぼうしの ような からの うみの まきがい。こけを たべて くれるよ。',
@@ -209,7 +211,7 @@ export const FISH = [
   {
     id: 'firefish', name: 'ハタタテハゼ', kind: 'fish', water: 'salt', rarity: 3, price: 300, unlock: 'tank6',
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake'],
-    growDays: [3, 6], sizeCm: [2, 5, 7], appetite: 0.8, space: 1, likes: ['liverock'], cleanMin: 50,
+    growDays: [3, 6], sizeCm: [2, 5, 7], appetite: 0.8, space: 1, likes: ['liverock'], cleanMin: 50, vitamin: 'ok',
     look: { lengthToHeight: 4.5, thickness: 0.14, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.7, school: false },
     texture: 'assets/fish/firefish.png',
     intro: 'せなかの ながい ひれを はたの ように たてる、しろと あかの さかな。',
@@ -218,7 +220,7 @@ export const FISH = [
   {
     id: 'yellow_tang', name: 'キイロハギ', kind: 'fish', water: 'salt', rarity: 3, price: 450, unlock: 'tank6',
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake'],
-    growDays: [4, 7], sizeCm: [3, 9, 14], appetite: 1.1, space: 2, likes: ['liverock', 'coral'], cleanMin: 50,
+    growDays: [4, 7], sizeCm: [3, 9, 14], appetite: 1.1, space: 2, likes: ['liverock', 'coral'], cleanMin: 50, vitamin: 'ok',
     look: { lengthToHeight: 1.6, thickness: 0.12, finStyle: 'tall' }, swim: { layer: 'middle', speed: 0.9, school: false },
     texture: 'assets/fish/yellow_tang.png',
     intro: 'からだ ぜんぶが レモンの ような きいろの さかな。',
@@ -227,7 +229,7 @@ export const FISH = [
   {
     id: 'blue_tang', name: 'ナンヨウハギ', kind: 'fish', water: 'salt', rarity: 3, price: 500, unlock: 'tank6',
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake'],
-    growDays: [4, 8], sizeCm: [3, 10, 15], appetite: 1.2, space: 2, likes: ['liverock', 'coral'], cleanMin: 50,
+    growDays: [4, 8], sizeCm: [3, 10, 15], appetite: 1.2, space: 2, likes: ['liverock', 'coral'], cleanMin: 50, vitamin: 'love',
     look: { lengthToHeight: 1.8, thickness: 0.14, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.0, school: false },
     texture: 'assets/fish/blue_tang.png',
     intro: 'あざやかな あおいろの からだに きいろい しっぽ。',
@@ -236,7 +238,7 @@ export const FISH = [
   {
     id: 'mandarin', name: 'ニシキテグリ', kind: 'fish', water: 'salt', rarity: 5, price: 1200, unlock: 'tank6', needs: ['liverock'],
     temp: { min: 24, max: 28, best: 26 }, food: ['food_flake', 'food_sinking'],
-    growDays: [4, 8], sizeCm: [2, 5, 7], appetite: 0.7, space: 1, likes: ['liverock', 'coral'], cleanMin: 60,
+    growDays: [4, 8], sizeCm: [2, 5, 7], appetite: 0.7, space: 1, likes: ['liverock', 'coral'], cleanMin: 60, vitamin: 'dislike',
     look: { lengthToHeight: 3.0, thickness: 0.30, finStyle: 'fan' }, swim: { layer: 'bottom', speed: 0.5, school: false },
     texture: 'assets/fish/mandarin.png',
     intro: 'あおと オレンジの もようが えのぐで かいた ように きれいな、でんせつの さかな。',

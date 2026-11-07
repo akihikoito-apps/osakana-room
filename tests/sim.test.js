@@ -277,8 +277,10 @@ function playUntilAllMissions(maxDays = 60) {
     ['medaka', 'fresh1'], ['medaka', 'fresh1'], ['minami_shrimp', 'fresh1'], ['plant', 'fresh1'], ['ishimaki', 'fresh1'],
     ['neon_tetra', 'fresh1'], ['corydoras', 'fresh1'], ['filter', 'fresh1'], ['light', 'fresh1'],
     ['tank_salt', 'salt'], ['clownfish', 'salt'], ['skunk_shrimp', 'salt'], ['shittaka', 'salt'], ['liverock', 'salt'],
+    ['auto_feeder', 'fresh1'], ['fan', 'fresh1'],
     ['tank_fresh', 'fresh2'], ['platy', 'fresh2'], ['cherry_barb', 'fresh2'], ['otocinclus', 'fresh2'], ['rummy_nose', 'fresh2'],
   ];
+  const hasVitamin = !!sim.data().itemById.food_vitamin;
   const log = [];
   let h = 0;
   for (; h < maxDays * 24 && Object.keys(st.missions.claimed).length < missions.MISSIONS.length; h++) {
@@ -301,6 +303,11 @@ function playUntilAllMissions(maxDays = 60) {
       if (t.clean < 75) sim.waterChange(st, t);
       if (t.leftover >= 1) sim.scoop(st, t);
       for (const f of t.fish) sim.pet(st, f.uid, now, t);
+      // v0.3：あさ 9じに ビタミン（なくなったら かう）
+      if (hasVitamin && sim.hourOf(st.clock.min) === 9 && st.coins >= 300) {
+        if (!(st.inv.food_vitamin > 0)) sim.buyItem(st, 'food_vitamin');
+        if (sim.vitaminStart(st, t, now).ok) { for (const f of t.fish) sim.vitaminEat(st, f.uid, now + 500); sim.vitaminEnd(st); now += 6000; }
+      }
     }
     now += 31000;
     sim.tick(st, HOUR, rnd);
@@ -309,8 +316,8 @@ function playUntilAllMissions(maxDays = 60) {
   return { st, days: st.daily.day, left: missions.MISSIONS.filter((m) => !st.missions.claimed[m.id]).map((m) => m.id), wish, log };
 }
 
-test('ふつうに あそぶと v0.2 の ミッション 24こが ぜんぶ うけとれる（60にち いない）', () => {
+test('ふつうに あそぶと v0.3 の ミッション 27こが ぜんぶ うけとれる（60にち いない）', () => {
   const { days, left, wish, st } = playUntilAllMissions(60);
-  assert.equal(missions.MISSIONS.length, 24);
+  assert.equal(missions.MISSIONS.length, 27);
   assert.deepEqual(left, [], `${days}にちめ で のこり: ${left.join(', ')}（かえなかった もの: ${wish.map((w) => w[0]).join(', ')}・コイン ${st.coins}）`);
 });

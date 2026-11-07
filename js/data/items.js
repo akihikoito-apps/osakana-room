@@ -2,7 +2,7 @@
 //
 // 項目
 //   id      : アイコンのファイル名・aq.setDecor() に渡す id と同じ
-//   type    : 'heater'|'filter'|'air'|'waterchange'|'decor'|'food'|'light'|'tank'（v0.2：すいそう そのもの）
+//   type    : 'heater'|'filter'|'air'|'waterchange'|'decor'|'food'|'light'|'tank'（v0.2：すいそう そのもの）|'feeder'|'fan'|'co2'|'skimmer'（v0.3）
 //   price   : お店の値段。null は売っていない（後の版）
 //   water   : 'fresh'|'salt'|'both'  どちらの すいそうで使えるか
 //   inTank  : true なら すいそうに入れるもの（aq.setDecor に id を渡す）。false は道具（ボタンになる）
@@ -98,6 +98,41 @@ export const ITEMS = [
     effect: { airPerHour: 0.3, cleanPerHour: 0.1 }, // 1こ あたり。くうき +0.3・きれいさ +0.1/時間（ライトで 1.5ばい。みずくさ と おなじ あつかい）
     icon: 'assets/items/coral.png',             // 絵はまだ無い（デザイン係へ）
     desc: 'いろあざやかな サンゴ。うみの さかなが よろこぶよ。',
+  },
+
+  // ---- v0.3：ビタミン剤（へっていく えさ）----
+  {
+    id: 'food_vitamin', name: 'ビタミン', type: 'food', price: 100, water: 'both', inTank: false, max: 1,
+    uses: 5,                                    // 1つ かうと 5かいぶん（つかうと へる。0 に なったら また かう）。もてるのは 5かいぶん まで
+    effect: { fill: 0 },                        // おなか は ふえない。そだち・けんこう・ごきげん は balance.js VITAMIN（すききらいで かわる）
+    icon: 'assets/items/food_vitamin.png',      // 絵はまだ無い（デザイン係へ）
+    desc: 'えいようが たっぷりの とくべつな ごはん。そだちと げんきが ぐんと あがるよ。すききらいが あるよ。1つで 5かいぶん。',
+  },
+
+  // ---- v0.3：器具 ----
+  {
+    id: 'auto_feeder', name: 'じどう えさやり', type: 'feeder', price: 200, water: 'both', inTank: true, max: 1, unlock: 'tank6',
+    effect: { atHours: [8, 18], below: 50, fill: 15 }, // ゲームの 8じ と 18じ に、おなか < 50 の 魚だけ おなか +15（コイン・なつき・そだち は なし）。スイッチで いり／きり
+    icon: 'assets/items/auto_feeder.png',       // 絵はまだ無い（デザイン係へ）
+    desc: 'おなかが すいた さかなに、あさと ゆうがた すこしだけ えさを あげて くれるよ。ごはんは じぶんでも あげてね。',
+  },
+  {
+    id: 'fan', name: 'クーラーファン', type: 'fan', price: 180, water: 'both', inTank: true, max: 1, unlock: 'tank6',
+    effect: { needsHeater: true },              // ヒーターと いっしょの ときだけ はたらく：おんど ダイヤル（balance.js THERMO）が つかえる。ファンだけ なら なにも しない
+    icon: 'assets/items/fan.png',               // 絵はまだ無い（デザイン係へ）
+    desc: 'ヒーターと いっしょに つかうと、みずの あたたかさを えらべるよ。さかなに ぴったりに すると よろこぶよ。',
+  },
+  {
+    id: 'co2_kit', name: 'シーオーツー', type: 'co2', price: 250, water: 'fresh', inTank: true, max: 1, unlock: 'tank6',
+    effect: { plantAirBoost: 1.5, moodBonusPlantLovers: 5 }, // みずくさ の くうき だけ 1.5ばい（ライトと かけあわせ。きれいさ は ふやさない）、みずくさ が すきな 魚の ごきげん +5。みずくさ が 0 なら こうか なし
+    icon: 'assets/items/co2_kit.png',           // 絵はまだ無い（デザイン係へ）
+    desc: 'みずくさと セットで つかうよ。みずくさが げんきに なって、くうきが ふえるよ。',
+  },
+  {
+    id: 'skimmer', name: 'プロテインスキマー', type: 'skimmer', price: 250, water: 'salt', inTank: true, max: 1, unlock: 'tank6',
+    effect: { dirtMultiplier: 0.8, leftoverPerHour: 0.1, airPerHour: 0.5 }, // くうき +0.5/時間（あわ） // よごれる はやさ 0.8ばい（フィルターと かけあわせ 0.4。みずかえ が いらなく ならない ように）、たべのこし −0.1/時間
+    icon: 'assets/items/skimmer.png',           // 絵はまだ無い（デザイン係へ）
+    desc: 'こまかい あわで うみの みずの よごれを とって くれるよ。',
   },
 
   // ---- すいそう（v0.2）。かうと へやに すいそうが ふえる（balance.js TANKS）----

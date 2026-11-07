@@ -110,7 +110,7 @@ async function audit(p) {
       }
       return r;
     };
-    const MODAL = '#celebrate, #dialog, #guide';
+    const MODAL = '#celebrate, #dialog, #guide, #bgm-picker';
     for (let i = 0; i < btns.length; i++) for (let j = i + 1; j < btns.length; j++) {
       const A = btns[i], Bt = btns[j];
       if (A.contains(Bt) || Bt.contains(A)) continue;
@@ -310,6 +310,10 @@ async function run(browser, base, W, H) {
   if (await p.evaluate(() => typeof G.sim.checkUnlock === 'function')) {
     try { await v02(); } catch (e) { notes.push('【不具合？】v0.2 の ながれが とちゅうで とまった: ' + e.message.split('\n')[0]); await shot('99_v02_stopped').catch(() => {}); }
   }
+  // 9. v0.3：かい 2ひき まで・ビタミン・おんど ダイヤル・じどう えさやり・おんがく
+  if (await p.evaluate(() => typeof G.sim.vitaminStart === 'function')) {
+    try { await v03(); } catch (e) { notes.push('【不具合？】v0.3 の ながれが とちゅうで とまった: ' + e.message.split('\n')[0]); await shot('99_v03_stopped').catch(() => {}); }
+  }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
 
@@ -465,6 +469,142 @@ async function run(browser, base, W, H) {
     notes.push('v0.2 リロード あと: ' + JSON.stringify(back));
     if (back.cel) notes.push('【不具合】リロードすると お知らせが また でる');
     if (back.tanks !== 2 || !back.unlocked) notes.push('【不具合】リロードで すいそう・解放が のこらない');
+  }
+
+  async function v03() {
+    const goRoom = async () => { for (let i = 0; i < 3 && (await st()).scr !== 'room'; i++) { await p.click('#btn-back'); await p.waitForTimeout(500); } };
+    const openShop = async (tab) => { await goRoom(); await p.click('#room-nav [data-go="shop"]'); await p.waitForTimeout(300); await p.click(`#scr-shop .tab[data-tab="${tab}"]`); await p.waitForTimeout(300); };
+    const openTank = async (slot) => { await goRoom(); await p.click(`.room-slot[data-slot="${slot}"]`); await p.waitForFunction(() => G.screen === 'tank', null, { timeout: 5000 }); await p.waitForTimeout(1500); };
+    await p.evaluate(() => { G.state.coins += 3000; G.refreshHud(); G.emit('changed'); });
+    const fresh = await p.evaluate(() => { const t = G.state.tanks.find((x) => x.water === 'fresh'); G.setTank(t.id); return { slot: t.slot, snails: t.fish.filter((f) => G.data.fishById[f.speciesId]?.kind === 'snail').length }; });
+    // かい：2ひき まで（いま 2ひき なら 3びきめは かえない）
+    await openShop('fish');
+    if (fresh.snails < 2) for (let i = fresh.snails; i < 2; i++) await buy('ishimaki');
+    await p.evaluate(() => document.querySelector('#shop-list [data-id="ishimaki"]')?.scrollIntoView({ block: 'center' }));
+    await p.waitForTimeout(300);
+    await shot('40_shop_snail_full');
+    await p.click('#shop-list [data-id="ishimaki"]'); await p.waitForTimeout(300);
+    const snailMsg = await p.textContent('#dialog .modal-body').catch(() => '');
+    const canBuy3 = !!(await p.$('#dialog .btn.primary'));
+    await shot('41_snail_dialog');
+    await p.click('#dialog .btn').catch(() => {}); await p.waitForTimeout(300);
+    notes.push(`かい 3びきめ: ${canBuy3 ? '【不具合】かえて しまう' : 'かえない'}「${(snailMsg || '').replace(/\s+/g, ' ').slice(-50)}」`);
+    // ビタミン：えさ タブで かう → すいそうで あげる
+    await p.click('#scr-shop .tab[data-tab="food"]'); await p.waitForTimeout(300);
+    await shot('42_shop_food');
+    await buy('food_vitamin');
+    const inv0 = await p.evaluate(() => G.state.inv.food_vitamin || 0);
+    if (inv0 !== 5) notes.push(`【不具合】ビタミンを かっても のこり ${inv0}（5 の はず）`);
+    await openTank(fresh.slot);
+    await shot('43_tank_vitamin_button');
+    const before = await p.evaluate(() => G.tank().fish.map((f) => ({ id: f.speciesId, h: Math.round(f.health), o: Math.round(f.onaka) })));
+    await p.click('#care [data-care="vitamin"]');
+    await p.waitForTimeout(1200);
+    await shot('44_vitamin_drop');
+    await p.waitForTimeout(6000);
+    await shot('45_vitamin_after');
+    const after = await p.evaluate(() => ({ left: G.state.inv.food_vitamin, today: G.state.daily.vitamin?.[G.tank().id] || 0, fish: G.tank().fish.map((f) => ({ id: f.speciesId, h: Math.round(f.health), o: Math.round(f.onaka) })), btn: document.querySelector('#care [data-care="vitamin"]')?.textContent, cool: document.querySelector('#care [data-care="vitamin"]')?.classList.contains('cool') }));
+    notes.push(`ビタミン：のこり ${inv0}→${after.left}・きょう ${after.today}・ボタン「${(after.btn || '').trim()}」 灰色=${after.cool}`);
+    notes.push('ビタミン まえ ' + JSON.stringify(before) + ' → あと ' + JSON.stringify(after.fish));
+    if (after.left !== inv0 - 1) notes.push('【不具合】ビタミンを あげても のこりが 1 へらない');
+    if (!after.cool) notes.push('【仕様と ちがう】ビタミンを あげた あとも ボタンが 灰色に ならない（1日1かい）');
+    // もう 1かい おす → doneToday の ことば
+    await p.click('#care [data-care="vitamin"]'); await p.waitForTimeout(500);
+    await shot('46_vitamin_done_today');
+    const left2 = await p.evaluate(() => G.state.inv.food_vitamin);
+    if (left2 !== after.left) notes.push('【不具合】1日に 2かい ビタミンが へった');
+    // おんど ダイヤル：ファンを 入れる（ヒーターは ある）
+    await openShop('equip');
+    await p.evaluate(() => document.querySelector('#shop-list [data-id="fan"]')?.scrollIntoView({ block: 'center' }));
+    await buy('fan');
+    await buy('auto_feeder');
+    await openTank(fresh.slot);
+    const thermoVis = await p.evaluate(() => !document.getElementById('thermo')?.hidden);
+    if (!thermoVis) notes.push('【不具合】ヒーターと ファンが あるのに おんど ダイヤルが 出ない');
+    await shot('47_thermo');
+    // ベタを 入れて すずしい(23ど) を おす → えらべない はず
+    await p.evaluate(() => { const t = G.tank(); G.state.coins += 500; const r = G.sim.buyFish(G.state, 'betta', t); G.emit('changed'); return r.ok; });
+    await p.waitForTimeout(800);
+    const thermo0 = await p.evaluate(() => G.tank().thermo);
+    await p.click('#thermo [data-step="cool"]'); await p.waitForTimeout(600);
+    await shot('48_thermo_unsafe');
+    const thermo1 = await p.evaluate(() => G.tank().thermo);
+    notes.push(`おんど：ベタが いる すいそうで すずしい を おした → ${thermo0}→${thermo1}`);
+    if (thermo1 === 'cool') notes.push('【不具合】ベタが いるのに すずしい（23ど）を えらべて しまう（仕様 2-2 safeOnly）');
+    await p.click('#thermo [data-step="warm"]'); await p.waitForTimeout(600);
+    const thermo2 = await p.evaluate(() => G.tank().thermo);
+    if (thermo2 !== 'warm') notes.push('【不具合】あたたかい（27ど）を えらべない');
+    // じどう えさやり の スイッチ
+    // おんど ダイヤル：あわない 段は 灰色（out）で、おしても かわらない
+    const outCls = await p.evaluate(() => [...document.querySelectorAll('#thermo .th-step')].map((b) => b.dataset.step + ':' + (b.classList.contains('out') || b.disabled ? 'はいいろ' : 'おせる')));
+    notes.push('おんど ダイヤル（ベタ いり）: ' + outCls.join(' '));
+    // じどう えさやり の スイッチ
+    const sw = await p.$('#feeder-sw:not([hidden])');
+    if (!sw) notes.push('【仕様と ちがう】じどう えさやり の いり／きり スイッチが 見つからない（仕様 2-1）');
+    else {
+      const s0 = await p.evaluate(() => ({ on: G.tank().feederOn !== false, text: document.querySelector('#feeder-sw .fs-state')?.textContent }));
+      await p.click('#feeder-sw'); await p.waitForTimeout(400);
+      const s1 = await p.evaluate(() => ({ on: G.tank().feederOn !== false, text: document.querySelector('#feeder-sw .fs-state')?.textContent }));
+      await shot('48b_feeder_off');
+      notes.push(`じどう えさ スイッチ: ${JSON.stringify(s0)} → ${JSON.stringify(s1)}`);
+      if (s0.on === s1.on) notes.push('【不具合】じどう えさ の スイッチを おしても かわらない');
+      // きり の まま 8じを こえても あげない
+      const fedOff = await p.evaluate(() => { const t = G.tank(); const f = t.fish.find((x) => G.data.fishById[x.speciesId]?.kind !== 'snail'); const m = ((G.state.clock.min % 1440) + 1440) % 1440; let d = 8 * 60 - 1 - m; if (d <= 0) d += 1440; G.sim.tick(G.state, d); f.onaka = 20; G.sim.tick(G.state, 2); return f.onaka; });
+      if (fedOff > 25) notes.push(`【不具合】じどう えさ きり なのに 8じに あげた（おなか 20→${fedOff.toFixed(1)}）`);
+      await p.click('#feeder-sw'); await p.waitForTimeout(300);
+    }
+    // エビ 7ひきめ：さかな・エビを 6ぴきに してから ミナミヌマエビを えらぶ
+    {
+      const n = await p.evaluate(() => G.tank().fish.filter((f) => G.data.fishById[f.speciesId]?.kind !== 'snail').length);
+      await openShop('fish');
+      for (let i = n; i < 6; i++) await buy('minami_shrimp');
+      await p.evaluate(() => document.querySelector('#shop-list [data-id="minami_shrimp"]')?.scrollIntoView({ block: 'center' }));
+      await p.click('#shop-list [data-id="minami_shrimp"]'); await p.waitForTimeout(300);
+      const msg = await p.textContent('#dialog .modal-body').catch(() => '');
+      const can7 = !!(await p.$('#dialog .btn.primary'));
+      await shot('48c_shrimp7');
+      await p.click('#dialog .btn').catch(() => {}); await p.waitForTimeout(300);
+      notes.push(`エビ 7ひきめ: ${can7 ? '【不具合】かえて しまう' : 'かえない'}「${(msg || '').replace(/\s+/g, ' ').slice(-50)}」`);
+      await openTank(fresh.slot);
+    }
+    // おんがく
+    const bgmBtn = await p.$('#btn-bgm:not([hidden])');
+    if (!bgmBtn) notes.push('おんがく ボタン：まだ 出ていない（BGM が とどいて いない？）');
+    else {
+      const tracks = await p.evaluate(async () => { try { const m = await import('./js/bgm.js'); return m.TRACKS.map((t) => t.file); } catch (e) { return []; } });
+      const missing = tracks.filter((f) => !existsSync(join(ROOT, f)));
+      notes.push(`おんがくの ファイル: ${tracks.length}きょく${missing.length ? '・【不具合】ない: ' + missing.join(', ') : '・ぜんぶ ある'}`);
+      await p.click('#btn-bgm'); await p.waitForTimeout(500);
+      await shot('49_bgm_picker');
+      const rows = await p.$$('#bgm-picker .bgm-row');
+      if (rows.length !== 5) notes.push(`【不具合】おんがくの 曲が ${rows.length}きょく（5きょく の はず）`);
+      const cur = async () => p.evaluate(async () => { try { const m = await import('./js/bgm.js'); return m.current(); } catch (e) { return { err: e.message }; } });
+      if (rows[0]) { await rows[0].click(); await p.waitForTimeout(2500); }
+      const s1 = await cur();
+      notes.push('おんがく えらぶ：' + JSON.stringify(s1));
+      if (!s1.playing) notes.push('【不具合？】曲を えらんでも ながれない（ヘッドレスの ブラウザ では 音が 出ない ことも ある）');
+      await shot('50_bgm_playing');
+      // きりかえ（えらぶと パネルが とじるので もういちど ひらく）
+      const reopen = async () => { if (await p.evaluate(() => document.getElementById('bgm-picker').hidden)) { await p.click('#btn-bgm'); await p.waitForTimeout(500); } };
+      await reopen();
+      const rows2 = await p.$$('#bgm-picker .bgm-row');
+      if (rows2[3]) { await rows2[3].click(); await p.waitForTimeout(2500); }
+      const s2 = await cur();
+      notes.push('おんがく きりかえ：' + JSON.stringify(s2));
+      if (s2.id === s1.id || !s2.playing) notes.push('【不具合】おんがくの きりかえが できない');
+      await shot('50b_bgm_switch');
+      await reopen();
+      await p.click('#bgm-picker .bgm-stop'); await p.waitForTimeout(1200);
+      const s3 = await cur();
+      notes.push('おんがく とめる：' + JSON.stringify(s3));
+      if (s3.on || s3.playing) notes.push('【不具合】「とめる」で おんがくが とまらない');
+      await p.click('#bgm-picker .bgm-close').catch(() => {}); await p.waitForTimeout(300);
+      // リロード しても えらんだ 曲・オフが のこる（localStorage）
+      const saved = await p.evaluate(() => { try { return JSON.parse(localStorage.getItem('osakana-room-bgm') || 'null'); } catch { return null; } });
+      notes.push('おんがくの せってい: ' + JSON.stringify(saved));
+    }
+    await goRoom(); await p.waitForTimeout(800);
+    await shot('51_room_v03');
   }
 }
 

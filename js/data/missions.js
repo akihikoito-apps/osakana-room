@@ -26,6 +26,9 @@
 //   'waterFishCount': ぜんぶの すいそうで その みずの 生きものの 数 { water, count }
 //   'hearts'       : なでて もらった ハートの つうさん（つかっても へらない数）{ count }
 //   'placeItem' は v0.2 から ぜんぶの すいそうを 見る
+//   --- v0.3 ---
+//   'vitaminEat'   : ビタミンを たべた かいすう（1かいの ビタミンで 1）。love: true なら だいすき の 魚が たべた かいすう { count, love? }
+//   'gadgetCount'  : ぜんぶの すいそうに 入っている v0.3 の 器具（ids の どれか）の かず { ids, count }
 //
 // 配列の じゅん（＝ order の じゅん）に 3つずつ 画面に出す。v0.2 の ものは order に 小数を つかって あいだに 入れた（おわったら つぎが 出る）。チュートリアル中は出さない。
 export const MISSIONS = [
@@ -43,11 +46,14 @@ export const MISSIONS = [
   { id: 'm_salt',       order: 8.2, title: 'うみの すいそう',      desc: 'うみの すいそうを かおう',                 goal: { type: 'hasTankWater', water: 'salt' }, reward: { coin: 150 } },
   { id: 'm_tank2',      order: 8.3, title: 'すいそうが ふえた',    desc: 'すいそうを 2つに しよう',                 goal: { type: 'tankCount', count: 2 },     reward: { coin: 100 } },
   { id: 'm_filter',     order: 9,  title: 'みずを きれいに',      desc: 'フィルターを いれよう',                   goal: { type: 'placeItem', id: 'filter' }, reward: { coin: 60 } },
+  { id: 'm_vitamin1',   order: 9.5, title: 'えいよう たっぷり',    desc: 'ビタミンを あげてみよう',                 goal: { type: 'vitaminEat', count: 1 },    reward: { coin: 40 } },
   { id: 'm_healthy',    order: 10, title: 'みんな げんき',        desc: 'さかな 3びき いじょう、みんなを げんきに', goal: { type: 'allHealthy', value: 70, minFish: 3 }, reward: { coin: 80 } },
   { id: 'm_natsuki',    order: 11, title: 'なかよしの しるし',    desc: 'なつきの ハートを 3こに しよう',          goal: { type: 'natsuki', value: 60 },      reward: { coin: 80 } },
   { id: 'm_zukan4',     order: 12, title: 'ずかん あつめ',        desc: 'ずかんに 4しゅるい のせよう',              goal: { type: 'zukan', count: 4 },         reward: { coin: 100 } },
   { id: 'm_light',      order: 13, title: 'きらきら すいそう',    desc: 'ライトを いれよう',                       goal: { type: 'placeItem', id: 'light' },  reward: { coin: 60 } },
+  { id: 'm_vitamin_love', order: 13.5, title: 'だいすきな ごはん',  desc: 'ビタミンが だいすきな さかなに 3かい あげよう', goal: { type: 'vitaminEat', count: 3, love: true }, reward: { coin: 80 } },
   { id: 'm_days5',      order: 14, title: 'まいにち おせわ',      desc: '5にち おせわ しよう',                     goal: { type: 'days', count: 5 },          reward: { coin: 100 } },
+  { id: 'm_gadget2',    order: 14.5, title: 'どうぐ はかせ',        desc: 'あたらしい どうぐを 2つ いれよう',         goal: { type: 'gadgetCount', ids: ['auto_feeder', 'fan', 'co2_kit', 'skimmer'], count: 2 }, reward: { coin: 100 } },
   { id: 'm_big',        order: 15, title: 'ビッグに なった！',    desc: 'さかなを ビッグに そだてよう',             goal: { type: 'grow', stage: 2 },          reward: { coin: 150 } },
   // ---- v0.2 ----
   { id: 'm_saltfish3',  order: 19, title: 'うみの なかまたち',    desc: 'うみの いきものを 3びきに しよう',          goal: { type: 'waterFishCount', water: 'salt', count: 3 }, reward: { coin: 100 } },

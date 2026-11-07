@@ -65,6 +65,13 @@ export function makeFxTextures() {
       g.closePath(); g.lineJoin = 'round'; g.lineWidth = 7; g.strokeStyle = '#ff9a1f'; g.stroke(); g.fillStyle = '#fff07a'; g.fill();
       g.beginPath(); g.arc(c, c, c * 0.16, 0, 7); g.fillStyle = '#ffffff'; g.fill();
     }),
+    puff: canvasTex(128, (g, n) => {
+      // ぷいっ：小さな泡 2つ と、すいっ の線
+      g.lineWidth = 6; g.strokeStyle = '#ffffff'; g.fillStyle = 'rgba(230,248,255,0.85)';
+      for (const [x, y, r] of [[n * 0.38, n * 0.55, n * 0.17], [n * 0.66, n * 0.4, n * 0.11]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke(); }
+      g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 5; g.lineCap = 'round';
+      for (const [y, l] of [[0.22, 0.25], [0.78, 0.2]]) { g.beginPath(); g.moveTo(n * 0.6, n * y); g.lineTo(n * (0.6 + l), n * (y - 0.04)); g.stroke(); }
+    }),
     ring: canvasTex(128, (g, n) => {
       g.beginPath(); g.arc(n / 2, n / 2, n * 0.4, 0, 7);
       g.lineWidth = 8; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.stroke();
@@ -113,6 +120,14 @@ export class FxLayer {
     switch (type) {
       case 'eat':
         this.add('heart', anchor, { size: 0.55, life: 1.1, vy: 0.7 });
+        break;
+      case 'love':
+        // 大小のハートを順番に＋キラキラ少し
+        [0.85, 0.62, 0.5].forEach((sz, i) => this.add('heart', anchor, { delay: i * 0.12, size: sz, life: 1.4, ox: (i - 1) * 0.4, vx: (i - 1) * 0.2, vy: 0.7 }));
+        for (let i = 0; i < 3; i++) this.add('sparkle', anchor, { delay: 0.3 + i * 0.1, size: 0.4, life: 0.7, ox: (Math.random() - 0.5) * 1.4, oy: -0.3, vy: 0.2, twinkle: true });
+        break;
+      case 'pui':
+        this.add('puff', anchor, { delay: 0.32, size: 0.6, life: 0.9, ox: 0.35, oy: -0.25, vx: 0.4, vy: 0.25, sway: 0 });
         break;
       case 'heart':
         this.add('heart', anchor, { size: 0.85, life: 1.6, vy: 0.55 });

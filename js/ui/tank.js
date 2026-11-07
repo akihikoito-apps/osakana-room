@@ -48,6 +48,12 @@ export function init(g) {
   });
   for (const c of ['#aq', '#aq-salt']) $(c).addEventListener('pointerdown', () => { if (!tutorialOn()) $('#gauges').classList.remove('open'); });
   // ほかの 水槽へ（へやに もどらずに じゅんばんに）
+  $('#feeder-sw').addEventListener('click', () => {
+    const t = G.tank();
+    const on = G.sim.setFeeder(t, t.feederOn === false);
+    toast(on ? 'じどう えさやりを オンに したよ' : 'じどう えさやりを オフに したよ');
+    G.markDirty(); G.saveNow(); renderFeeder();
+  });
   $('#tank-title .tt-prev').addEventListener('click', () => step(-1));
   $('#tank-title .tt-next').addEventListener('click', () => step(1));
   $('#fish-card').addEventListener('pointerdown', () => armCardClose());
@@ -101,7 +107,7 @@ function ensureAq() {
     const canvas = $(water === 'salt' ? '#aq-salt' : '#aq');
     const a = createAquarium(canvas, { water, species: G.data.FISH });
     a.on('tapFish', ({ uid }) => { if (a === aq) onTapFish(uid); });
-    a.on('eat', ({ uid }) => { if (a === aq) onEat(uid); });
+    a.on('eat', ({ uid, kind }) => { if (a === aq) onEat(uid, kind); });
     // 魚の いない ところを タップしたら カードを とじる（見回しの ドラッグは のぞく）
     let downAt = null;
     canvas.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; justTapped = false; });
@@ -171,7 +177,10 @@ export function hide() {
 
 // ---------- 3D と データを あわせる ----------
 function syncFish() {
-  aq?.setFish(G.tank().fish.map((f) => ({ uid: f.uid, speciesId: f.speciesId, stage: f.stage, health: f.health, happy: f.mood })));
+  const fish = G.tank().fish;
+  aq?.setFish(fish.map((f) => ({ uid: f.uid, speciesId: f.speciesId, stage: f.stage, health: f.health, happy: f.mood })));
+  // ビタミンの すききらい（3D の ぷいっ・だいすき の よろこび）
+  aq?.setFoodPrefs?.(Object.fromEntries(fish.map((f) => [f.uid, { vitamin: G.data.fishById[f.speciesId]?.vitamin || 'ok' }])));
 }
 function syncDecor() { aq?.setDecor(G.tank().decor.slice()); }
 function syncWater() {
@@ -228,12 +237,73 @@ function renderCareState() {
   cb.classList.toggle('busy', cleaning);
   const show = G.tutorialShows || (() => true);
   fb.hidden = !show('feed'); wb.hidden = !show('water'); cb.hidden = !show('clean'); btn('photo').hidden = !show('photo');
+  // ビタミン：いちど かったら 出す。のこり かいすう・きょう もう あげた・みんな にがて は うすく
+  const vb = btn('vitamin');
+  const left = s.inv.food_vitamin || 0;
+  vb.hidden = !s.owned.food_vitamin || !show('feed');
+  // きょう もう あげた 水槽は「☀ あしたの あさ また」（のこりが あっても おせない わけ）
+  const doneNow = (s.daily.vitamin?.[t.id] || 0) >= (sim.balance().VITAMIN?.perTankPerDay ?? 1);
+  vb.querySelector('.vit-left').textContent = doneNow && left ? '☀ あしたの あさ また' : ` のこり ${left}`;
+  const done = (s.daily.vitamin?.[t.id] || 0) >= (sim.balance().VITAMIN?.perTankPerDay ?? 1);
+  const allNo = t.fish.length > 0 && t.fish.every((f) => G.data.fishById[f.speciesId]?.vitamin === 'dislike');
+  vb.classList.toggle('cool', !left || done || allNo || cleaning || sim.vitaminBusy());
+  renderCap(); renderThermo();
+}
+
+/** 定員：「さかな ◯／6 ・ かい ◯／2」（かずが わかる ように いっぱい なら ことばで） */
+export function capText(t) {
+  const c = G.sim.capacityOf(t);
+  const fishFull = c.full ?? (c.space >= c.capacity - 1e-9);   // 6ぴき でも space でも いっぱい
+  return { fish: fishFull ? 'さかな いっぱい' : `さかな ${c.fish}ひき`, snail: c.snail >= c.snailMax ? 'かい いっぱい' : `かい ${c.snail}／${c.snailMax}`, fishFull, snailFull: c.snail >= c.snailMax, c };
+}
+function renderCap() {
+  const box = $('#tank-cap');
+  const t = G.tank();
+  if (!t.fish.length || G.tutorialBusy?.()) { box.hidden = true; return; }
+  const k = capText(t);
+  box.replaceChildren(el('span', { class: k.fishFull ? 'full' : '', text: '🐟 ' + k.fish }), el('span', { class: k.snailFull ? 'full' : '', text: '🐚 ' + k.snail }));
+  box.hidden = false;
+}
+
+/** おんど ダイヤル（ヒーターと ファンが りょうほう ある 水槽） */
+function renderThermo() {
+  const box = $('#thermo');
+  const t = G.tank(), sim = G.sim;
+  if (!sim.hasThermo(t) || G.tutorialBusy?.()) { box.hidden = true; renderFeeder(); return; }
+  const steps = sim.balance().THERMO?.steps || [];
+  renderFeeder();
+  box.querySelector('.th-steps').replaceChildren(...steps.map((st) => {
+    const out = sim.thermoOutFish(t, st.id);
+    const face = out.length ? el('img', { class: 'th-fish', src: G.data.fishById[out[0].speciesId]?.texture || '', alt: '' }) : el('span', { class: 'th-face', text: '😊' });
+    return el('button', { class: 'th-step' + (t.thermo === st.id ? ' on' : '') + (out.length ? ' out' : ''), 'data-step': st.id, onclick: () => pickThermo(st.id) },
+      el('span', { class: 'th-lb', text: st.label }), el('span', { class: 'th-deg', text: st.temp + 'ど' }), face);
+  }));
+  box.hidden = false;
+}
+/** じどう えさやりの オン／オフ（きぐが ある 水槽だけ。「いり」は「えさ いり」と よめるので つかわない） */
+function renderFeeder() {
+  const b = $('#feeder-sw');
+  const t = G.tank();
+  if (!t.decor.includes('auto_feeder') || G.tutorialBusy?.()) { b.hidden = true; return; }
+  const on = t.feederOn !== false;
+  b.classList.toggle('on', on);
+  b.querySelector('.fs-state').textContent = on ? 'オン' : 'オフ';
+  b.setAttribute('aria-pressed', String(on));
+  b.hidden = false;
+}
+function pickThermo(id) {
+  const t = G.tank();
+  const r = G.sim.setThermo(G.state, t, id);
+  // あわない 段（灰色）は えらべない。おしたら わけを いう
+  if (!r.ok) { if (r.out?.length) toast(G.sim.data().THERMO_LINES.outOfRange.replaceAll('{name}', G.data.fishById[r.out[0].speciesId]?.name || '')); return; }
+  G.markDirty(); G.saveNow();
+  renderThermo(); renderGauges();
 }
 
 /** ヒントの action の ボタンを ゆっくり 光らせる */
 function glow(action) {
   $$('.hint-glow').forEach((e) => e.classList.remove('hint-glow'));
-  const map = { feed: '#care [data-care="feed"]', water_change: '#care [data-care="water"]', scoop: '#care [data-care="clean"]', shop: '#btn-menu' };
+  const map = { feed: '#care [data-care="feed"]', water_change: '#care [data-care="water"]', scoop: '#care [data-care="clean"]', shop: '#btn-menu', vitamin: '#care [data-care="vitamin"]', thermo: '#thermo' };
   const e = action && map[action] && $(map[action]);
   if (e) e.classList.add('hint-glow');
 }
@@ -274,6 +344,7 @@ function onCare(kind, b) {
     G.emit('action', { type: 'feedStart' });
     return;
   }
+  if (kind === 'vitamin') { giveVitamin(b); return; }
   if (kind === 'water') {
     if (!sim.ownsTool(s, 'water_change')) { toast('みずかえセットは おみせに あるよ'); return; }
     busy.water = now + 1500;
@@ -324,7 +395,46 @@ function startClean(b, t) {
 // とちゅうで 裏に まわったら、そこで おわった ことに する
 document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') cleanDone?.(); });
 
-function onEat(uid) {
+/** ビタミン：おとす（にがての 魚は 3D が ぷいっ）。おわりに しめる */
+let vitTimer = 0;
+function giveVitamin(b) {
+  const s = G.state, t = G.tank(), sim = G.sim;
+  if (cleaning) return;
+  const r = sim.vitaminStart(s, t);
+  if (!r.ok) { if (r.text) toast(r.text); else if (r.reason === 'noFish') toast('まだ さかなが いないよ'); return; }
+  const W = $('#aq').clientWidth || 1;
+  const xs = t.fish.map((f) => aq?.screenPosOf(f.uid)?.x).filter((x) => x != null);
+  const x = xs.length ? xs.reduce((a, v) => a + v, 0) / xs.length / W : 0.5;
+  aq?.feed(Math.min(0.85, Math.max(0.15, x)), 0.15, { kind: 'vitamin' });
+  if (t.fish.length > 4) setTimeout(() => aq?.feed(Math.min(0.85, Math.max(0.15, x + 0.12)), 0.15, { kind: 'vitamin' }), 250);
+  // にがての 魚：すききらいを ずかんに のせる（はじめての しゅるい なら ふきだし）
+  for (const f of t.fish) {
+    if (G.data.fishById[f.speciesId]?.vitamin !== 'dislike') continue;
+    const e = sim.vitaminEat(s, f.uid);
+    if (e?.line) toast('♪ ' + e.line);   // ぷいっ は あかるく（3D は setFoodPrefs で じどうで 'pui'）
+  }
+  renderCareState();
+  setTimeout(renderCareState, r.lockMs + 50);
+  clearTimeout(vitTimer);
+  vitTimer = setTimeout(() => { const end = sim.vitaminEnd(s); G.handleEvents(end?.events); G.markDirty(); G.saveNow(); G.emit('changed'); }, r.windowMs);
+  G.markDirty(); G.saveNow();
+  G.emit('action', { type: 'vitamin' });
+}
+let vitLineShown = false;
+function onVitaminEat(uid) {
+  const r = G.sim.vitaminEat(G.state, uid);
+  if (!r) return;
+  const kinds = r.react || [];
+  // 3D は だいすき を じぶんで よろこぶ。ここでは のこりの リアクションを つづけて
+  kinds.forEach((k, i) => setTimeout(() => aq?.react(uid, k === 'turn' ? 'pui' : k), i * 1000));
+  if (r.line && !vitLineShown && r.pref !== 'dislike') { vitLineShown = true; toast(r.line, r.pref === 'love' ? 'gold' : ''); setTimeout(() => { vitLineShown = false; }, 6000); }
+  G.handleEvents(r.events);
+  G.markDirty();
+  renderGauges();
+}
+
+function onEat(uid, kind) {
+  if (kind === 'vitamin') { onVitaminEat(uid); return; }
   const r = G.sim.feedEat(G.state, uid);
   if (!r) return;
   if (r.coin) {
@@ -515,6 +625,13 @@ function onSimEvent(ev) {
     toast(G.sim.text('recovered', name));
     G.queueReact(ev.uid, 'happy');
     if (G.screen === 'tank') renderHint();
+  } else if (ev.type === 'thermoReset') {
+    const tk = G.state.tanks.find((x) => x.id === ev.tankId);
+    const out = tk?.fish[tk.fish.length - 1];
+    toast(G.sim.data().THERMO_LINES.reset?.replaceAll('{name}', G.data.fishById[out?.speciesId]?.name || '') || 'おんどを ふつうに もどしたよ');
+  } else if (ev.type === 'autoFeed') {
+    // じどう えさやり：見ている 水槽なら 3D の きかいから 粒を おとす（見た目だけ。数値は sim で もう 足した）
+    if (G.screen === 'tank' && aq && ev.tankId === t.id) aq.autoFeed?.({ kind: 'flake' });
   } else if (ev.type === 'newDay') {
     toast(`${ev.day}にちめの あさ だよ`);
   }

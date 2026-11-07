@@ -79,7 +79,7 @@ function allScreenTexts() {
   walkVal(balance.UNLOCK.tank6.banner, 'UNLOCK.banner'); walkVal(balance.UNLOCK.tank6.lockedLine, 'UNLOCK.lockedLine');
   walkVal([balance.HEART.doneLine, balance.HEART.restLine], 'HEART'); walkVal(balance.SHOP_TABS, 'SHOP_TABS');
   walkVal(balance.WATER_LABELS, 'WATER_LABELS'); walkVal(balance.HEART_LABEL, 'HEART_LABEL');
-  for (const f of [...walk('js/ui'), 'js/main.js', 'js/sim.js', 'js/state.js', ...walk('js/aquarium')]) for (const s of uiStrings(read(f))) out.push([`${f}:${s.line}`, s.text]);
+  for (const f of [...walk('js/ui'), 'js/main.js', 'js/sim.js', 'js/state.js', ...walk('js/aquarium'), ...walk('js', (p) => p === 'js/bgm.js')]) for (const s of uiStrings(read(f))) out.push([`${f}:${s.line}`, s.text]);
   for (const s of htmlTexts(read('index.html'))) out.push(['index.html', s]);
   const m = JSON.parse(read('manifest.json'));
   out.push(['manifest', m.name], ['manifest', m.description]);
@@ -136,7 +136,8 @@ test('aquarium：180°（Math.PI）で ひっくりかえす・上下を 反転�
       }
       if (/rotation\.[zx]\s*[+\-]?=\s*-?3\.14/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
       if (/\.scale\.y\s*=\s*-|\.scale\.set\([^,]+,\s*-/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}`);
-      if (/rotation\.z\s*\+=/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}（たしつづけると まわりきる）`);
+      // たしつづける 回転は 魚の からだ（.mesh）だけ だめ（クーラーファンの はね などは まわって よい）
+      if (/\.mesh\.rotation\.z\s*\+=/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim()}（たしつづけると まわりきる）`);
     });
   }
   assert.deepEqual(bad, []);

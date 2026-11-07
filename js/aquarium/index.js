@@ -19,7 +19,7 @@ import { mergeSpec } from './speciesDefaults.js';
 const RENDERERS = new WeakMap();
 
 const FOV = 30;
-const REACTIONS = ['heart', 'jump', 'spin', 'happy', 'sad', 'thanks', 'sleepy'];
+const REACTIONS = ['heart', 'jump', 'spin', 'happy', 'sad', 'thanks', 'sleepy', 'pui'];
 
 /**
  * @param {HTMLCanvasElement} canvas
@@ -57,6 +57,14 @@ export function createAquarium(canvas, opts = {}) {
   const emit = (name, data) => { for (const fn of listeners[name] || []) { try { fn(data); } catch (e) { console.error(e); } } };
 
   let camDist = 12;
+  // えさの好み：uid → { [kind]: 'love'|'ok'|'dislike' }（文字だけなら ふつうのえさ以外 すべてに）
+  const prefs = new Map();
+  const foodPref = (agent, kind = 'flake') => {
+    const p = prefs.get(agent.uid);
+    if (!p) return 'ok';
+    if (typeof p === 'string') return kind === 'flake' ? 'ok' : p;
+    return p[kind] || 'ok';
+  };
   let disposed = false;
   const ctx = { minLen: 0 };
   let cssW = 1, cssH = 1;
@@ -207,10 +215,19 @@ export function createAquarium(canvas, opts = {}) {
   let fpsAcc = 0, fpsN = 0, fps = 60, slowSecs = 0;
   Object.assign(ctx, {
     bounds: tank.bounds, fishes: [], foods: tank.foods, schools, time: 0,
-    onEat: (agent) => {
-      emit('eat', { uid: agent.uid });
-      if (autoHeart) fx.spawn('eat', anchorFor(agent.uid));
+    onEat: (agent, kind) => {
+      emit('eat', { uid: agent.uid, kind });
+      const pref = foodPref(agent, kind);
+      // 好きなえさ：大喜び（ハート大小3つ＋くるっ）。うるさくならないよう 1匹4秒に1回・水槽で同時に2匹まで
+      const busy = [...fishes.values()].filter((f) => f.agent.react && f.agent.react.love).length;
+      if (pref === 'love' && simTime - (agent.lastLove ?? -99) > 4 && busy < 2) {
+        agent.lastLove = simTime;
+        agent.startReact('spin'); agent.react.love = true;
+        fx.spawn('love', anchorFor(agent.uid));
+      } else if (autoHeart) fx.spawn('eat', anchorFor(agent.uid));
     },
+    onPui: (agent) => { fx.spawn('pui', anchorFor(agent.uid)); },
+    foodPref: (agent, kind) => foodPref(agent, kind),
   });
 
   function updateSchools(dt) {
@@ -254,6 +271,9 @@ export function createAquarium(canvas, opts = {}) {
     simTime += dt;
     ctx.time = simTime;
     ctx.fishes = [...fishes.values()].map((f) => f.agent);
+    tank.bottomEaters = Math.min(5, ctx.fishes.filter((a) => a.eatsFromBottom).length);
+    tank.creatures = ctx.fishes.length;
+    tank.snails = Math.min(2, ctx.fishes.filter((a) => a.isSnail).length);
     updateSchools(dt);
     tank.update(dt);
     cleaner.update(dt, ctx);
@@ -320,7 +340,7 @@ export function createAquarium(canvas, opts = {}) {
     },
     setDecor(ids) { tank.setDecor(ids || []); },
     setWater(w) { tank.setWater(w || {}); tank.setFogRange(camDist + TANK_D / 2); },
-    feed(xNorm = 0.5, yNorm = 0.3) {
+    feed(xNorm = 0.5, yNorm = 0.3, o = {}) {
       ndc.set(xNorm * 2 - 1, -(yNorm * 2 - 1));
       ray.setFromCamera(ndc, camera);
       // 画面のその位置の真上（水面）に落とす
@@ -328,7 +348,7 @@ export function createAquarium(canvas, opts = {}) {
       const t = (zPlane - ray.ray.origin.z) / ray.ray.direction.z;
       const p = ray.ray.at(t, _v);
       const b = tank.bounds;
-      tank.dropFood(THREE.MathUtils.clamp(p.x, b.minX + 0.4, b.maxX - 0.4), THREE.MathUtils.clamp(zPlane + (Math.random() - 0.5) * 1.5, b.minZ, b.maxZ));
+      tank.dropFood(THREE.MathUtils.clamp(p.x, b.minX + 0.4, b.maxX - 0.4), THREE.MathUtils.clamp(zPlane + (Math.random() - 0.5) * 1.5, b.minZ, b.maxZ), o.kind || 'flake');
     },
     /** 水の中の餌を全部消す（水かえのときなど）。 */
     clearFood() { for (const f of tank.foods) { f.alive = false; f.gone = true; } },
@@ -350,7 +370,14 @@ export function createAquarium(canvas, opts = {}) {
     stop() { running = false; cancelAnimationFrame(raf); },
     /** 確認用（中身を見るだけ）。 */
     get _agents() { return [...fishes.values()].map((f) => f.agent); },
-    /** そうじのアニメ（約3秒）。終わると解決する Promise を返す。 */
+    /** 自動えさやり機から少しえさを落とす（機械が無ければ右上から）。 */
+    autoFeed(o = {}) { tank.autoFeed(o.kind || 'flake'); },
+    /**
+     * えさの好みを渡す（何度呼んでもよい。渡した uid だけ上書き）。
+     * 例：setFoodPrefs({ f1: { vitamin: 'love' }, f2: { vitamin: 'dislike' } })、f3: 'love' のように文字だけでも可。null で消す。
+     */
+    setFoodPrefs(map = {}) { for (const [uid, p] of Object.entries(map)) { if (p == null) prefs.delete(uid); else prefs.set(uid, p); } },
+    /** そうじのアニメ（約2秒）。終わると解決する Promise を返す。 */
     playClean() { return cleaner.play(); },
     /**
      * 後片付け。canvas をまた使うなら dispose() のまま（renderer を使い回す）。

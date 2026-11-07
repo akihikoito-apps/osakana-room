@@ -39,6 +39,7 @@ async function detail(f, have) {
       likes.length ? el('div', { class: 'small', text: `すきな もの：${likes.join('、')}` }) : null,
       friends.length ? el('div', { class: 'small', text: `なかよし：${friends.join('、')}` }) : null,
       nigate.length ? el('div', { class: 'small', text: `にがて：${nigate.join('、')}` }) : null,
+      el('div', { class: 'small', text: `ビタミン：${(G.state.dex[f.id]?.vitaminTried || G.state.vitaminSeen?.[f.id]) ? (G.sim.data().VITAMIN_DEX?.[f.vitamin || 'ok'] || '') : '？'}` }),
       f.hint ? el('div', { class: 'small', text: '💡 ' + f.hint }) : null,
     );
   }

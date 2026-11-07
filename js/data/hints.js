@@ -21,6 +21,10 @@
 //   'saltNoLiverock' : うみの すいそうに 生きものが いて、ライブロックが 1つも なく、きれいさ < 70
 //   'unlockNear'     : UNLOCK.tank6 が まだで、1つめの すいそうの 生きものが 4〜5ひき（{n} は のこりの かず）
 //   'tankEmpty'      : 生きものが 1ぴきも いない すいそう（2つめ いこう）
+//   --- v0.3 ---
+//   'fanCold'        : ヒーターと クーラーファンが 両方 あり、すいおん < どれかの魚の min（tempLow の かわりに 出す。ダイヤルは あんぜんな だん しか えらべないので ふつうは おきない）
+//   'co2NoPlant'     : シーオーツーが あるのに みずくさ が 0（淡水）
+//   'weakVitamin'    : げんきが ない魚が いて、ほかの 原因が もう ない（なおる とちゅう）。ビタミンを もっていて、その魚が dislike でない
 //
 // priority が 小さいほど さきに 出す。いちどに 出すのは 1つだけ。
 // 魚が「げんきが ない」（けんこう < 40）ときは、えらばれた ヒントの まえに WEAK_PREFIX を つける（action は そのヒントの もの）。
@@ -32,6 +36,8 @@ export const RECOVERED_LINE = '{name}が げんきに なったよ！';         
 export const HINTS = [
   { id: 'h_noheater',    priority: 1,  when: { type: 'noHeaterCold' },
     text: 'みずが すこし つめたいみたい。おみせの ヒーターで あたためて あげよう。', action: 'shop' },
+  { id: 'h_fan_cold',    priority: 1.5, when: { type: 'fanCold' },
+    text: '{name}には すこし すずしすぎる みたい。おんど ダイヤルを あたたかく してみよう。', action: 'thermo' },
   { id: 'h_cold',        priority: 2,  when: { type: 'tempLow' },
     text: 'いま ヒーターが みずを あたためているよ。すこし まってね。', action: null },
   { id: 'h_hot',         priority: 2,  when: { type: 'tempHigh' },
@@ -58,6 +64,10 @@ export const HINTS = [
     text: '{name}は {like}が すきだよ。すいそうに いれて あげると よろこぶよ。', action: 'shop' },
   { id: 'h_nigate',      priority: 10, when: { type: 'nigate' },
     text: '{name}は いっしょの なかまが すこし にがて みたい。すきな かざりを いれると きげんが なおるよ。', action: 'shop' },
+  { id: 'h_co2',         priority: 12, when: { type: 'co2NoPlant' },
+    text: 'シーオーツーは みずくさが あると はたらくよ。みずくさを いれてみよう。', action: 'shop' },
+  { id: 'h_weak_vitamin', priority: 13, when: { type: 'weakVitamin' },
+    text: 'ビタミンを あげると {name}が はやく げんきに なるよ。', action: 'vitamin' },
   { id: 'h_unlock_near', priority: 15, when: { type: 'unlockNear' },
     text: 'あと {n}ひきで あたらしい なかまに あえるよ。エビや かいも かぞえるよ。', action: 'shop' },
   { id: 'h_tank_empty',  priority: 16, when: { type: 'tankEmpty' },
@@ -80,6 +90,33 @@ export const SHOP_LINES = {
   locked: '1つめの すいそうに 6ぴき いると あえるよ（エビも かいも かぞえるよ）',                                   // unlock 前の かぎつき カード（balance.js UNLOCK.tank6.lockedLine と おなじ）
   tankMax: 'へやに すいそうが いっぱいだよ。いまの すいそうを たいせつに そだてよう。',     // すいそうが TANKS.max（6）
   newTank: 'あたらしい すいそうが へやに きたよ！',                                       // すいそうを かった とき
+  snailFull: 'かいは 1つの すいそうに 2ひき までだよ。',                                   // （v0.3）かい が snailMax
+  fishFull: 'さかなと エビは 1つの すいそうに 6ぴき までだよ。かいなら あと すこし いれられるよ。', // （v0.3）さかな・エビが fishMax（かいの あきが あるとき。ないときは h_full）
+  co2Salt: 'シーオーツーは かわの すいそうで つかうよ。',                                 // （v0.3）うみの すいそうで えらんだ
+  skimmerFresh: 'プロテインスキマーは うみの すいそうで つかうよ。',                       // （v0.3）かわの すいそうで えらんだ
+  vitaminFull: 'ビタミンは まだ のこっているよ。つかいおわったら また かってね。',          // （v0.3）5かいぶん もっている
+};
+
+// ---- v0.3：ビタミンの ことば（{name} は その魚）----
+export const VITAMIN_LINES = {
+  love: '{name}は ビタミンが だいすき！ おおよろこび！',          // だいすき の 魚が たべた（いちばん よろこんだ 1ぴきだけ ふきだし）
+  ok: '{name}が ビタミンを たべたよ。げんきが でてきた！',
+  dislike: '{name}は ぷいっ！ いつもの ごはんが すきなんだね。',   // ぷいっ（はじめて その しゅるいで おきた とき だけ。♪ マークを そえる）
+  willEat: '{n}ひき よろこぶよ',                                  // ビタミンボタンの よこ（この すいそうで たべる 魚の かず）
+  allDislike: 'みんな いつもの ごはんが すき みたい。ビタミンは のこしておくね。', // 全員 dislike（おとさない・へらない）
+  doneToday: 'この すいそうの ビタミンは つぎの あさ 6じに また あげられるよ。', // きょう もう あげた すいそう（ボタンに のこり時間も 出す）
+  empty: 'ビタミンが なくなったよ。おみせで かえるよ。',                       // のこり 0
+};
+// ずかんの「ビタミン」の らん（fish.vitamin → ことば）
+export const VITAMIN_DEX = { love: 'だいすき', ok: 'たべる', dislike: 'いつもの ごはんが すき' };
+
+// ---- v0.3：おんど ダイヤル の ことば ----
+export const THERMO_LINES = {
+  title: 'おんど ダイヤル',
+  outOfRange: '{name}には あわない あたたかさ だよ。',   // 灰色の だんを おしたとき（えらべない）
+  reset: '{name}に あわせて ふつうに もどしたよ。',        // あとから 入った 魚に あわないので 'normal' に もどした とき
+  needHeater: 'ファンは ヒーターと いっしょに つかうよ。',   // ファンだけ の すいそう
+  recommend: 'みんなに おすすめ',                          // 全員 ぴったり／はんい内 に なる だんの しるし
 };
 
 // えさボタンを おしたが 全員 おなか いっぱい（≥ 90）のとき

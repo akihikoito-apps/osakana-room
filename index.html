@@ -47,6 +47,9 @@
   <section id="scr-tank" class="screen" data-screen="tank" hidden>
     <canvas id="aq"></canvas>
     <canvas id="aq-salt" hidden></canvas>
+    <div id="tank-cap" hidden></div>
+    <button id="feeder-sw" hidden aria-label="じどう えさやり"><img src="assets/items/auto_feeder.png" alt=""><span class="fs-lb">じどう えさ</span><span class="fs-state">オン</span></button>
+    <div id="thermo" hidden><span class="th-title">🌡️ おんど</span><div class="th-steps"></div></div>
     <div id="tank-title"><button class="tt-prev" aria-label="まえの すいそう">◀</button><div class="tt-body"><span class="tt-name"></span><span class="tt-water"></span><span class="tt-dots"></span></div><button class="tt-next" aria-label="つぎの すいそう">▶</button></div>
     <div id="tank-pops"></div>
     <div id="gauges" class="panel">
@@ -57,6 +60,7 @@
     </div>
     <div id="care" class="dock">
       <button class="care-btn" data-care="feed"><img src="assets/items/food_flake.png" alt=""><span class="lb">えさ</span></button>
+      <button class="care-btn vit" data-care="vitamin" hidden><img src="assets/items/food_vitamin.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'care-emoji',textContent:'💊'}))"><span class="lb">ビタミン<small class="vit-sub">げんきの もと</small><small class="vit-left"></small></span></button>
       <button class="care-btn" data-care="water"><img src="assets/items/water_change.png" alt=""><span class="lb">みずかえ</span></button>
       <button class="care-btn" data-care="clean"><span class="care-emoji">🥅</span><span class="lb">そうじ</span></button>
       <button class="care-btn" data-care="photo"><span class="care-emoji">📷</span><span class="lb">しゃしん</span></button>
@@ -99,6 +103,13 @@
   <!-- チュートリアルの ふきだし -->
   <div id="guide" hidden><div class="guide-face">🐟</div><div class="guide-text"></div><button class="guide-ok pill" hidden>OK</button></div>
   <div id="guide-arrow" hidden>👇</div>
+
+  <!-- おんがく（js/bgm.js が あるときだけ 出す） -->
+  <button id="btn-bgm" hidden aria-label="おんがく"><span class="bgm-ic" aria-hidden="true"></span><span class="lb">おんがく</span></button>
+  <div id="bgm-picker" class="modal" hidden><div class="bgm-panel">
+    <div class="bgm-head"><span class="bgm-h">おんがくを えらぶ</span><span class="bgm-state"></span><span class="spacer"></span><button class="btn bgm-stop">■ とめる</button><button class="bgm-close" aria-label="とじる">✕</button></div>
+    <div class="bgm-list"></div>
+  </div></div>
 
   <!-- かいほうの おいわい -->
   <div id="celebrate" hidden><div class="confetti"></div><div class="cel-box"><div class="cel-ic">🌊</div><div class="cel-text"></div><div class="cel-sub"></div><div class="cel-btns"><button class="btn soft cel-ok">やったー！</button><button class="btn primary cel-shop">🛒 おみせへ</button></div></div></div>

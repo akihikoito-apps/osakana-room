@@ -36,6 +36,9 @@
   <button data-a="salt">うみ／かわ</button>
   <button data-a="snail">かい</button>
   <button data-a="clean">そうじ</button>
+  <button data-a="vitamin">ビタミン</button>
+  <button data-a="auto">じどうえさ</button>
+  <button data-a="devices">きぐ</button>
 </div>
 <script type="module">
 import { createAquarium } from '../js/aquarium/index.js';
@@ -64,6 +67,11 @@ const snails = SNAILS.map((id, i) => ({ uid: 's' + i, speciesId: id, stage: 2, h
 let showSnail = q.get('snail') !== '0';
 const allFish = () => (showSnail ? [...fish, ...snails] : fish);
 aq.setFish(allFish());
+// ビタミンの好み（確認用）：3匹に1匹は だいすき、3匹に1匹は きらい
+const prefs = {};
+allFish().forEach((f, i) => { prefs[f.uid] = { vitamin: ['love', 'dislike', 'ok'][i % 3] }; });
+aq.setFoodPrefs(prefs);
+aq.on('eat', ({ uid, kind }) => { if (kind !== 'flake') console.log('eat', uid, kind); });
 let decor = salt ? ['liverock', 'liverock', 'coral', 'coral', 'coral', 'heater', 'filter', 'air_pump', 'light']
   : ['stone', 'plant', 'plant', 'driftwood', 'heater', 'filter', 'air_pump', 'light'];
 aq.setDecor(decor);
@@ -118,6 +126,14 @@ document.getElementById('ui').addEventListener('click', (e) => {
       b.disabled = true; aq.playClean().then(() => { b.disabled = false; });
       break;
     }
+    case 'vitamin': aq.feed(0.3 + Math.random() * 0.4, 0.1, { kind: 'vitamin' }); break;
+    case 'auto': aq.autoFeed(); break;
+    case 'devices': {
+      const on = !b.classList.contains('on'); b.classList.toggle('on', on);
+      const extra = ['auto_feeder', 'fan', 'co2_kit', 'skimmer'];
+      aq.setDecor(on ? [...decor, ...extra] : decor);
+      break;
+    }
     case 'grow': fish.forEach((f) => (f.stage = (f.stage + 1) % 3)); aq.setFish(allFish()); break;
   }
 });
@@ -130,6 +146,8 @@ if (shot === 'react') setTimeout(() => { ['heart', 'thanks', 'sleepy', 'sad', 'h
 if (shot === 'dirt') { water.dirt = 0.8; aq.setWater(water); }
 if (shot === 'weak') { fish.forEach((f, i) => { if (i % 2 === 0) f.health = 10; }); aq.setFish(allFish()); }
 if (shot === 'dark') { water.light = 0.2; aq.setWater(water); }
+if (shot === 'devices') { aq.setDecor([...decor, 'auto_feeder', 'fan', 'co2_kit', 'skimmer']); setTimeout(() => aq.autoFeed(), 1200); }
+if (shot === 'vitamin') { setTimeout(() => { aq.feed(0.35, 0.1, { kind: 'vitamin' }); aq.feed(0.6, 0.1, { kind: 'vitamin' }); }, 300); }
 if (shot === 'clean') { water.dirt = 0.7; aq.setWater(water); setTimeout(() => { water.dirt = 0.05; aq.setWater(water); aq.playClean(); }, 1500); }
 </script>
 </body>

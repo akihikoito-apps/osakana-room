@@ -509,3 +509,81 @@ body.photo #tank-title, body.photo #hint-mini { display: none !important; }
   #tank-title .tt-body { min-width: 96px; max-width: 140px; padding: 3px 8px; }
   #tank-title .tt-name { font-size: 14px; }
 }
+
+/* ---------- v0.3：おんがく（Codex 案） ---------- */
+#btn-bgm { position: absolute; z-index: 21; left: calc(var(--safe-l) + 12px); bottom: calc(var(--safe-b) + 12px); width: 64px; height: 60px; border-radius: 18px; background: #fff; box-shadow: 0 2px 6px rgba(49, 90, 104, 0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 12px; }
+#btn-bgm .bgm-ic { width: 28px; height: 28px; background: url(../assets/items/bgm.png) center / contain no-repeat; }
+#btn-bgm .bgm-ic:empty::before { content: ''; }
+#btn-bgm.playing { outline: 3px solid #39a7bc; outline-offset: -3px; }
+#btn-bgm.playing::after { content: ''; position: absolute; top: 4px; right: 4px; width: 10px; height: 10px; border-radius: 50%; background: #39a7bc; }
+body.photo #btn-bgm, body.idle #btn-bgm { display: none !important; }
+#scr-tank #hint-mini, #hint-mini { left: calc(var(--safe-l) + 84px); }
+#bgm-picker { z-index: 85; background: rgba(23, 61, 77, 0.4); }
+#bgm-picker .bgm-panel { width: min(716px, calc(100% - 24px)); max-height: calc(100% - 16px); overflow: auto; padding: 14px 16px; border-radius: 24px; background: #fff; box-shadow: var(--shadow-strong); }
+#bgm-picker .bgm-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+#bgm-picker .bgm-h { font-size: 20px; color: #234b5b; }
+#bgm-picker .bgm-state { font-size: 14px; color: var(--ink-soft); }
+#bgm-picker .spacer { flex: 1; }
+#bgm-picker .btn { min-width: 64px; min-height: 44px; padding: 0 14px; }
+#bgm-picker .bgm-list { display: flex; flex-direction: column; gap: 6px; }
+.bgm-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 14px; border-radius: 14px; background: #eff7f7; text-align: left; border: 2px solid transparent; }
+.bgm-row.on { background: #ddf5f7; border-color: #39a7bc; }
+.bgm-body { flex: 1; display: grid; }
+.bgm-title { font-size: 16px; }
+.bgm-note { font-size: 13px; color: var(--ink-soft); }
+.bgm-mark { font-size: 14px; color: #1f7f92; white-space: nowrap; }
+
+/* ---------- v0.3：ビタミン・定員・おんど ダイヤル ---------- */
+.care-btn .vit-left { display: block; font-size: 12px; line-height: 1; color: #634d16; }
+.care-btn.vit { background: #fff3c4; }
+.care-btn.vit .lb { line-height: 1.1; }
+#tank-cap { position: absolute; z-index: 10; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 70px); display: flex; gap: 6px; pointer-events: none; }
+#tank-cap span { padding: 2px 10px; border-radius: 12px; background: rgba(255,255,255,0.9); font-size: 13px; color: #234b5b; box-shadow: var(--shadow); }
+#tank-cap span.full, #shop-tank .st-cap .full { background: #fff0d9; }
+#shop-tank .st-cap { margin-left: auto; display: flex; gap: 6px; }
+#shop-tank .st-cap span { padding: 2px 10px; border-radius: 14px; background: #fff; font-size: 14px; white-space: nowrap; }
+#thermo { position: absolute; z-index: 10; left: calc(var(--safe-l) + 8px); top: calc(var(--safe-t) + var(--hud-h) + 12px + 4 * 52px); display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 14px; background: rgba(255,255,255,0.9); box-shadow: var(--shadow); }
+#thermo .th-title { font-size: 12px; color: var(--ink-soft); padding-left: 4px; }
+#thermo .th-steps { display: flex; gap: 4px; }
+#thermo .th-step { min-width: 44px; min-height: 44px; padding: 2px 6px; border-radius: 12px; background: #eff7f7; display: grid; justify-items: center; font-size: 12px; line-height: 1.1; border: 2px solid transparent; }
+#thermo .th-step.on { background: #ddf5f7; border-color: #39a7bc; }
+#thermo .th-step.out { background: #fff7ee; }
+#thermo .th-deg { font-size: 11px; color: var(--ink-soft); }
+#thermo .th-fish { width: 26px; height: 14px; object-fit: contain; }
+#thermo .th-face { font-size: 14px; }
+body.idle #thermo, body.idle #tank-cap, body.photo #thermo, body.photo #tank-cap { opacity: 0; pointer-events: none; }
+@media (max-height: 500px) {
+  #thermo { top: calc(var(--safe-t) + 60px + 4 * 48px); }
+  #thermo .th-title { display: none; }
+  .care-btn { min-width: 92px; padding: 0 10px 0 6px; }
+  .care-btn[data-care="photo"] .lb { display: none; }
+  .care-btn[data-care="photo"] { min-width: 56px; padding: 0 8px; }
+  #tank-cap { bottom: calc(var(--safe-b) + 68px); }
+  #tank-cap span { font-size: 12px; }
+}
+/* v0.3：左は ゲージ・おんがく・💡、右は 魚カード・おんど・定員（かさならない ように） */
+#thermo { left: auto; right: calc(var(--safe-r) + 8px); top: auto; bottom: calc(var(--safe-b) + 100px); }
+#scr-tank #hint-mini, #hint-mini { left: calc(var(--safe-l) + 12px); bottom: calc(var(--safe-b) + 84px); }
+@media (max-height: 500px) { #thermo { top: auto; bottom: calc(var(--safe-b) + 96px); } }
+@media (min-height: 600px) and (min-width: 900px) { #tank-cap { bottom: calc(var(--safe-b) + 92px); } #thermo { bottom: calc(var(--safe-b) + 128px); } #scr-tank #hint-mini, #hint-mini { bottom: calc(var(--safe-b) + 84px); } }
+
+/* v0.3 てなおし：じどう えさやり スイッチ・ダイヤルの えらべない 段・ヒントは 右の きぐと かさならない ように */
+#feeder-sw { position: absolute; z-index: 10; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 170px); display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 2px 10px 2px 4px; border-radius: 14px; background: rgba(255,255,255,0.9); box-shadow: var(--shadow); font-size: 13px; }
+#feeder-sw img { width: 32px; height: 32px; object-fit: contain; }
+#feeder-sw .fs-state { padding: 0 8px; border-radius: 10px; background: #eef3f1; color: var(--ink-soft); }
+#feeder-sw.on .fs-state { background: var(--good); color: var(--ink); }
+#thermo .th-step.out { background: #eef2f0; color: #8aa0a8; }
+#thermo .th-step.out .th-fish { opacity: 0.8; }
+body.idle #feeder-sw, body.photo #feeder-sw { opacity: 0; pointer-events: none; }
+@media (max-height: 500px) {
+  .hint { left: calc(var(--safe-l) + 140px); right: calc(var(--safe-r) + 236px); width: auto; min-width: 0; transform: none; }
+  #feeder-sw { bottom: calc(var(--safe-b) + 160px); }
+}
+@media (min-height: 600px) and (min-width: 900px) { #feeder-sw { bottom: calc(var(--safe-b) + 220px); } }
+
+/* さいごの てなおし：ビタミンの ひとこと・おんがくの「とめる」と「とじる」を わける */
+.care-btn .vit-sub { display: block; font-size: 10px; line-height: 1; color: #8a6d1d; }
+.shop-item .vit-note { color: #634d16; font-size: 12px; }
+#bgm-picker .bgm-stop { background: #f5b7a9; color: #203e4a; min-width: 110px; border-radius: 22px; }
+#bgm-picker .bgm-close { width: 44px; height: 44px; border-radius: 50%; background: #eef3f1; font-size: 20px; font-weight: 900; margin-left: 16px; }
+@media (max-height: 500px) { .care-btn .vit-sub { display: none; } }

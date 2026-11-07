@@ -13,6 +13,8 @@ import * as dex from './ui/dex.js';
 import * as missions from './ui/missions.js';
 import * as photo from './ui/photo.js';
 import * as tutorial from './ui/tutorial.js';
+import { initAwake, awakeState } from './ui/awake.js';
+import { initBgmUi, wirePicker, bgmNow } from './ui/bgm-ui.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
@@ -197,6 +199,13 @@ async function boot() {
   setTimeout(celebrate, 900);
   G.on('tutorialDone', () => setTimeout(celebrate, 1200));
 
+  // あそんでいる あいだは 画面を くらく しない（Wake Lock、だめなら 無音の 小さな 動画）
+  initAwake();
+  G.awake = awakeState;
+  // おんがく（js/bgm.js が とどいていれば ボタンを 出す）
+  wirePicker();
+  initBgmUi(G);
+  G.bgmNow = bgmNow;
   if (DEBUG) setupDebug(G);
   registerSW();
 }

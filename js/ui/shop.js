@@ -74,6 +74,12 @@ function renderTankBar() {
   bar.querySelector('.st-prev').hidden = !many;
   bar.querySelector('.st-next').hidden = !many;
   bar.querySelector('.st-name').replaceChildren(el('span', { class: 'water-tag ' + t.water, text: WATER[t.water] }), G.sim.tankName(s, t));
+  // 定員：いっぱいの ものは ことばで
+  const c = G.sim.capacityOf(t);
+  const fishFull = c.full ?? (c.space >= c.capacity - 1e-9), snailFull = c.snail >= c.snailMax;
+  let cap = bar.querySelector('.st-cap');
+  if (!cap) { cap = el('span', { class: 'st-cap' }); bar.append(cap); }
+  cap.replaceChildren(el('span', { class: fishFull ? 'full' : '', text: fishFull ? '🐟 いっぱい' : `🐟 ${c.fish}ひき` }), el('span', { class: snailFull ? 'full' : '', text: snailFull ? '🐚 いっぱい' : `🐚 ${c.snail}／${c.snailMax}` }));
 }
 
 /** かぎの 案内（一覧の 上に 1回だけ）：あと ◯ひき と ○●（うまった 数） */
@@ -104,7 +110,8 @@ function render() {
       const c = status(it, isFish);
       const locked = c.reason === 'locked';
       let priceEl;
-      if (c.reason === 'have' || c.reason === 'max') priceEl = el('span', { class: 'price', text: c.reason === 'have' ? 'もってる' : 'いっぱい' });
+      if (c.reason === 'vitaminFull') priceEl = el('span', { class: 'price', text: `のこり ${s.inv[it.id] || 0}かい` });
+      else if (c.reason === 'have' || c.reason === 'max') priceEl = el('span', { class: 'price', text: c.reason === 'have' ? 'もってる' : 'いっぱい' });
       else if (locked) priceEl = el('span', { class: 'price', text: '🔒' });
       else if (price === 0) priceEl = el('span', { class: 'price', text: '🎁 プレゼント' });
       else priceEl = el('span', { class: 'price' }, coinIcon(), String(price));
@@ -123,6 +130,7 @@ function render() {
       el('div', { class: 'nm', text: locked && isFish ? '？？？' : it.name }),
       locked ? el('div', { class: 'lock-line', text: '🔒 もうすこし' })
         : short ? short
+        : it.uses ? el('div', { class: 'lock-line vit-note', text: `${it.uses}かいぶん・おなかは ふえないよ。げんきの もと` })
         : c.reason === 'needs' ? el('div', { class: 'lock-line', text: `${sim.data().itemById[c.item]?.name || ''}が いるよ` })
         : isFish ? el('div', { class: 'stars', text: stars(it.rarity || 1) }) : (count && it.max > 1 ? el('div', { class: 'tagline', text: `いれた かず ${count}/${it.max}` }) : null),
       !s.tutorial.done && tut?.recommend === it.id ? el('span', { class: 'rec', text: 'おすすめ' }) : null,
@@ -153,6 +161,10 @@ function reasonText(c, it) {
     case 'water': return (it.water === 'salt' ? L.wrongWater : L.wrongWaterFresh || '').replaceAll('{name}', name) || 'この すいそうの みずには あわないよ';
     case 'needs': return (L.needs || '').replaceAll('{name}', name).replaceAll('{item}', sim.data().itemById[c.item]?.name || '');
     case 'locked': return L.locked || '1つめの すいそうに 6ぴき いると あえるよ';
+    case 'snailFull': return L.snailFull || 'かいは 1つの すいそうに 2ひき までだよ。';
+    case 'co2Salt': return L.co2Salt || 'かわの すいそうで つかうよ。';
+    case 'skimmerFresh': return L.skimmerFresh || 'うみの すいそうで つかうよ。';
+    case 'vitaminFull': return L.vitaminFull || 'まだ のこっているよ。';
     case 'tankMax': return L.tankMax || 'へやに すいそうが いっぱいだよ';
     default: return 'まだ うっていないよ';
   }
