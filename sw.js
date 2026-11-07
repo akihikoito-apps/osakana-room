@@ -1,6 +1,6 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [

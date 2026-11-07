@@ -190,7 +190,7 @@ function syncWater() {
   // よるは すこし くらく（まっくらには しない）
   const day = lightOf(G.state.clock.min);
   const light = base * (0.55 + 0.45 * (day - 0.45) / 0.55);
-  aq.setWater({ dirt: (100 - t.clean) / 100, light: Math.max(0.3, Math.min(1, light)), bubbles: t.decor.includes('air_pump') });
+  aq.setWater({ dirt: (100 - t.clean) / 100, waste: (t.waste || 0) / (G.sim.balance().CLEAN?.wasteMax ?? 9), light: Math.max(0.3, Math.min(1, light)), bubbles: t.decor.includes('air_pump') });
 }
 
 // ---------- ゲージ ----------
@@ -366,7 +366,7 @@ function onCare(kind, b) {
   G.refreshHud();
 }
 
-/** そうじ：あみで すくう アニメ（aq.playClean。仕様 v0.2 7章：2びょう）→ おわりに たべのこし 0 */
+/** そうじ：あみで すくう アニメ（aq.playClean。仕様 v0.2 7章：2びょう）→ おわりに たべのこし・そこの ごみ 0 */
 let cleanDone = null;
 function startClean(b, t) {
   cleaning = true;
@@ -382,7 +382,7 @@ function startClean(b, t) {
     const tank = G.state.tanks.find((x) => x.id === t.id) || t;
     const r = G.sim.scoop(G.state, tank);
     if (r.ok) {
-      toast('たべのこしを すくったよ');
+      toast('そこの ごみを すくったよ');
       G.emit('action', { type: 'scoop', result: r });
       G.handleEvents(r.events);
     } else toast('ピカピカだね！');

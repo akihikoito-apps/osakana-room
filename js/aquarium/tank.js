@@ -155,7 +155,7 @@ export class Tank {
     this.decorGroup = new THREE.Group();
     scene.add(this.group, this.decorGroup);
     this.decorIds = [];
-    this.water = { dirt: 0, bubbles: undefined, light: 1 };
+    this.water = { dirt: 0, waste: undefined, bubbles: undefined, light: 1 };
     this.time = 0;
     this.caustic = makeCausticTexture();
     this.rayTex = rayTexture();
@@ -443,11 +443,12 @@ export class Tank {
     this.dirtPatches.sort((a, b) => a.order - b.order);
   }
 
-  /** にごりの見た目に合わせて ごみの数を変える。 */
+  /** ごみの数を変える（waste を もらったら それで。ないときは にごりに合わせる）。 */
   updateDirtPatches() {
-    const d = this.dirtShown ?? this.water.dirt;
-    const n = Math.round(d * this.dirtPatches.length * 1.1);
-    const cleaned = this.cleanedPatches && (this.time < this.cleanedUntil || d > this.water.dirt + 0.01) ? this.cleanedPatches : null;
+    const w = this.water.waste;
+    const d = w ?? (this.dirtShown ?? this.water.dirt);
+    const n = w !== undefined ? Math.round(w * this.dirtPatches.length) : Math.round(d * this.dirtPatches.length * 1.1);
+    const cleaned = this.cleanedPatches && (this.time < this.cleanedUntil || (w === undefined && d > this.water.dirt + 0.01)) ? this.cleanedPatches : null;
     if (!cleaned) this.cleanedPatches = null;
     this.dirtPatches.forEach((p, i) => {
       if (p.caught) return;   // あみの中のものは そうじ係が動かす
@@ -903,6 +904,7 @@ export class Tank {
       this.water.dirt = clamp(+w.dirt || 0, 0, 1);
       if (!this.dirtInit) { this.dirtShown = this.water.dirt; this.dirtInit = true; }
     }
+    if (w.waste !== undefined) this.water.waste = clamp(+w.waste || 0, 0, 1);   // そこの ごみ（そうじ で へる）
     if (w.light !== undefined) this.water.light = clamp(+w.light, 0, 1);
     if (w.bubbles !== undefined) this.water.bubbles = w.bubbles;
     this.applyWater();

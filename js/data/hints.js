@@ -57,7 +57,7 @@ export const HINTS = [
   { id: 'h_hungry',      priority: 6,  when: { type: 'hungry' },
     text: '{name}の おなかが すいたみたい。「えさ」で ごはんを あげよう。', action: 'feed' },
   { id: 'h_leftover',    priority: 7,  when: { type: 'leftover' },
-    text: 'すいそうの そこに たべのこしが あるよ。「そうじ」で すくって あげよう。', action: 'scoop' },
+    text: 'すいそうの そこに ごみが たまってきたよ。「そうじ」で すくって あげよう。', action: 'scoop' },
   { id: 'h_lonely',      priority: 8,  when: { type: 'lonelySchool' },
     text: '{name}は なかまと およぐのが すきだよ。おなじ さかなを むかえて あげると よろこぶよ。', action: 'shop' },
   { id: 'h_like',        priority: 9,  when: { type: 'noLikedDecor' },

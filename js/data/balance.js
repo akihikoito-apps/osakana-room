@@ -45,6 +45,9 @@ export const CLEAN = {
   leftoverMax: 5,              // たべのこし は 5こ まで たまる
   cleanerIds: ['corydoras', 'albino_corydoras', 'minami_shrimp', 'red_bee_shrimp', 'skunk_shrimp'],  // v0.2 で スカンクシュリンプを 足した（かい は SNAIL）
   cleanerLeftoverPerHour: 0.125, // そうじやの魚 1ぴきで たべのこし を 8じかんで 1こ たべる
+  wastePerSpacePerHour: 0.04, // そこの ごみ（ふん）：魚の space 1 あたり。6ぴきで 1日に 6こ くらい（v0.3.1）
+  wasteMax: 9,                 // そこの ごみ は 9こ まで（3D の ごみの かずと おなじ）
+  perWastePerHour: -0.1,       // ごみ 1こ あたり きれいさ が すこし はやく へる
   scoopClean: 0,               // 「そうじ」（あみで たべのこしを すくう）：たべのこし 0 にするだけ（きれいさ は ふえない。コインも なし）
   // フィルターは よごれる はやさ（basePerHour＋perSpace＋perLeftover の合計）を filter.effect.dirtMultiplier 倍（0.5）にする
   // みずくさ・みずかえ の量は items.js の effect

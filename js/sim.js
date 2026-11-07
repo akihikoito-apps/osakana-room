@@ -19,7 +19,7 @@ const FALLBACK = {
   START: { coins: 200, roomTemp: 20, waterTemp: 20, clean: 100, air: 70, leftover: 0, fish: { onaka: 60, health: 80, mood: 60, natsuki: 0 } },
   TANK: { capacity: 6, fishMax: 6, snailMax: 2 },
   TEMP: { towardRoomPerHour: 0.5, bestRange: 2, farOut: 3 },
-  CLEAN: { basePerHour: -0.3, perSpacePerHour: -0.4, perLeftoverPerHour: -1.5, leftoverMax: 5, cleanerIds: [], cleanerLeftoverPerHour: 0.125, scoopClean: 0 },
+  CLEAN: { basePerHour: -0.3, perSpacePerHour: -0.4, perLeftoverPerHour: -1.5, leftoverMax: 5, wastePerSpacePerHour: 0.04, wasteMax: 9, perWastePerHour: -0.1, cleanerIds: [], cleanerLeftoverPerHour: 0.125, scoopClean: 0 },
   AIR: { naturalPerHour: 0.6, naturalCap: 60, perSpacePerHour: -0.5 },
   HUNGER: { perHour: -3.5, full: 90, rewardBelow: 80, leftoverIfHalfFull: 0.5, feedLockRealSec: 5 },
   HEALTH: { min: 10, max: 100, weak: 40, good: 70, bad: { tempOut: -2, tempFarOut: -3, dirty: -1.5, veryDirty: -3, airLow: -2, airVeryLow: -3, starving: -1.5, nigate: 0 }, badCapPerHour: -3, recoverPerHour: 4, recoverBestPerHour: 6, best: { clean: 70, air: 50, onaka: 30 } },
@@ -119,6 +119,7 @@ export function normalize(state) {
     t.clean = clamp(num(t.clean, S0.clean), 0, 100);
     t.air = clamp(num(t.air, S0.air), 0, 100);
     t.leftover = clamp(num(t.leftover, S0.leftover), 0, B.CLEAN.leftoverMax);
+    t.waste = clamp(num(t.waste, 0), 0, B.CLEAN.wasteMax);
     t.timers = { idle: 0, sad: 0, sleepy: 0, thanksGap: 99, ...(t.timers || {}) };
     t.thanksToday = num(t.thanksToday, 0);
     if (!(B.THERMO.steps || []).some((x) => x.id === t.thermo)) t.thermo = B.THERMO.defaultStep || 'normal';   // おんど ダイヤル
@@ -330,7 +331,7 @@ function flowTank(state, t, h, events) {
   const C = hasItem(t, 'co2_kit') ? (items.co2_kit?.effect?.plantAirBoost ?? items.co2_kit?.effect?.plantBoost ?? 1.5) : 1;     // シーオーツー：みずくさの くうき だけ（ライトと かけあわせ）
   const F = (hasItem(t, 'filter') ? (items.filter?.effect?.dirtMultiplier ?? 0.5) : 1) * (hasItem(t, 'skimmer') ? (items.skimmer?.effect?.dirtMultiplier ?? 0.8) : 1);
   // きれいさ：よごれ（フィルターで 半分）＋ みずくさ
-  let dClean = (B.CLEAN.basePerHour + B.CLEAN.perSpacePerHour * S + B.CLEAN.perLeftoverPerHour * t.leftover) * F;
+  let dClean = (B.CLEAN.basePerHour + B.CLEAN.perSpacePerHour * S + B.CLEAN.perLeftoverPerHour * t.leftover + B.CLEAN.perWastePerHour * (t.waste || 0)) * F;
   let dAir = (t.air < B.AIR.naturalCap ? B.AIR.naturalPerHour : 0) + B.AIR.perSpacePerHour * S;
   let dLeft = 0;
   for (const id of t.decor) {
@@ -350,6 +351,8 @@ function flowTank(state, t, h, events) {
   t.clean = clamp(t.clean + dClean * h, 0, 100);
   t.air = clamp(t.air + dAir * h, 0, 100);
   t.leftover = clamp(t.leftover + dLeft * h, 0, B.CLEAN.leftoverMax);
+  // そこの ごみ（ふん）：みずかえ では へらない。「そうじ」の あみで すくう
+  t.waste = clamp((t.waste || 0) + B.CLEAN.wastePerSpacePerHour * t.fish.reduce((a, f) => a + (D.fishById[f.speciesId]?.kind === 'snail' ? 0 : (D.fishById[f.speciesId]?.space ?? 1)), 0) * h, 0, B.CLEAN.wasteMax);
 
   const H = B.HEALTH, M = B.MOOD;
   const safe = !state.tutorial.done;        // チュートリアル中は けんこう・ごきげん を 下げない
@@ -595,11 +598,12 @@ export function waterChange(state, t = state.tanks[0]) {
   return { ok: true, coin, dirty, events: done(state) };
 }
 
-/** そうじ（あみで たべのこしを すくう）。たべのこしが 1こ 以上 あったときだけ 数える。 */
+/** そうじ（あみで たべのこし と そこの ごみ を すくう）。どちらかが 1こ 以上 あったときだけ 数える。 */
 export function scoop(state, t = state.tanks[0]) {
-  if (t.leftover <= 0) return { ok: false, reason: 'none' };
-  const had = t.leftover >= 1;
+  if (t.leftover <= 0 && !(t.waste > 0)) return { ok: false, reason: 'none' };
+  const had = t.leftover >= 1 || t.waste >= 1;
   t.leftover = 0;
+  t.waste = 0;
   t.clean = clamp(t.clean + (B.CLEAN.scoopClean || 0), 0, 100);
   if (had) inc(state, 'scoop');
   return { ok: true, coin: 0, had, events: done(state) };
@@ -839,7 +843,7 @@ export function currentHint(state, t = state.tanks[0]) {
     saltNoLiverock: () => t.water === 'salt' && !has('liverock') && t.clean < 70 && any,
     unlockNear: () => { if (isUnlocked(state, 'tank6')) return null; const n = (B.UNLOCK.tank6?.count ?? 6) - state.tanks[0].fish.length; return t === state.tanks[0] && n >= 1 && n <= 2 ? any : null; },
     hungry: () => find((f) => f.onaka < 30),
-    leftover: () => t.leftover >= 1 && any,
+    leftover: () => (t.leftover >= 1 || t.waste >= 3) && any,
     lonelySchool: () => find((f, s) => s.swim?.school && !t.fish.some((g) => g !== f && g.speciesId === f.speciesId)),
     noLikedDecor: () => find((f, s) => f.mood < 50 && !(s.likes || []).some((tg) => t.decor.some((id) => D.itemById[id]?.tag === tg)) && likeName(f)),
     nigate: () => find((f) => mates(t, f).some((g) => D.compatOf(f.speciesId, g.speciesId) === 0)),
@@ -908,7 +912,7 @@ export function tankName(state, t) {
 export function addTank(state, water = 'fresh', includes = []) {
   const slot = freeSlot(state);
   if (slot < 0) return null;
-  const N = { temp: 25, clean: 100, air: 70, leftover: 0, ...(B.TANKS.newTank || {}) };
+  const N = { temp: 25, clean: 100, air: 70, leftover: 0, waste: 0, ...(B.TANKS.newTank || {}) };
   let k = state.tanks.length + 1;
   while (state.tanks.some((t) => t.id === 't' + k)) k++;
   const t = { id: 't' + k, water, slot, name: '', thermo: B.THERMO.defaultStep || 'normal', feederOn: true, temp: N.temp, clean: N.clean, air: N.air, leftover: N.leftover, decor: includes.filter((id) => D.itemById[id]?.inTank), equip: [], fish: [] };

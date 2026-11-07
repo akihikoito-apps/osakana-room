@@ -24,7 +24,7 @@ export function newState(init = {}) {
     coins: init.coins ?? 100,
     tanks: [{
       id: 't1', water: 'fresh', slot: 0, name: '',
-      temp: init.waterTemp ?? 20, clean: init.clean ?? 100, air: init.air ?? 70, leftover: init.leftover ?? 0,
+      temp: init.waterTemp ?? 20, clean: init.clean ?? 100, air: init.air ?? 70, leftover: init.leftover ?? 0, waste: 0,
       decor: [], equip: [],
       fish: [],
     }],
@@ -93,7 +93,7 @@ function fixTank(t, b, i) {
     water: t.water === 'salt' ? 'salt' : 'fresh',
     name: typeof t.name === 'string' ? t.name.slice(0, 16) : '',
     slot: Number.isInteger(t.slot) ? t.slot : i,
-    temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99),
+    temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99), waste: n(t.waste, 0, 0, 99),
     decor: Array.isArray(t.decor) ? t.decor.filter((x) => typeof x === 'string') : [],
     equip: Array.isArray(t.equip) ? t.equip.filter((x) => typeof x === 'string') : [],
     fish: Array.isArray(t.fish) ? t.fish.filter((f) => isObj(f) && typeof f.speciesId === 'string').map((f) => ({
