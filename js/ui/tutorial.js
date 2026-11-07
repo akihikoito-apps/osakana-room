@@ -209,6 +209,8 @@ function render() {
   const t = targetEl(st);
   if (t && t.id !== 'shop-list' && t.id !== 'gauges') t.classList.add('guide-target');
   if (t?.id === 'gauges') t.querySelectorAll('.gauge').forEach((x) => x.classList.add('guide-target'));
+  // ゲージの せつめいの あいだは スマホでも ひらいて 見せる
+  $('#gauges').classList.toggle('open', st.target === 'meters');
   if (t && t.closest('#shop-list') && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   placeArrow();
 }

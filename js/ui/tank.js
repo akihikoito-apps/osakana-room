@@ -11,6 +11,12 @@ let busy = {};                // ボタンの 連打よけ（実時間）
 let feedTimer = 0;
 let hint = null, happyLineAt = 0, happyUntil = 0, hintOpenUntil = 0;
 const HINT_OPEN_MS = 10000;
+const CARD_CLOSE_MS = 8000;       // 魚カードは さわらなければ 8びょうで とじる
+const GAUGE_CLOSE_MS = 8000;      // スマホで ひらいた ゲージは 8びょうで たたむ
+const IDLE_MS = 10000;            // なにも しない 時間が 10びょう で ボタンを うすく
+let cardTimer = 0, gaugeTimer = 0, idleTimer = 0;
+const isPhone = () => matchMedia('(max-height: 500px)').matches;
+const tutorialOn = () => !!G?.tutorialBusy?.();
 const pending = [];           // すいそうが 見えていない ときの リアクション（見えたら 出す）
 
 const FACE = { good: '😊', ok: '😐', bad: '😟' };
@@ -29,6 +35,25 @@ export function init(g) {
   });
   // 10びょう たったら 小さな 💡 に たたむ（水槽の 底が かくれない ように）。おすと また ひらく
   $('#hint-mini').addEventListener('click', () => { if (!hint) return; hintOpenUntil = performance.now() + HINT_OPEN_MS; $('#hint').hidden = false; $('#hint-mini').hidden = true; });
+  // スマホ：ゲージは たたんで おき、さわると ひらく
+  $('#gauges').addEventListener('click', () => {
+    if (!isPhone()) return;
+    const g = $('#gauges');
+    g.classList.toggle('open');
+    clearTimeout(gaugeTimer);
+    if (g.classList.contains('open') && !tutorialOn()) gaugeTimer = setTimeout(() => g.classList.remove('open'), GAUGE_CLOSE_MS);
+  });
+  $('#aq').addEventListener('pointerdown', () => { if (!tutorialOn()) $('#gauges').classList.remove('open'); });
+  $('#fish-card').addEventListener('pointerdown', () => armCardClose());
+  // なにも しない 時間が つづいたら ボタンを うすく（さわれば もどる。うすい ときの タップも そのまま きく：agy の いけん）
+  const wake = () => {
+    document.body.classList.remove('idle');
+    armIdle();
+  };
+  window.addEventListener('pointerdown', wake, true);
+  window.addEventListener('keydown', wake, true);
+  G.on('screen', () => { document.body.classList.remove('idle'); armIdle(); });
+  armIdle();
   // 名前の札を 魚に ついていかせる
   const follow = () => {
     if (tagEl && tagUid && aq) {
@@ -41,6 +66,25 @@ export function init(g) {
     requestAnimationFrame(follow);
   };
   requestAnimationFrame(follow);
+}
+
+function armIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const busy = tutorialOn() || G.screen !== 'tank' || !$('#dialog').hidden || document.body.classList.contains('photo');
+    if (busy) { armIdle(); return; }
+    // カードと ひらいた ヒントは さきに とじる
+    selected = null; renderCard();
+    if (hint && !$('#hint').hidden) { hintOpenUntil = 0; }
+    $('#gauges').classList.remove('open');
+    document.body.classList.add('idle');
+  }, IDLE_MS);
+}
+
+function armCardClose() {
+  clearTimeout(cardTimer);
+  if (tutorialOn()) return;
+  cardTimer = setTimeout(() => { selected = null; renderCard(); }, CARD_CLOSE_MS);
 }
 
 function ensureAq() {
@@ -243,6 +287,7 @@ function onTapFish(uid) {
   selected = uid;
   showTag(uid);
   renderCard();
+  armCardClose();
 }
 
 function showTag(uid) {
