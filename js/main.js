@@ -62,6 +62,9 @@ async function boot() {
 
   // ---------- 画面の切り替え ----------
   const SHEETS = ['shop', 'dex', 'missions'];
+  // v0.5：あとから 足す 画面（js/ui/help.js など）。G.addScreen('help', { show(G, opts), hide(G) }) で とうろく
+  const EXTRA = {};
+  G.addScreen = (name, mod, { sheet = true } = {}) => { EXTRA[name] = mod; if (sheet && !SHEETS.includes(name)) SHEETS.push(name); };
   function go(name, opts = {}) {
     if (name === G.screen) {
       // おなじ 画面でも タブや 水槽が かわったら かきなおす
@@ -78,6 +81,8 @@ async function boot() {
     if (name === 'shop') shop.show(G, opts);
     if (name === 'dex') dex.show(G);
     if (name === 'missions') missions.show(G);
+    if (from && EXTRA[from]) EXTRA[from].hide?.(G);
+    if (EXTRA[name]) EXTRA[name].show?.(G, opts);
     $('#btn-back').hidden = name === 'room';
     $('#btn-back .lb').textContent = SHEETS.includes(name) ? 'もどる' : 'へや';
     $('#btn-menu').hidden = name !== 'tank';
@@ -181,6 +186,8 @@ async function boot() {
 
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
+  // v0.5：ヘルプ・こうしん りれき（案内係）／ミニゲーム・かりすいそう・プレイヤー（ゲーム係）。無くても うごく
+  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js'].map(optional))) m.init?.(G);
 
   // ずっと押していると出るメニューや、ダブルタップの拡大を止める
   document.addEventListener('contextmenu', (e) => e.preventDefault());

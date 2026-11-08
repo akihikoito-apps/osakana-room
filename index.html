@@ -14,6 +14,8 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/help.css">   <!-- v0.5 案内係：ヘルプ・こうしん りれき -->
+<link rel="stylesheet" href="css/play.css">   <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう・プレイヤー -->
 </head>
 <body>
 <div id="app">
@@ -40,7 +42,16 @@
       <button class="nav-btn" data-go="shop"><span class="nav-ic">🛒</span><span class="lb">おみせ</span></button>
       <button class="nav-btn" data-go="dex"><span class="nav-ic">📖</span><span class="lb">ずかん</span></button>
       <button class="nav-btn" data-go="missions"><span class="nav-ic">⭐</span><span class="lb">ミッション</span><span class="badge" hidden></span></button>
+      <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう（G.addScreen で とうろく）-->
+      <button class="nav-btn" data-go="minigame" hidden><span class="nav-ic">🎮</span><span class="lb">ミニゲーム</span></button>
+      <button class="nav-btn" data-go="box" hidden><span class="nav-ic">📦</span><span class="lb">かりすいそう</span></button>
     </nav>
+    <!-- v0.5：へやの すみの ちいさな ボタン（プレイヤー＝ゲーム係、ヘルプ・こうしん りれき＝案内係）-->
+    <div id="room-corner">
+      <button class="corner-btn" id="btn-player" data-go="player" hidden><span class="nav-ic">👤</span><span class="lb">プレイヤー</span></button>
+      <button class="corner-btn" id="btn-help" data-go="help" hidden><span class="nav-ic">❓</span><span class="lb">ヘルプ</span></button>
+      <button class="corner-btn" id="btn-log" data-go="changelog" hidden><span class="nav-ic">📜</span><span class="lb">こうしん りれき</span></button>
+    </div>
   </section>
 
   <!-- すいそう -->

@@ -27,7 +27,7 @@ let zoomed = null;        // ズームして 入った わく（もどる とき
 
 export function init(g) {
   G = g;
-  $$('#room-nav [data-go]').forEach((b) => b.addEventListener('click', () => G.go(b.dataset.go)));
+  $('#room-nav [data-go], #room-corner [data-go]').forEach((b) => b.addEventListener('click', () => G.go(b.dataset.go)));
   window.addEventListener('resize', () => { layout(); render(true); });
   G.on('tick', () => { if (G.screen === 'room') { renderNight(); render(); } });
   G.on('changed', () => { if (G.screen === 'room') render(true); });

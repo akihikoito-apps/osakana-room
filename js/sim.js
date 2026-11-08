@@ -27,7 +27,7 @@ const FALLBACK = {
   BOND: { feed: 2, feedPerDay: 5, pet: 1, petPerDay: 5, petCooldownRealSec: 30, waterChange: 1, waterChangePerDay: 2, heartStep: 20 },
   NAKAYOSHI: { value: { 0: 20, 1: 60, 2: 100 }, alone: 50, aloneSchool: 40 },
   GROW: { goodHour: { onaka: 20, health: 60, tempInRange: true }, feedBonusHours: 2, feedBonusPerDay: 4, hoursPerGrowDay: 20 },
-  COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, pet: { chance: 0.3, coin: 3, perDay: 8 }, thanks: { chancePerHour: 0.15, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
+  COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, pet: { chance: 0.3, coin: 6, perDay: 8 }, thanks: { chancePerHour: 0.15, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
   UNLOCK: { tank6: { tankIndex: 0, count: 6, banner: ['うみの すいそうが かえるように なったよ！'], lockedLine: '1つめの すいそうに 6ぴき いると あえるよ' } },
   TANKS: { max: 6, newTank: { temp: 25, clean: 100, air: 70, leftover: 0 } },
   MULTI_TANK: { careDailyCapPerExtraTank: 25, thanksAllTanksBase: 4, thanksAllTanksPerExtra: 3, emptyTankNoCareCoin: true },

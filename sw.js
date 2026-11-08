@@ -4,7 +4,7 @@ const VERSION = '0.4.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
-  './', 'index.html', 'manifest.json', 'css/style.css',
+  './', 'index.html', 'manifest.json', 'css/style.css', 'css/help.css', 'css/play.css',
   'icon-180.png', 'icon-192.png', 'icon-512.png', 'stay-awake.mp4',
   'js/main.js', 'js/state.js', 'js/sim.js', 'js/version.js', 'js/bgm.js',
   'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js', 'js/ui/awake.js', 'js/ui/bgm-ui.js',
