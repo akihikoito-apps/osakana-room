@@ -1,0 +1,236 @@
+/* v0.6 ぼうけん（ぼうけん係）：へやの ぼうけんボタン・ぼうけん画面・つり・ガサガサ・いけの すいそう */
+
+/* ---------- へやの ぼうけんボタン（左下。おんがくは 左上の ボタンの したへ） ---------- */
+#btn-adventure {
+  position: absolute; z-index: 20; left: calc(var(--safe-l) + 10px); bottom: calc(var(--safe-b) + 10px);
+  display: flex; align-items: center; gap: 8px; min-width: 168px; max-width: 230px; padding: 8px 14px 8px 8px;
+  border-radius: 22px; background: linear-gradient(#fff8e1, #ffe7a6); box-shadow: var(--shadow-strong);
+  text-align: left; color: var(--ink);
+}
+#btn-adventure:active { transform: translateY(2px); }
+#btn-adventure .arb-ic { position: relative; width: 56px; height: 56px; flex: none; display: grid; place-items: center; }
+#btn-adventure .arb-ic img { width: 100%; height: 100%; object-fit: contain; }
+#btn-adventure .arb-emoji { font-size: 40px; }
+#btn-adventure .arb-lock { position: absolute; right: -6px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 15px; box-shadow: var(--shadow); }
+#btn-adventure .arb-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#btn-adventure .arb-name { font-size: 20px; font-weight: 800; letter-spacing: 1px; line-height: 1.1; }
+#btn-adventure .arb-sub { font-size: 13px; line-height: 1.25; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+#btn-adventure .arb-bar { position: relative; display: block; height: 18px; border-radius: 999px; background: rgba(32, 62, 74, 0.12); overflow: hidden; }
+#btn-adventure .arb-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #ff9ab8, #ff6f96); }
+#btn-adventure .arb-bar::after { content: attr(data-n); position: absolute; inset: 0; font-size: 11px; line-height: 18px; white-space: nowrap; text-align: center; font-weight: 700; color: #203e4a; }
+#btn-adventure.locked { background: linear-gradient(#f3f6f5, #dde6e3); }
+#btn-adventure.locked .arb-ic img { filter: grayscale(0.85) opacity(0.75); }
+#btn-adventure.locked .arb-name { color: #5b7480; }
+#btn-adventure.open .arb-ic { animation: arbBob 2.4s ease-in-out infinite; }
+#btn-adventure .arb-badge { position: absolute; right: -6px; top: -10px; padding: 1px 9px; border-radius: 999px; background: #ff6f96; color: #fff; font-size: 12px; font-weight: 800; box-shadow: var(--shadow); animation: arbPop 1.6s ease-in-out infinite; white-space: nowrap; }
+#btn-adventure.wiggle { animation: arbWiggle 0.5s ease; }
+@keyframes arbBob { 50% { transform: translateY(-4px) rotate(-4deg); } }
+@keyframes arbPop { 50% { transform: scale(1.1); } }
+@keyframes arbWiggle { 20% { transform: rotate(-4deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }
+body.zooming #btn-adventure { opacity: 0; transition: opacity 200ms; }
+/* おんがくボタン：へやでは 左上（プレイヤー・ヘルプの したの だん）。すいそうでは いままで どおり 左下 */
+body.on-room #btn-bgm { bottom: auto; top: calc(var(--safe-t) + var(--hud-h) + 22px + 50px + 8px); width: 58px; height: 54px; }
+@media (max-height: 500px) {
+  #btn-adventure { min-width: 150px; padding: 6px 12px 6px 6px; gap: 6px; border-radius: 18px; }
+  #btn-adventure .arb-ic { width: 44px; height: 44px; }
+  #btn-adventure .arb-name { font-size: 17px; }
+  #btn-adventure .arb-sub { font-size: 12px; }
+  body.on-room #btn-bgm { top: calc(var(--safe-t) + var(--hud-h) + 16px + 40px + 6px); width: 52px; height: 48px; font-size: 11px; }
+  body.on-room #btn-bgm .bgm-ic { width: 22px; height: 22px; }
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  #btn-adventure { min-width: 200px; padding: 10px 18px 10px 10px; }
+  #btn-adventure .arb-ic { width: 68px; height: 68px; }
+  #btn-adventure .arb-name { font-size: 24px; }
+  #btn-adventure .arb-sub { font-size: 15px; }
+  body.on-room #btn-bgm { top: calc(var(--safe-t) + var(--hud-h) + 22px + 50px + 10px); }
+}
+
+/* ---------- おいわい ---------- */
+#adv-cel { position: absolute; inset: 0; z-index: 90; background: rgba(32, 62, 74, 0.3); display: grid; place-items: center; overflow: hidden; }
+#adv-cel[hidden] { display: none; }
+#adv-cel .cel-box { position: relative; width: min(460px, 92%); max-height: 94%; overflow: auto; padding: 14px 20px; border-radius: 20px; background: #fff; box-shadow: var(--shadow-strong); text-align: center; animation: celIn 220ms ease-out; }
+#adv-cel .ac-pics { display: flex; justify-content: center; gap: 14px; }
+#adv-cel .ac-pics img { width: 92px; height: 92px; object-fit: contain; animation: arbBob 2.4s ease-in-out infinite; }
+#adv-cel .ac-pics.wide img { width: 150px; height: 84px; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow); animation: none; }
+#adv-cel .ac-emoji { font-size: 60px; }
+#adv-cel .cel-text { font-size: 22px; line-height: 1.45; margin-top: 6px; font-weight: 700; }
+#adv-cel .cel-sub { font-size: 15px; color: var(--ink-soft); margin-top: 4px; line-height: 1.4; }
+#adv-cel .cel-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+#adv-cel .cel-btns .btn { min-height: 48px; min-width: 140px; }
+#adv-cel .confetti { position: absolute; inset: 0; pointer-events: none; }
+#adv-cel .confetti i { position: absolute; top: -12px; width: 6px; height: 10px; border-radius: 2px; animation: confetti 1.4s ease-in forwards; }
+@media (max-height: 420px) { #adv-cel .ac-pics img { width: 70px; height: 70px; } #adv-cel .ac-pics.wide img { width: 120px; height: 66px; } #adv-cel .cel-text { font-size: 19px; } }
+
+/* ---------- ぼうけん画面 ---------- */
+#scr-adventure { padding: 0; background: linear-gradient(#cdeef7, #eaf7ef); overflow: hidden; }
+#scr-adventure .adv-bg { position: absolute; inset: 0; }
+#scr-adventure .adv-bg img { width: 100%; height: 100%; object-fit: cover; object-position: center 60%; display: block; }
+#scr-adventure .adv-main { position: absolute; inset: 0; padding: calc(var(--safe-t) + var(--hud-h) + 12px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 10px) calc(var(--safe-l) + 12px); }
+.adv-locked { margin-top: 20vh; text-align: center; font-size: 22px; }
+
+/* 行き先の カード */
+.adv-menu { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.adv-h { margin: 0; font-size: var(--fs-h); }
+.adv-cards { flex: 1; min-height: 0; width: 100%; max-width: 980px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.adv-card { position: relative; min-height: 0; border-radius: 24px; overflow: hidden; box-shadow: var(--shadow-strong); background: #fff; border: 4px solid #fff; }
+.adv-card .ac-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.adv-card .ac-label { position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 6px 14px 8px; border-radius: 18px; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.adv-card .ac-name { font-size: 28px; font-weight: 800; line-height: 1.2; }
+.adv-card .ac-line { font-size: 15px; color: var(--ink-soft); }
+.adv-card .ac-chip { position: absolute; top: 10px; right: 10px; padding: 3px 12px; border-radius: 999px; background: var(--coin); font-size: 15px; font-weight: 700; box-shadow: var(--shadow); }
+.adv-card.hot .ac-chip { background: #ff6f96; color: #fff; animation: arbPop 1.6s ease-in-out infinite; }
+.adv-card:active { transform: translateY(2px); }
+@media (max-height: 420px) { .adv-card .ac-name { font-size: 22px; } .adv-card .ac-line { font-size: 13px; } .adv-card .ac-label { padding: 4px 12px 5px; } .adv-cards { gap: 10px; } }
+
+/* うみ・いけ の 上の だん */
+.adv-top { position: relative; z-index: 3; display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.adv-title { display: flex; flex-direction: column; padding: 6px 16px 8px; border-radius: 18px; background: rgba(255, 255, 255, 0.88); box-shadow: var(--shadow); }
+.adv-title .at-name { font-size: 22px; font-weight: 800; line-height: 1.2; }
+.adv-title .at-sub { font-size: 13px; color: var(--ink-soft); }
+.adv-bait, .adv-gasa-left { display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 4px 8px 4px 6px; border-radius: 18px; background: rgba(255, 255, 255, 0.92); box-shadow: var(--shadow); font-size: 16px; }
+.adv-gasa-left { padding: 4px 14px; }
+.adv-bait img { width: 40px; height: 40px; object-fit: contain; }
+.adv-bait b, .adv-gasa-left b { font-size: 22px; margin: 0 2px; }
+.adv-bait .ab-buy { padding: 6px 12px; border-radius: 999px; background: var(--coin); font-weight: 700; font-size: 15px; }
+
+/* 下の 大きな ボタン */
+.adv-actions { position: absolute; z-index: 4; left: 50%; bottom: calc(var(--safe-b) + 12px); transform: translateX(-50%); display: flex; gap: 10px; }
+.adv-go { min-width: 230px; min-height: 64px; padding: 6px 22px; border-radius: 22px; font-size: 24px; font-weight: 800; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; box-shadow: var(--shadow-strong); }
+.adv-go small { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.adv-go.cant { background: #e8eeec; color: #7d939b; }
+.adv-go.wait { background: rgba(255, 255, 255, 0.35); color: #fff; box-shadow: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); pointer-events: none; }   /* えんしゅつ中は おせる ボタンに 見せない */
+.adv-go.pull { background: #ff6f96; color: #fff; animation: pullPulse 0.5s ease-in-out infinite; }
+@keyframes pullPulse { 50% { transform: scale(1.08); } }
+@media (max-height: 420px) { .adv-go { min-height: 54px; min-width: 200px; font-size: 20px; } }
+
+/* ---------- つり ---------- */
+.fish-stage { position: absolute; inset: 0; z-index: 1; }
+.fish-stage .fs-rod { position: absolute; left: 2%; bottom: 4%; width: min(30vh, 220px); transform: rotate(-4deg); transform-origin: 10% 90%; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.2)); transition: transform 300ms; }
+.fish-stage .fs-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.fish-stage .fs-line path { fill: none; stroke: rgba(255, 255, 255, 0.9); stroke-width: 2; }
+.fish-stage .fs-bobber { position: absolute; left: 58%; top: 56%; width: 34px; height: 46px; margin: -23px 0 0 -17px; }
+.fish-stage .fs-bobber i { position: absolute; inset: 0; border-radius: 50% 50% 48% 48%; background: linear-gradient(#ff5a5a 0 48%, #fff 48% 100%); box-shadow: inset -4px -4px 0 rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.2); }
+.fish-stage .fs-bobber::before { content: ''; position: absolute; left: 50%; top: -10px; width: 4px; height: 12px; margin-left: -2px; border-radius: 2px; background: #ffcf3a; }
+.fish-stage .fs-ripple { position: absolute; left: 58%; top: 58%; width: 0; height: 0; }
+.fish-stage .fs-mark { position: absolute; left: 58%; top: 56%; margin: -96px 0 0 -48px; width: 96px; padding: 2px 0 4px; border-radius: 22px; background: #fff; color: #ff4f7b; font-weight: 900; display: flex; flex-direction: column; align-items: center; line-height: 1.05; box-shadow: var(--shadow-strong); animation: markPop 0.4s ease-out, pullPulse 0.5s 0.4s ease-in-out infinite; pointer-events: none; }
+.fish-stage .fs-mark b { font-size: 30px; }
+.fish-stage .fs-mark span { font-size: 15px; }
+.fish-stage .fs-shadow { position: absolute; left: 70%; top: 66%; width: 120px; height: 44px; margin: -22px 0 0 -60px; border-radius: 50%; background: rgba(10, 50, 80, 0.32); filter: blur(6px); animation: shadowIn 2.4s ease-in-out forwards; }
+.fish-stage .fs-shadow.r5 { width: 170px; height: 60px; background: rgba(60, 20, 80, 0.32); }
+@keyframes markPop { from { transform: scale(0.3); } 70% { transform: scale(1.2); } to { transform: none; } }
+@keyframes shadowIn { from { transform: translateX(120px); opacity: 0; } to { transform: translateX(-30px); opacity: 1; } }
+.fish-stage.cast .fs-bobber { animation: bobCast 0.7s cubic-bezier(.3,.0,.4,1) both; }
+@keyframes bobCast { from { transform: translate(-46vw, 22vh) scale(0.7); } 60% { transform: translate(-10vw, -14vh) scale(1); } to { transform: none; } }
+.fish-stage.wait .fs-bobber { animation: bobFloat 1.4s ease-in-out infinite; }
+@keyframes bobFloat { 50% { transform: translateY(4px) rotate(3deg); } }
+.fish-stage.wait .fs-ripple::before, .fish-stage.bite .fs-ripple::before, .fish-stage.bite .fs-ripple::after { content: ''; position: absolute; left: -40px; top: -12px; width: 80px; height: 24px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.85); animation: ripple 1.4s ease-out infinite; }
+.fish-stage.bite .fs-ripple::after { animation-delay: 0.45s; }
+@keyframes ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+.fish-stage.bite .fs-bobber { animation: bobBite 0.42s ease-in-out infinite; }
+@keyframes bobBite { 0% { transform: translateY(0); } 40% { transform: translateY(16px) scaleY(0.75); } 100% { transform: translateY(0); } }
+.fish-stage.bite .fs-rod { transform: rotate(4deg); }
+.fish-stage.reel .fs-bobber { animation: bobReel 0.8s ease-in both; }
+@keyframes bobReel { to { transform: translate(-40vw, 20vh) scale(0.6); opacity: 0.3; } }
+.fish-stage.reel .fs-rod { transform: rotate(-16deg); }
+.fish-stage.reel .fs-ripple::before { content: ''; position: absolute; left: -60px; top: -40px; width: 120px; height: 60px; border-radius: 50%; background: radial-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%); animation: splashUp 0.6s ease-out both; }
+@keyframes splashUp { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.6) translateY(-20px); opacity: 0; } }
+.fish-stage.rare.bite::after, .fish-stage.rare.reel::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 58% 56%, rgba(255, 236, 140, 0.55), rgba(255, 236, 140, 0) 45%); animation: rareGlow 0.8s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes rareGlow { from { opacity: 0.4; } to { opacity: 1; } }
+
+/* ---------- ガサガサ ---------- */
+.gasa-stage { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.gasa-stage .gs-net { position: absolute; right: 4%; bottom: 14%; width: min(34vh, 230px); transform: rotate(-20deg); filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.2)); transition: transform 400ms; }
+.gasa-stage.sweep .gs-net { animation: netSweep 2.1s ease-in-out both; }
+@keyframes netSweep {
+  0% { right: 4%; bottom: 14%; transform: rotate(-20deg); }
+  15% { right: 58%; bottom: 6%; transform: rotate(-60deg); }
+  30% { right: 46%; bottom: 3%; transform: rotate(-52deg); }
+  45% { right: 58%; bottom: 6%; transform: rotate(-64deg); }
+  60% { right: 40%; bottom: 3%; transform: rotate(-50deg); }
+  75% { right: 54%; bottom: 6%; transform: rotate(-62deg); }
+  100% { right: 34%; bottom: 3%; transform: rotate(-48deg); }
+}
+.gasa-stage.lift .gs-net { right: 34%; bottom: 26%; transform: rotate(-30deg); transition: bottom 600ms cubic-bezier(.2,1.4,.4,1), transform 600ms; }
+.gasa-stage .gs-word { position: absolute; bottom: 30%; font-size: 44px; font-weight: 900; color: #fff7d6; -webkit-text-stroke: 4px #2f6b2c; paint-order: stroke; transform: translateX(-50%); }
+.gasa-stage .gs-word.pop { animation: wordPop 0.6s ease-out both; }
+@keyframes wordPop { from { transform: translate(-50%, 10px) scale(0.5); opacity: 0; } 40% { transform: translate(-50%, -6px) scale(1.15); opacity: 1; } to { transform: translate(-50%, -16px) scale(1); opacity: 0.9; } }
+.gasa-stage .gs-splash i { position: absolute; bottom: 12%; width: 10px; height: 14px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: rgba(220, 245, 255, 0.95); animation: drop 0.8s ease-out both; }
+@keyframes drop { from { transform: translate(0, 0); opacity: 1; } 50% { transform: translate(var(--dx), -70px); } to { transform: translate(calc(var(--dx) * 1.6), 10px); opacity: 0; } }
+.gasa-stage.rare.lift::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 60% 60%, rgba(255, 236, 140, 0.6), rgba(255, 236, 140, 0) 45%); animation: rareGlow 0.6s ease-in-out infinite alternate; }
+
+/* ---------- パネル（えさやさん・つかまえた！） ---------- */
+#scr-adventure .adv-panel { position: absolute; inset: 0; z-index: 30; background: rgba(32, 62, 74, 0.35); display: grid; place-items: center; padding: 10px; }
+#scr-adventure .adv-panel[hidden] { display: none; }
+.ap-box { position: relative; width: min(480px, 94%); max-height: 96%; overflow: auto; padding: 14px 18px 16px; border-radius: 24px; background: #fff; box-shadow: var(--shadow-strong); text-align: center; animation: celIn 220ms ease-out; }
+.ap-close { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; border-radius: 50%; background: #eef3f1; font-size: 18px; }
+.ap-head { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.ap-head img { width: 72px; height: 72px; object-fit: contain; }
+.ap-title { font-size: 24px; font-weight: 800; text-align: left; }
+.ap-have { font-size: 15px; color: var(--ink-soft); text-align: left; }
+.ap-have b { font-size: 20px; color: var(--ink); }
+.ap-gift { margin-top: 10px; padding: 10px; border-radius: 18px; background: #fff4d6; }
+.ap-gift-t { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+.ap-take { min-width: 180px; min-height: 52px; font-size: 20px; }
+.ap-price { margin-top: 8px; font-size: 18px; }
+.ap-packs { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+.ap-pack { min-width: 130px; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; line-height: 1.2; }
+.ap-pack small { font-size: 14px; display: flex; align-items: center; gap: 2px; }
+.ap-pack em { font-style: normal; font-size: 12px; color: #c0485f; }
+.ap-pack.cant { background: #e8eeec; color: #7d939b; }
+.ap-note { margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
+
+/* つかまえた！ */
+.ar-box-wrap { overflow: hidden; }
+.ar-verb { font-size: 28px; font-weight: 900; color: #ff6f96; letter-spacing: 2px; }
+.ar-pic { position: relative; height: 130px; display: grid; place-items: center; }
+.ar-pic img { max-width: 78%; max-height: 124px; object-fit: contain; animation: catchIn 0.6s cubic-bezier(.2,1.4,.4,1) both; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.18)); }
+.ar-emoji { font-size: 80px; }
+@keyframes catchIn { from { transform: translateY(40px) scale(0.4) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.ar-name { font-size: 26px; font-weight: 800; }
+.ar-tags { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.ar-tags .stars { font-size: 24px; }
+.ar-rare { padding: 1px 10px; border-radius: 999px; background: linear-gradient(90deg, #ffd34d, #ff9ab8); font-weight: 800; font-size: 15px; }
+.ar-shiny { padding: 1px 10px; border-radius: 999px; background: #e8f6ff; font-weight: 800; font-size: 15px; }
+.ar-first { margin-top: 4px; font-size: 15px; font-weight: 700; color: #3a8d5f; }
+.ar-ask { margin-top: 6px; font-size: 15px; color: var(--ink-soft); line-height: 1.4; }
+.ar-ask.strong { font-size: 18px; font-weight: 700; color: var(--ink); }
+.ar-sub { margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+.ar-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.ar-btns .btn { min-height: 50px; min-width: 150px; font-size: 17px; }
+.ar-rays { position: absolute; left: 50%; top: 96px; width: 420px; height: 420px; margin: -210px 0 0 -210px; pointer-events: none; opacity: 0; }
+.ar-box-wrap.r4 .ar-rays, .ar-box-wrap.r5 .ar-rays, .ar-box-wrap.shiny .ar-rays { opacity: 0.55; background: repeating-conic-gradient(rgba(255, 220, 110, 0.55) 0 10deg, rgba(255, 220, 110, 0) 10deg 20deg); border-radius: 50%; animation: rays 8s linear infinite; mask-image: radial-gradient(#000 20%, transparent 65%); -webkit-mask-image: radial-gradient(#000 20%, transparent 65%); }
+.ar-box-wrap.r5 .ar-rays { background: repeating-conic-gradient(rgba(255, 150, 210, 0.55) 0 10deg, rgba(170, 220, 255, 0.45) 10deg 20deg); }
+.ar-box-wrap > *:not(.ar-rays) { position: relative; }
+@keyframes rays { to { transform: rotate(360deg); } }
+.ar-sparks { position: absolute; left: 50%; top: 96px; pointer-events: none; }
+.ar-sparks i { position: absolute; font-style: normal; font-size: 22px; animation: spark 1.2s ease-out both; }
+@keyframes spark { from { transform: translate(0, 0) scale(0.3); opacity: 1; } to { transform: translate(var(--x), var(--y)) scale(1.1); opacity: 0; } }
+@media (max-height: 420px) { .ar-pic { height: 92px; } .ar-pic img { max-height: 88px; } .ar-verb { font-size: 22px; } .ar-name { font-size: 21px; } .ar-btns .btn { min-height: 44px; } .ap-head img { width: 54px; height: 54px; } }
+
+/* ふきだし */
+#scr-adventure .adv-guide { position: absolute; z-index: 32; left: 50%; bottom: calc(var(--safe-b) + 96px); transform: translateX(-50%); width: min(560px, 92%); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 22px; background: #fff; box-shadow: var(--shadow-strong); animation: celIn 220ms ease-out; }
+#scr-adventure .adv-guide[hidden] { display: none; }
+.adv-guide .ag-face { font-size: 34px; }
+.adv-guide .ag-text { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 18px; line-height: 1.4; }
+.adv-guide .ag-pic { width: 56px; height: 56px; object-fit: contain; }
+.adv-guide .ag-ok { min-width: 64px; min-height: 44px; background: var(--coin); }
+@media (max-height: 420px) { #scr-adventure .adv-guide { bottom: calc(var(--safe-b) + 76px); padding: 6px 10px; } .adv-guide .ag-text { font-size: 16px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #btn-adventure, #btn-adventure .arb-ic, #btn-adventure .arb-badge, .adv-card.hot .ac-chip, .ar-box-wrap .ar-rays { animation: none !important; }
+}
+
+/* ---------- いけの すいそう（へやの 小さな すいそう・水の ふだ・3D の canvas） ---------- */
+#scr-tank canvas.aq-extra { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.water-tag.pond { background: #cfe5b0; }
+.room-slot.pond .water { background: linear-gradient(#bfe0a8, #7fb68c 70%, #5e9877); }
+.room-slot.pond .sand { background: linear-gradient(#8a6c4c, #6e5236); height: 15%; }
+/* はんぶん りくち（みぎ） */
+.room-slot.pond .water::after { content: ''; position: absolute; right: 0; bottom: 0; width: 38%; height: 72%; border-radius: 40% 0 0 0 / 30% 0 0 0; background: linear-gradient(#86bf5a 0 10%, #8a6a45 10% 100%); }
+.room-slot.pond .tank-rim { background: linear-gradient(#6a8a5a, #4f6e44); }
+.fish-stage .fs-mark[hidden] { display: none; }
+/* 文字が きれない ように（ゲーム係の playtest の しるし）：はばは 中身に あわせる */
+#btn-adventure { max-width: none; width: max-content; }
+#btn-adventure .arb-body { flex: none; min-width: 0; }
+#btn-adventure .arb-name { line-height: 1.3; }

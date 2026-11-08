@@ -99,12 +99,11 @@ test('すいそうは へやに 6つ まで（はじめの 1つ を ふくむ）
   st.unlocks.tank6 = 1;
   for (let i = 0; i < 5; i++) assert.ok(sim.buyItem(st, i % 2 ? 'tank_salt' : 'tank_fresh').ok, `${i + 2}つめ`);
   assert.equal(st.tanks.length, 6);
-  for (const id of ['tank_salt', 'tank_fresh']) {
-    const c = sim.canBuyItem(st, id);
-    assert.equal(c.ok, false); assert.equal(c.reason, 'tankMax');
-    assert.equal(sim.buyItem(st, id).ok, false);
-  }
+  // v0.6：7つめ からは そうこへ（へやは 6つの まま）
+  const r = sim.buyItem(st, 'tank_salt');
+  assert.ok(r.ok && r.stored);
   assert.equal(st.tanks.length, 6);
+  assert.equal(st.storage.length, 1);
   assert.deepEqual(st.tanks.map((t) => t.slot).sort(), [0, 1, 2, 3, 4, 5]);
   assert.equal(new Set(st.tanks.map((t) => t.id)).size, 6);
   assert.equal(B.TANKS.max, 6);

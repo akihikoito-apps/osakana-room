@@ -164,6 +164,7 @@ function targetEl(st) {
   if (tg === 'feedButton') return scr === 'tank' ? $('#care [data-care="feed"]') : scr === 'room' ? $('#room-tank') : $('#btn-back');
   if (tg === 'meters') return scr === 'tank' ? $('#gauges') : null;   // すいそう以外なら render で すいそうへ つれていく
   if (tg === 'coins') return $('#hud-coins');
+  if (tg === 'helpButton') { const b = $('#btn-help'); return scr === 'room' && b && !b.hidden ? b : null; }   // へや以外なら render で へやへ
   return null;
 }
 
@@ -203,7 +204,8 @@ function render() {
   const inShop = G.screen === 'shop';
   document.body.classList.toggle('tut-shop', inShop);
   g.classList.toggle('inshop', inShop);
-  g.classList.toggle('top', G.screen === 'room');
+  g.classList.toggle('top', G.screen === 'room' && st.target !== 'helpButton');   // ヘルプ（ひだりうえ）を さす ときは したに
+  if (st.target === 'helpButton' && G.screen !== 'room') { clearTimeout(autoGo); autoGo = setTimeout(() => { if (cur()?.target === 'helpButton' && G.screen !== 'room') G.go('room'); }, 700); }
   if (inShop) { const r = $('#shop-guide-slot').getBoundingClientRect(); g.style.top = r.top + 'px'; } else g.style.top = '';
   g.hidden = false;
   if (st.target === 'meters' && G.screen !== 'tank') { clearTimeout(autoGo); autoGo = setTimeout(() => { if (cur()?.target === 'meters' && G.screen !== 'tank') G.go('tank'); }, 700); }
@@ -224,7 +226,7 @@ function placeArrow() {
   const r = t.getBoundingClientRect();
   if (!r.width) { a.hidden = true; return; }
   if (t.id === 'gauges') { a.textContent = '👈'; a.style.left = (r.right + 26) + 'px'; a.style.top = (r.top + r.height / 2 + 18) + 'px'; }
-  else if (t.id === 'hud-coins') { a.textContent = '👆'; a.style.left = (r.left + r.width / 2) + 'px'; a.style.top = (r.bottom + 44) + 'px'; }
+  else if (t.id === 'hud-coins' || t.id === 'btn-help') { a.textContent = '👆'; a.style.left = (r.left + r.width / 2) + 'px'; a.style.top = (r.bottom + 44) + 'px'; }
   else if (t.closest('#shop-list')) { a.textContent = '👇'; a.style.left = (r.left + r.width / 2) + 'px'; a.style.top = (r.top + 34) + 'px'; }   // おみせでは カードの なかを さす（となりを おさない ように）
   else { a.textContent = '👇'; a.style.left = (r.left + r.width / 2) + 'px'; a.style.top = Math.max(40, r.top - 2) + 'px'; }
   a.hidden = false;

@@ -253,15 +253,17 @@ test('ミッション：チュートリアル中は たっせい しない・た
   assert.ok(r.ok); assert.equal(st.coins - c0, 30);
   assert.equal(sim.claimMission(st, 'm_feed3').ok, false, '2かいめは だめ');
   assert.equal(st.coins - c0, 30);
-  assert.deepEqual(sim.visibleMissions(st).map((m) => m.id), ['m_pet5', 'm_water1', 'm_fish2']);
+  // v0.6：5つ 見える（lane ごとに 1つ）。はじめの 3つは いままでと おなじ
+  assert.deepEqual(sim.visibleMissions(st).map((m) => m.id).slice(0, 3), ['m_pet5', 'm_water1', 'm_fish2']);
+  assert.equal(sim.visibleMissions(st).length, 5);
   assert.equal(sim.claimMission(st, 'nope').ok, false);
 });
 
-test('ミッション：見えている 3つ だけ たっせい する（さきの ものは まだ）', () => {
+test('ミッション：見えている ものだけ たっせい する（さきの ものは まだ）', () => {
   const st = freshState();
   for (const id of ['medaka', 'guppy', 'neon_tetra', 'corydoras']) addFish(st, id);
   sim.checkMissions(st);
-  assert.ok(st.missions.done.m_fish2 === undefined, 'm_fish2 は 4ばんめ なので まだ');
+  assert.ok(st.missions.done.m_tank2 === undefined, 'm_tank2（room の 3ばんめ）は まだ 見えないので まだ');
   assert.equal(sim.visibleMissions(st).length, missions.MISSION_VISIBLE);
 });
 
@@ -285,7 +287,8 @@ function playUntilAllMissions(maxDays = 60) {
   const hasVitamin = !!sim.data().itemById.food_vitamin;
   const log = [];
   let h = 0;
-  for (; h < maxDays * 24 && Object.keys(st.missions.claimed).length < missions.MISSIONS.length; h++) {
+  const OLD27 = missions.MISSIONS.filter((m) => m.order < 30);   // v0.5 までの 27こ
+  for (; h < maxDays * 24 && OLD27.some((m) => !st.missions.claimed[m.id]); h++) {
     while (wish.length) {
       const [id, where] = wish[0];
       const isFish = !!sim.data().fishById[id];
@@ -315,11 +318,11 @@ function playUntilAllMissions(maxDays = 60) {
     sim.tick(st, HOUR, rnd);
     for (const m of missions.MISSIONS) if (st.missions.done[m.id] && !st.missions.claimed[m.id]) sim.claimMission(st, m.id);
   }
-  return { st, days: st.daily.day, left: missions.MISSIONS.filter((m) => !st.missions.claimed[m.id]).map((m) => m.id), wish, log };
+  return { st, days: st.daily.day, left: OLD27.filter((m) => !st.missions.claimed[m.id]).map((m) => m.id), wish, log };
 }
 
 test('ふつうに あそぶと v0.3 の ミッション 27こが ぜんぶ うけとれる（60にち いない）', () => {
   const { days, left, wish, st } = playUntilAllMissions(60);
-  assert.equal(missions.MISSIONS.length, 27);
+  assert.equal(missions.MISSIONS.filter((m) => m.order < 30).length, 27);
   assert.deepEqual(left, [], `${days}にちめ で のこり: ${left.join(', ')}（かえなかった もの: ${wish.map((w) => w[0]).join(', ')}・コイン ${st.coins}）`);
 });

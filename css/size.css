@@ -1,0 +1,81 @@
+/* v0.6 個体差（個体差係）：魚カードの おおきさ・ものさし・キラキラ／えさを えらぶ／ずかんの おうかん・キラキラ */
+
+/* ---------- 魚カード ---------- */
+.card .c-size .c-cm { font-size: 17px; font-weight: 900; color: var(--ink); white-space: nowrap; flex: none; }
+.card .c-size .c-now { font-size: 13px; color: var(--ink-soft); }
+.card .c-size .c-word { margin-left: 4px; flex: none; font-size: 13px; padding: 1px 8px; border-radius: 999px; background: #eef3f1; white-space: nowrap; }
+.card .c-size .c-word.crown { background: linear-gradient(90deg, #ffe58a, #ffc93a); color: #5c4300; font-weight: 800; }
+.card .c-fore { margin: 0 0 2px 70px; line-height: 1.2; }
+.card .c-fore span { display: inline-block; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 999px; background: #e3f1fb; color: #1f5f8f; }
+.card .c-fore[data-f="big"] span { background: #ffefc2; color: #7a5200; }
+.card .c-fore[data-f="small"] span { background: #f0e8fb; color: #5d3f8f; }
+.card .c-ruler .r-tick { position: absolute; top: 1px; bottom: 1px; width: 1px; margin-left: -0.5px; background: rgba(32, 62, 74, 0.25); }
+.card .c-ruler .r-crown { position: absolute; right: 0; top: -14px; width: 12%; text-align: center; font-size: 11px; line-height: 1; }
+.card .c-ruler { display: flex; align-items: center; gap: 4px; height: 26px; font-size: 11px; color: var(--ink-soft); }
+.card .c-ruler .r-end { flex: none; white-space: nowrap; }
+.card .c-ruler .r-track { position: relative; flex: 1; height: 10px; margin-top: 8px; border-radius: 5px; background: linear-gradient(90deg, #cfe6f5, #bfe8cf 50%, #fff0c4); }
+.card .c-ruler .r-crownzone { position: absolute; top: 0; bottom: 0; right: 0; width: 10%; border-radius: 0 5px 5px 0; background: #f2b600; border-left: 2px solid #b07d00; }
+.card .c-ruler .r-mark { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #2f8fd8; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(32, 62, 74, 0.45); }
+.card .c-ruler.crown .r-mark { background: #f2a900; }
+.card .c-shiny { margin-left: 4px; font-size: 0.9em; }
+.card.shiny { box-shadow: 0 0 0 2px #ffe08a, 0 0 14px rgba(255, 214, 102, 0.75), 0 4px 14px rgba(32, 62, 74, 0.2); }
+@media (min-height: 600px) and (min-width: 900px) {
+  .card .c-size .c-cm { font-size: 21px; }
+  .card .c-size .c-now, .card .c-size .c-word { font-size: 15px; }
+  .card .c-fore { margin-left: 92px; } .card .c-fore span { font-size: 15px; }
+  .card .c-ruler { height: 28px; font-size: 13px; }
+  .card .c-ruler .r-track { height: 12px; }
+}
+@media (max-height: 500px) {
+  .card .c-fore { margin-left: 64px; } .card .c-fore span { font-size: 11px; }
+  .card .c-ruler { height: 24px; font-size: 10px; }
+  .card:has(.c-size) { max-height: 244px; }
+  .card:has(.c-size) .c-row { height: 20px; }
+  .card .c-size .c-cm { font-size: 15px; }
+  .card .c-size .c-word { font-size: 11px; padding: 0 6px; }
+}
+
+/* ---------- えさを えらぶ ---------- */
+.care-btn .food-left { display: block; font-size: 12px; line-height: 1; color: #634d16; }
+.care-btn .lb .food-name { display: block; }
+.care-btn.food-pick { min-width: 0; padding: 0 8px; flex-direction: column; justify-content: center; gap: 0; }
+.care-btn.food-pick .fp-ic { font-size: 16px; line-height: 1; color: var(--ink-soft); }
+.care-btn.food-pick .lb { font-size: 13px; }
+#food-menu {
+  position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 30;
+  display: flex; gap: 6px; padding: 8px; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97); box-shadow: 0 6px 18px rgba(32, 62, 74, 0.28);
+}
+#food-menu .fm-item {
+  display: flex; flex-direction: column; align-items: center; gap: 1px; width: 76px; padding: 4px 2px 6px;
+  border-radius: 12px; background: #f3f7f5; border: 2px solid transparent; color: var(--ink);
+}
+#food-menu .fm-item.on { border-color: var(--good-deep, #3a9b6b); background: #e6f6ec; }
+#food-menu .fm-item.dim { opacity: 0.45; }
+#food-menu .fm-pic { position: relative; width: 44px; height: 44px; }
+#food-menu .fm-pic img { width: 100%; height: 100%; object-fit: contain; display: block; }
+#food-menu .fm-love { position: absolute; right: -6px; top: -4px; font-style: normal; font-size: 15px; color: #ff4f8b; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
+#food-menu .fm-name { font-size: 12px; line-height: 1.15; white-space: nowrap; }
+#food-menu .fm-left { font-size: 11px; line-height: 1; color: var(--ink-soft); }
+@media (min-height: 600px) and (min-width: 900px) {
+  #food-menu .fm-item { width: 92px; }
+  #food-menu .fm-pic { width: 56px; height: 56px; }
+  #food-menu .fm-name { font-size: 14px; }
+  .care-btn.food-pick .lb { font-size: 15px; }
+}
+@media (max-height: 500px) {
+  .care-btn.food-pick { min-width: 0; padding: 0 6px; }
+  .care-btn.food-pick .lb { font-size: 11px; }
+  #food-menu { padding: 6px; gap: 4px; }
+  #food-menu .fm-item { width: 66px; }
+  #food-menu .fm-pic { width: 36px; height: 36px; }
+}
+
+/* ---------- ずかん ---------- */
+.dex-item .pic { position: relative; }
+.dex-item .dex-crown { position: absolute; left: 2px; top: 0; font-size: 20px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+.dex-item .dex-shiny { position: absolute; right: 2px; top: 0; font-size: 15px; line-height: 1; padding: 2px 6px; border-radius: 999px; background: #ffe27a; color: #8a4b00; font-weight: 900; box-shadow: 0 0 0 1px #e0a800; }
+.dex-rec .nw { white-space: nowrap; }
+#food-menu .fm-check { position: absolute; left: -6px; top: -4px; width: 18px; height: 18px; border-radius: 50%; background: var(--good-deep, #3a9b6b); color: #fff; font-style: normal; font-size: 12px; line-height: 18px; text-align: center; font-weight: 900; }
+.dex-rec { color: #5c4a10; }
+@media (max-height: 420px) { .dex-item .dex-crown { font-size: 16px; } .dex-item .dex-shiny { font-size: 11px; padding: 1px 4px; } }

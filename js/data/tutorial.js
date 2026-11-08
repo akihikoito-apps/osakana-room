@@ -37,5 +37,7 @@ export const TUTORIAL = {
     { id: 't_water',   say: '「みずかえセット」で、よごれた みずを ピカピカに できるよ。',                 target: 'shopItem:water_change', wait: 'buyItem:water_change', lockOthers: true },
     { id: 't_meters',  say: 'ここで みずの ようすが わかるよ。かおが にこにこに なるように おせわ しようね。', target: 'meters',  wait: 'tap',      lockOthers: true },
     { id: 't_end',     say: 'おせわを すると コインが もらえるよ。こまったら ヒントが おしえてくれるよ。', target: 'coins',      wait: 'tap',      lockOthers: false },
+    // v0.6（ゲーム係）：さいごに ヘルプの ばしょを おしえる（へやの ひだりうえ。Codex・agy の あんを あわせた）
+    { id: 't_help',    say: 'わからない ことが あったら、ひだりうえの「ヘルプ」を みてね！',              target: 'helpButton', wait: 'tap',      lockOthers: false },
   ],
 };

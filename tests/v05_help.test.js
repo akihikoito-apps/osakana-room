@@ -34,9 +34,9 @@ test('こうしん りれき：いまの 版（js/version.js）より ふるい 
   assert.ok(verNum(CHANGELOG[0].ver) >= verNum(m[1]), 'りれきの いちばん うえが いまの 版より ふるい');
 });
 
-test('ヘルプ：7つの みだし・かんじ なし・1つの ばめんは 4ぎょう まで・絵が ある', () => {
+test('ヘルプ：8つの みだし（v0.6 ぼうけん）・かんじ なし・1つの ばめんは 4ぎょう まで・絵が ある', () => {
   const cats = helpTopics(balance);
-  assert.equal(cats.length, 7);
+  assert.equal(cats.length, 8);   // v0.6：ぼうけん を たした
   const ids = new Set();
   for (const c of cats) {
     assert.ok(!ids.has(c.id)); ids.add(c.id);

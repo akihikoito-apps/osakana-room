@@ -56,7 +56,7 @@ function render() {
       tile('💗', 'いまの ハート', fmt(p.hearts) + 'こ', null, 'hearts'),
       tile('🪙', 'いまの コイン', fmt(p.coins), null, 'coins'),
       tile('📅', 'あそんだ ひ', fmt(p.days) + 'にち', null, 'days'),
-      tile('🐟', 'いっしょに いる いきもの', fmt(p.creatures) + 'ひき', p.inBox ? `かりすいそう ${p.inBox}ひき` : null, 'creatures'),
+      tile('🐟', 'いっしょに いる いきもの', fmt(p.creatures) + 'ひき', p.inBox ? `おやすみすいそう ${p.inBox}ひき` : null, 'creatures'),
       tile('🌟', 'ビッグの なかま', fmt(p.big) + 'ひき', null, 'big'),
       tile('📖', 'ずかん', `${p.dex}／${p.dexAll}`, null, 'dex'),
       tile('🎮', 'クイズ さいこう', p.quizBest != null ? `${p.quizBest}／${p.quizN}もん` : 'まだ', null, 'quiz'),

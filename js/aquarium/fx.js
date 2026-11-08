@@ -149,6 +149,9 @@ export class FxLayer {
         for (let i = 0; i < 9; i++) this.add('sparkle', anchor, { delay: 0.65 + i * 0.09, size: r(0.4, 0.7), life: 1.0, ox: r(-1.1, 1.1), oy: r(-0.8, 0.4), vy: r(0.1, 0.4), twinkle: true });
         this.add('heart', anchor, { delay: 1.25, size: 0.8, life: 1.4, vy: 0.5 });
         break;
+      case 'shine':   // v0.6 キラキラの 子：ときどき ちいさな ✦ が 1〜2こ
+        for (let i = 0; i < 1 + (Math.random() < 0.5 ? 1 : 0); i++) this.add('sparkle', anchor, { delay: i * 0.4, size: r(0.28, 0.4), life: 1.0, ox: r(-0.5, 0.5), oy: r(-0.75, -0.45), vy: 0.08, sway: 0, twinkle: true });
+        break;
       case 'sad':
         for (let i = 0; i < 2; i++) this.add('drop', anchor, { delay: i * 0.7, size: 0.62, life: 1.4, ox: 0.25 + i * 0.12, oy: -0.2, vy: -0.3, sway: 0 });
         break;

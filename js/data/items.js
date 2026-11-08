@@ -183,6 +183,34 @@ export const ITEMS = [
     desc: 'ビタミンが 30かいぶん はいった おとくな セット。ふつうに かうより 100コイン おとく だよ。',
   },
 
+  // ---- v0.6：えいようの ある えさ（個体差係）。かいすうの ある えさ（つかうと へる・のこり 0 で また かう）----
+  //   たべる・たべない・だいすき は js/data/sizes.js（FOOD_PREF_OVERRIDE と defaultFoodPref）。えいようの 数値も そこ。
+  //   いろいろな えさを こまめに あげると「えいよう」が たまって ビッグの ときに おおきく なりやすい（js/size.js）。
+  {
+    id: 'food_bloodworm', name: 'あかむし', type: 'food', price: 60, water: 'both', inTank: false, max: 1,
+    uses: 10, effect: { fill: 30 },
+    icon: 'assets/items/food_bloodworm.png',
+    desc: 'あかい むしの ごはん。かわや いけの さかなが だいすき。1つで 10かいぶん。',
+  },
+  {
+    id: 'food_brine', name: 'ブラインシュリンプ', type: 'food', price: 60, water: 'both', inTank: false, max: 1,
+    uses: 10, effect: { fill: 30 },
+    icon: 'assets/items/food_brine.png',
+    desc: 'ちいさな エビの あかちゃんの ごはん。うみの さかなが だいすき。1つで 10かいぶん。',
+  },
+  {
+    id: 'food_veggie', name: 'やさいタブレット', type: 'food', price: 50, water: 'both', inTank: false, max: 1,
+    uses: 10, effect: { fill: 30 },
+    icon: 'assets/items/food_veggie.png',
+    desc: 'そこに しずむ みどりの ごはん。エビや かい、そうを たべる さかなが だいすき。1つで 10かいぶん。',
+  },
+  {
+    id: 'food_krill', name: 'クリル', type: 'food', price: 70, water: 'both', inTank: false, max: 1,
+    uses: 10, effect: { fill: 35 },
+    icon: 'assets/items/food_krill.png',
+    desc: 'おおきめの エビの ごはん。おおきな さかなが だいすき。ちいさな さかなの くちには はいらないよ。1つで 10かいぶん。',
+  },
+
   // ---- v0.3：器具 ----
   {
     id: 'auto_feeder', name: 'じどう えさやり', type: 'feeder', price: 200, water: 'both', inTank: true, max: 1, unlock: 'tank6',
@@ -208,6 +236,13 @@ export const ITEMS = [
     icon: 'assets/items/skimmer.png',           // 絵はまだ無い（デザイン係へ）
     desc: 'こまかい あわで うみの みずの よごれを とって くれるよ。',
   },
+  // ---- v0.6：おそうじロボ（インテリア係）。Codex と agy に そうだんして きめた ----
+  {
+    id: 'clean_robot', name: 'おそうじロボ', type: 'cleaner', price: 220, water: 'both', inTank: true, max: 1, unlock: 'tank6',
+    effect: { wastePerHour: 0.12 },             // そこの ごみ を 1じかんに 0.12 すいこむ（ふつうの すいそうで たまる はやさの はんぶん くらい）。ごみが 1こ より 下には しない（さいごは あみで そうじ）
+    icon: 'assets/items/clean_robot.png',
+    desc: 'すいそうの そこを ゆっくり うごいて、ごみを すこしずつ すいこむよ。さいごは あみでも おそうじ してね。',
+  },
 
   // ---- すいそう（v0.2）。かうと へやに すいそうが ふえる（balance.js TANKS）----
   {
@@ -215,7 +250,7 @@ export const ITEMS = [
     includes: ['heater', 'air_pump'],           // ヒーターと ブクブクつき（あたらしい すいそうで さむくならないように）
     effect: {},
     icon: 'assets/items/tank_fresh.png',        // 絵はまだ無い（デザイン係へ）
-    desc: 'かわや いけの いきものの すいそう。ヒーターと ブクブクが ついているよ。',
+    desc: 'かわの いきものの すいそう。ヒーターと ブクブクが ついているよ。',   // v0.6：いけの いきものは tank_pond
   },
   {
     id: 'tank_salt', name: 'うみの すいそう', type: 'tank', price: 1000, water: 'salt', inTank: false, max: 5, unlock: 'tank6',
@@ -223,5 +258,35 @@ export const ITEMS = [
     effect: {},
     icon: 'assets/items/tank_salt.png',         // 絵はまだ無い（デザイン係へ）
     desc: 'うみの みずの すいそう。うみの さかなが かえるよ。ヒーターと ブクブクが ついているよ。',
+  },
+
+  // ---- v0.6 ぼうけん（ぼうけん係）。しくみは js/adventure.js、数は balance.js ADVENTURE ----
+  // いけの すいそう：ぼうけんが ひらいた とき 1つ プレゼント。そのあとは おみせの すいそうの たなでも かえる。
+  // ヒーターは つけない（いけの 生きものには 25ど が あつい 子が いる。へやの おんど 20ど で くらす）
+  {
+    id: 'tank_pond', name: 'いけの すいそう', type: 'tank', price: 800, water: 'pond', inTank: false, max: 5, unlock: 'adventure',
+    includes: ['air_pump'],
+    effect: {},
+    icon: 'assets/items/tank_pond.png',
+    desc: 'いけで つかまえた いきものの すいそう。ブクブクが ついているよ。かわの かざりや どうぐが つかえるよ。',
+  },
+  // 道具（おみせには ならばない。price: null。type 'adventure' は おみせ・すいそうの ボタンに 出ない）
+  {
+    id: 'fishing_rod', name: 'つりざお', type: 'adventure', price: null, water: 'both', inTank: false, max: 1,
+    effect: {},
+    icon: 'assets/items/fishing_rod.png',
+    desc: 'うみで つりが できるよ。はじめて うみに いった ときの プレゼント。',
+  },
+  {
+    id: 'bait', name: 'つりえさ', type: 'adventure', price: null, water: 'both', inTank: false, max: 30,   // 1こ 100コインは ぼうけんの えさやさんで（balance.js ADVENTURE.fishing.baitPrice）
+    effect: {},
+    icon: 'assets/items/bait.png',
+    desc: 'つりの えさ。1かい つるのに 1こ つかうよ。',
+  },
+  {
+    id: 'gasa_net', name: 'ガサガサの あみ', type: 'adventure', price: null, water: 'both', inTank: false, max: 1,
+    effect: {},
+    icon: 'assets/items/gasa_net.png',
+    desc: 'いけの みずくさを ガサガサ すると いきものが つかまるよ。1にち 1かい。',
   },
 ];

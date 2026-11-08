@@ -30,8 +30,21 @@
 //   'vitaminEat'   : ビタミンを たべた かいすう（1かいの ビタミンで 1）。love: true なら だいすき の 魚が たべた かいすう { count, love? }
 //   'gadgetCount'  : ぜんぶの すいそうに 入っている v0.3 の 器具（ids の どれか）の かず { ids, count }
 //
+//   --- v0.6（ゲーム係）---
+//   'stat'        : state.stats[key] の かず（fishing・gasagasa・adventureOpen・shinyGet・crownGet・feedKinds・quizPlays・quizPerfect・quizCorrect・toBox・fromBox・storeTank・coinsEarned など）{ key, count }
+//   'bigCount' / 'adultCount' : ビッグ／おとな いじょうの 生きものの かず（おやすみすいそう・そうこも）{ count }
+//   'creatures'   : そだてている 生きもの ぜんぶの かず { count }
+//   'decorCount' / 'decorKinds' : 入れた かざりの かず／しゅるい { count }
+//   'zukanWater'  : その 水の 生きものの ずかんの かず { water, count }
+//   'zukanRarity' : ★ rarity いじょうの ずかんの かず { rarity, count }
+//   'tanksWater'  : その 水の すいそうの かず（そうこも）{ water, count }
+//   'quizBest'    : クイズの さいこう きろく { count }
+//   lane : あそびの しゅるい（care おせわ／grow そだてる／zukan ずかん・ぼうけん／room すいそう・かざり／play ハート・クイズ）。
+//          画面には lane ごとに 1つめを 出す（5つの まどが おなじ しゅるいで うまらない。agy の あん）。
+//   gate : 'started'（すこし すすんでから 出す＝うんしだいの キラキラ・おうかん）／{ stat }（ぼうけんが ひらいてから）／{ unlock }
+//
 // 配列の じゅん（＝ order の じゅん）に 3つずつ 画面に出す。v0.2 の ものは order に 小数を つかって あいだに 入れた（おわったら つぎが 出る）。チュートリアル中は出さない。
-export const MISSIONS = [
+const OLD = [
   { id: 'm_feed3',      order: 1,  title: 'ごはんの じかん',      desc: 'えさを 3かい あげよう',                   goal: { type: 'feed', count: 3 },          reward: { coin: 30 } },
   { id: 'm_pet5',       order: 2,  title: 'なでなで',              desc: 'さかなを 5かい タッチしよう',             goal: { type: 'pet', count: 5 },           reward: { coin: 20 } },
   { id: 'm_water1',     order: 3,  title: 'ピカピカの みず',      desc: 'みずかえを 1かい しよう',                 goal: { type: 'waterChange', count: 1 },   reward: { coin: 30 } },
@@ -62,4 +75,119 @@ export const MISSIONS = [
   { id: 'm_zukan12',    order: 22, title: 'ずかん はかせ',        desc: 'ずかんに 12しゅるい のせよう',             goal: { type: 'zukan', count: 12 },        reward: { coin: 200 } },
 ];
 
-export const MISSION_VISIBLE = 3;   // いちどに 画面に出す かず
+// v0.5 まで の 27こ の lane
+const OLD_LANE = {
+  m_feed3: 'care', m_water1: 'care', m_thanks1: 'care', m_vitamin1: 'care', m_healthy: 'care', m_vitamin_love: 'care', m_days5: 'care',
+  m_pet5: 'play', m_hearts20: 'play', m_natsuki: 'play', m_hearts100: 'play',
+  m_fish2: 'zukan', m_snail: 'zukan', m_tank6: 'zukan', m_zukan4: 'zukan', m_saltfish3: 'zukan', m_zukan12: 'zukan',
+  m_plant: 'room', m_salt: 'room', m_tank2: 'room', m_filter: 'room', m_light: 'room', m_gadget2: 'room', m_liverock: 'room',
+  m_friends: 'grow', m_grow1: 'grow', m_big: 'grow',
+};
+
+// ---- v0.6 で ふやした ミッション（ゲーム係）----
+// [id, title, desc, goal, coin, gate]。lane の 中は 上から じゅんに 出る（やさしい → ながい）。
+// ほうしゅう：かんたん 30〜60／ふつう 80〜200／ながい 300〜500（Codex 30〜300・agy 50〜800 の あいだ）
+const ADV = { stat: 'adventureOpen' };
+const T6 = { unlock: 'tank6' };
+const NEW = {
+  care: [
+    ['c_feed20', 'もりもり ごはん', 'えさを 20かい あげよう', { type: 'feed', count: 20 }, 60],
+    ['c_water5', 'みずかえ じょうず', 'みずかえを 5かい しよう', { type: 'waterChange', count: 5 }, 60],
+    ['c_scoop5', 'おそうじ たいむ', 'そうじを 5かい しよう', { type: 'scoop', count: 5 }, 60],
+    ['c_feedkinds2', 'いろいろな ごはん', '2しゅるいの えさを あげよう', { type: 'stat', key: 'feedKinds', count: 2 }, 80],
+    ['c_feed50', 'ごはん たっぷり', 'えさを 50かい あげよう', { type: 'feed', count: 50 }, 120],
+    ['c_thanks10', 'ありがとう いっぱい', 'ありがとうを 10かい もらおう', { type: 'thanks', count: 10 }, 120],
+    ['c_vitamin10', 'げんきの もと', 'ビタミンを 10かい あげよう', { type: 'vitaminEat', count: 10 }, 120],
+    ['c_days10', '10にち おせわ', '10にち おせわ しよう', { type: 'days', count: 10 }, 150],
+    ['c_scoop20', 'ピカピカ はかせ', 'そうじを 20かい しよう', { type: 'scoop', count: 20 }, 150],
+    ['c_healthy5', 'げんきな すいそう', '5ひき いじょう いる すいそうを みんな げんきに', { type: 'allHealthy', value: 70, minFish: 5 }, 150],
+    ['c_feedkinds4', 'ごはん はかせ', '4しゅるいの えさを あげよう', { type: 'stat', key: 'feedKinds', count: 4 }, 200],
+    ['c_water20', 'みずかえ めいじん', 'みずかえを 20かい しよう', { type: 'waterChange', count: 20 }, 200],
+    ['c_feed150', 'まいにちの ごはん', 'えさを 150かい あげよう', { type: 'feed', count: 150 }, 300],
+    ['c_thanks50', 'ありがとうの たば', 'ありがとうを 50かい もらおう', { type: 'thanks', count: 50 }, 300],
+    ['c_days30', '30にち おせわ', '30にち おせわ しよう', { type: 'days', count: 30 }, 400],
+    ['c_days60', 'ずっと いっしょ', '60にち おせわ しよう', { type: 'days', count: 60 }, 500],
+  ],
+  grow: [
+    ['g_adult3', 'おとなの なかま', 'おとなを 3びきに しよう', { type: 'adultCount', count: 3 }, 80],
+    ['g_creatures10', 'にぎやかな おへや', 'いきものを 10ぴきに しよう', { type: 'creatures', count: 10 }, 100],
+    ['g_big3', 'ビッグ トリオ', 'ビッグを 3びきに しよう', { type: 'bigCount', count: 3 }, 150],
+    ['g_adult10', 'おとな いっぱい', 'おとなを 10ぴきに しよう', { type: 'adultCount', count: 10 }, 150],
+    ['g_crown1', 'おうかんの しるし', 'おうかんの いきものを みつけたよ', { type: 'stat', key: 'crownGet', count: 1 }, 150, 'started'],
+    ['g_natsuki100', 'だいすきの しるし', 'なつきの ハートを 5こに しよう', { type: 'natsuki', value: 100 }, 200],
+    ['g_big5', 'ビッグ ファイブ', 'ビッグを 5ひきに しよう', { type: 'bigCount', count: 5 }, 200],
+    ['g_creatures20', 'いきもの だいすき', 'いきものを 20ぴきに しよう', { type: 'creatures', count: 20 }, 200],
+    ['g_adult20', 'おとなの むれ', 'おとなを 20ぴきに しよう', { type: 'adultCount', count: 20 }, 300],
+    ['g_crown3', 'おうかん あつめ', 'おうかんの しゅるいを 3つに しよう', { type: 'stat', key: 'crownGet', count: 3 }, 300, 'started'],
+    ['g_big10', 'ビッグ いっぱい', 'ビッグを 10ぴきに しよう', { type: 'bigCount', count: 10 }, 300],
+    ['g_crown5', 'おうかん はかせ', 'おうかんの しゅるいを 5つに しよう', { type: 'stat', key: 'crownGet', count: 5 }, 500, 'started'],
+    ['g_big20', 'ビッグ めいじん', 'ビッグを 20ぴきに しよう', { type: 'bigCount', count: 20 }, 500],
+  ],
+  zukan: [
+    ['z_shrimp2', 'エビの なかま', 'エビを 2ひきに しよう', { type: 'kindCount', kind: 'shrimp', count: 2 }, 60],
+    ['z_zukan8', 'ずかん 8', 'ずかんに 8しゅるい のせよう', { type: 'zukan', count: 8 }, 80],
+    ['z_adv', 'ぼうけんの はじまり', 'ぼうけんに いけるように なったよ', { type: 'stat', key: 'adventureOpen', count: 1 }, 100, ADV],
+    ['z_fishing1', 'はじめての つり', 'うみで つりを しよう', { type: 'stat', key: 'fishing', count: 1 }, 60, ADV],
+    ['z_gasa1', 'はじめての ガサガサ', 'いけで ガサガサ しよう', { type: 'stat', key: 'gasagasa', count: 1 }, 60, ADV],
+    ['z_salt5', 'うみの ずかん', 'うみの いきものを ずかんに 5しゅるい', { type: 'zukanWater', water: 'salt', count: 5 }, 120, T6],
+    ['z_zukan16', 'ずかん 16', 'ずかんに 16しゅるい のせよう', { type: 'zukan', count: 16 }, 150],
+    ['z_fishing10', 'つり じょうず', 'つりを 10かい しよう', { type: 'stat', key: 'fishing', count: 10 }, 150, ADV],
+    ['z_gasa10', 'ガサガサ じょうず', 'ガサガサを 10かい しよう', { type: 'stat', key: 'gasagasa', count: 10 }, 150, ADV],
+    ['z_shiny1', 'キラキラ はっけん', 'キラキラの いきものを みつけたよ', { type: 'stat', key: 'shinyGet', count: 1 }, 200, 'started'],
+    ['z_rare3', 'めずらしい なかま', '★3 いじょうを ずかんに 5しゅるい', { type: 'zukanRarity', rarity: 3, count: 5 }, 200],
+    ['z_pond5', 'いけの ずかん', 'いけの いきものを ずかんに 5しゅるい', { type: 'zukanWater', water: 'pond', count: 5 }, 200, ADV],
+    ['z_zukan20', 'ずかん 20', 'ずかんに 20しゅるい のせよう', { type: 'zukan', count: 20 }, 200],
+    ['z_fishing30', 'つり めいじん', 'つりを 30かい しよう', { type: 'stat', key: 'fishing', count: 30 }, 300, ADV],
+    ['z_gasa30', 'ガサガサ めいじん', 'ガサガサを 30かい しよう', { type: 'stat', key: 'gasagasa', count: 30 }, 300, ADV],
+    ['z_zukan25', 'ずかん 25', 'ずかんに 25しゅるい のせよう', { type: 'zukan', count: 25 }, 300],
+    ['z_rare4', 'とっても めずらしい', '★4 いじょうを ずかんに 3しゅるい', { type: 'zukanRarity', rarity: 4, count: 3 }, 300],
+    ['z_zukan30', 'ずかん 30', 'ずかんに 30しゅるい のせよう', { type: 'zukan', count: 30 }, 400],
+    ['z_pond15', 'いけ はかせ', 'いけの いきものを ずかんに 15しゅるい', { type: 'zukanWater', water: 'pond', count: 15 }, 400, ADV],
+    ['z_shiny3', 'キラキラ コレクター', 'キラキラの いきものを 3びき みつけよう', { type: 'stat', key: 'shinyGet', count: 3 }, 500, 'started'],
+    ['z_zukan50', 'ずかん はかせ 50', 'ずかんに 50しゅるい のせよう', { type: 'zukan', count: 50 }, 500, ADV],
+  ],
+  room: [
+    ['r_decor3', 'かざりつけ', 'かざりを 3つ いれよう', { type: 'decorCount', count: 3 }, 50],
+    ['r_box1', 'おやすみ なさい', 'おやすみすいそうに 1ぴき あずけよう', { type: 'stat', key: 'toBox', count: 1 }, 50],
+    ['r_frombox1', 'おはよう', 'おやすみすいそうから 1ぴき もどそう', { type: 'stat', key: 'fromBox', count: 1 }, 50],
+    ['r_kinds5', 'かざり いろいろ', 'かざりを 5しゅるい いれよう', { type: 'decorKinds', count: 5 }, 100],
+    ['r_decor8', 'すてきな すいそう', 'かざりを 8つ いれよう', { type: 'decorCount', count: 8 }, 120],
+    ['r_store1', 'そうこに しまおう', 'すいそうを そうこに しまおう', { type: 'stat', key: 'storeTank', count: 1 }, 80, T6],
+    ['r_tank3', 'すいそう 3つ', 'すいそうを 3つに しよう', { type: 'tankCount', count: 3 }, 200, T6],
+    ['r_pondtank', 'いけの すいそう', 'いけの すいそうを もとう', { type: 'hasTankWater', water: 'pond' }, 150, ADV],
+    ['r_kinds10', 'かざり はかせ', 'かざりを 10しゅるい いれよう', { type: 'decorKinds', count: 10 }, 200],
+    ['r_gadget4', 'どうぐ めいじん', 'あたらしい どうぐを 4つ いれよう', { type: 'gadgetCount', ids: ['auto_feeder', 'fan', 'co2_kit', 'skimmer'], count: 4 }, 200, T6],
+    ['r_salt2', 'うみが ふたつ', 'うみの すいそうを 2つに しよう', { type: 'tanksWater', water: 'salt', count: 2 }, 300, T6],
+    ['r_decor20', 'かざり いっぱい', 'かざりを 20こ いれよう', { type: 'decorCount', count: 20 }, 300],
+    ['r_tank6', 'すいそう 6つ', 'すいそうを 6つに しよう', { type: 'tankCount', count: 6 }, 400, T6],
+    ['r_tank8', 'すいそう コレクター', 'すいそうを 8つに しよう（そうこも かぞえるよ）', { type: 'tankCount', count: 8 }, 500, T6],
+  ],
+  play: [
+    ['p_pet30', 'なでなで 30', 'さかなを 30かい なでよう', { type: 'pet', count: 30 }, 50],
+    ['p_quiz1', 'クイズに ちょうせん', 'さかな あて クイズで あそぼう', { type: 'stat', key: 'quizPlays', count: 1 }, 50],
+    ['p_hearts50', 'ハート 50', 'ハートを 50こ あつめよう', { type: 'hearts', count: 50 }, 80],
+    ['p_quizbest3', 'クイズ 3もん', 'クイズで 3もん せいかい しよう', { type: 'quizBest', count: 3 }, 80],
+    ['p_pet100', 'なでなで 100', 'さかなを 100かい なでよう', { type: 'pet', count: 100 }, 120],
+    ['p_quizperfect1', 'ぜんもん せいかい', 'クイズで ぜんもん せいかい しよう', { type: 'stat', key: 'quizPerfect', count: 1 }, 150],
+    ['p_hearts200', 'ハート 200', 'ハートを 200こ あつめよう', { type: 'hearts', count: 200 }, 150],
+    ['p_quiz10', 'クイズ だいすき', 'クイズで 10かい あそぼう', { type: 'stat', key: 'quizPlays', count: 10 }, 150],
+    ['p_hearts300', 'ハート 300', 'ハートを 300こ あつめよう', { type: 'hearts', count: 300 }, 200],
+    ['p_quizcorrect30', 'さかな ものしり', 'クイズで 30もん せいかい しよう', { type: 'stat', key: 'quizCorrect', count: 30 }, 200],
+    ['p_pet300', 'なでなで 300', 'さかなを 300かい なでよう', { type: 'pet', count: 300 }, 200],
+    ['p_coins3000', 'コイン ちょきん', 'コインを ぜんぶで 3000 もらおう', { type: 'stat', key: 'coinsEarned', count: 3000 }, 300],
+    ['p_hearts600', 'ハート 600', 'ハートを 600こ あつめよう', { type: 'hearts', count: 600 }, 300],
+    ['p_quizperfect5', 'クイズ めいじん', 'クイズで ぜんもん せいかいを 5かい', { type: 'stat', key: 'quizPerfect', count: 5 }, 300],
+    ['p_hearts1000', 'ハート 1000', 'ハートを 1000こ あつめよう', { type: 'hearts', count: 1000 }, 500],
+  ],
+};
+
+const LANES = ['care', 'grow', 'zukan', 'room', 'play'];
+export const MISSIONS = [
+  ...OLD.map((m) => ({ ...m, lane: OLD_LANE[m.id] || 'care' })),
+  // order：lane の 中の じゅん（30, 31, …）＋ lane ごとに すこし ずらす（かさならない ように）
+  ...LANES.flatMap((lane, li) => NEW[lane].map(([id, title, desc, goal, coin, gate], i) => ({
+    id, order: 30 + i + li / 10, lane, title, desc, goal, reward: { coin }, ...(gate ? { gate } : {}),
+  }))),
+];
+
+export const MISSION_VISIBLE = 5;   // いちどに 画面に出す かず（v0.6：3 → 5）

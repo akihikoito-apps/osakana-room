@@ -190,6 +190,8 @@ export function makeFishMaterial(texture) {
     uDull: { value: 0 },
     uFlash: { value: 0 },
     uRim: { value: 0.35 },
+    uShiny: { value: 0 },     // v0.6 キラキラ（0/1）
+    uTime: { value: 0 },
   };
   const mat = new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5, side: THREE.DoubleSide });
   mat.userData.u = u;
@@ -208,7 +210,7 @@ export function makeFishMaterial(texture) {
         vec3 transformed = vec3( position );
         transformed.z += fishDz(position.x);`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uDull;\nuniform float uFlash;\nuniform float uRim;')
+      .replace('#include <common>', '#include <common>\nuniform float uDull;\nuniform float uFlash;\nuniform float uRim;\nuniform float uShiny;\nuniform float uTime;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         float fishLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(fishLum) * vec3(0.78, 0.84, 0.92) * 0.9, uDull);`)
@@ -217,8 +219,15 @@ export function makeFishMaterial(texture) {
       .replace('#include <opaque_fragment>', `
         float fishRim = 1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0);
         outgoingLight += vec3(0.75, 0.95, 1.0) * pow(fishRim, 3.0) * uRim * (1.0 - uDull * 0.6);
+        // v0.6 キラキラ：ふちに パステルの にじいろ＋ゆっくり とおる ひかりの おび（はやい てんめつは しない）
+        if (uShiny > 0.5) {
+          float fr = pow(fishRim, 1.6);
+          vec3 irid = 0.55 + 0.45 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + fr * 0.9 + uTime * 0.05));
+          float band = pow(max(0.0, sin(gl_FragCoord.x * 0.012 - gl_FragCoord.y * 0.006 - uTime * 1.1)), 24.0);
+          outgoingLight += irid * (0.05 + 0.28 * fr) * (1.0 - uDull * 0.6) + vec3(1.0, 0.97, 0.88) * band * 0.2 * diffuseColor.a;
+        }
         #include <opaque_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'osakana-fish-v1';
+  mat.customProgramCacheKey = () => 'osakana-fish-v2';
   return mat;
 }

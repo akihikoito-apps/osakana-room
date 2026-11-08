@@ -16,14 +16,14 @@ test('魚と どうぐの id が かぶらない・形が そろっている', (
   assert.equal(new Set(ids).size, ids.length, 'id が かぶっている');
   for (const f of FISH) {
     assert.match(f.id, /^[a-z_]+$/);
-    assert.ok(['fresh', 'salt'].includes(f.water), f.id);
+    assert.ok(Object.keys(balance.WATERS).includes(f.water), f.id);   // v0.6：balance.js WATERS（fresh・salt・pond …）
     assert.ok(f.temp.min < f.temp.max && f.temp.best >= f.temp.min && f.temp.best <= f.temp.max, `${f.id} temp`);
     assert.ok(Array.isArray(f.growDays) && f.growDays.length === 2 && f.growDays.every((d) => d > 0), `${f.id} growDays`);
     // v0.3：かい は space 0（べつ枠）。さかな・エビは 0 より 大きい
     if (f.kind === 'snail') assert.equal(f.space, 0, `${f.id} space`); else assert.ok(f.space > 0 && f.space <= balance.TANK.capacity, `${f.id} space`);
     assert.ok(f.rarity >= 1 && f.rarity <= 5, `${f.id} rarity`);
   }
-  for (const i of ITEMS) assert.ok(['both', 'fresh', 'salt'].includes(i.water), i.id);
+  for (const i of ITEMS) assert.ok(['both', ...Object.keys(balance.WATERS)].includes(i.water), i.id);   // v0.6：tank_pond は 'pond'
 });
 
 test('魚の えさ id は items.js に ある・売っている魚は 売っている えさで たべられる', () => {
@@ -119,7 +119,9 @@ test('texture の パスは assets/fish/<id>.png の 形', () => {
 test('ミッション：id・order が かぶらない、goal の type が わかる もの、placeItem の id が 売っている', () => {
   const KNOWN = ['buyFish', 'fishCount', 'speciesCount', 'placeItem', 'feed', 'waterChange', 'scoop', 'pet', 'thanks', 'grow', 'natsuki', 'friends', 'allHealthy', 'days', 'zukan',
     'tankCreatures', 'unlock', 'kindCount', 'tankCount', 'hasTankWater', 'waterFishCount', 'hearts',
-    'vitaminEat', 'gadgetCount'];
+    'vitaminEat', 'gadgetCount',
+    // v0.6（ゲーム係）
+    'stat', 'bigCount', 'adultCount', 'creatures', 'boxCount', 'storageCount', 'decorCount', 'decorKinds', 'zukanWater', 'zukanRarity', 'tanksWater', 'quizBest'];
   const M = missions.MISSIONS;
   assert.equal(new Set(M.map((m) => m.id)).size, M.length);
   assert.equal(new Set(M.map((m) => m.order)).size, M.length);
@@ -130,8 +132,8 @@ test('ミッション：id・order が かぶらない、goal の type が わ�
     if (m.goal.type === 'grow') assert.ok([1, 2].includes(m.goal.stage));
     if (m.goal.type === 'unlock') assert.ok(balance.UNLOCK[m.goal.id], `${m.id} の unlock ${m.goal.id}`);
     if (m.goal.type === 'kindCount') assert.ok(balance.SHOP_TABS.some((t) => t.kind === m.goal.kind), `${m.id} kind`);
-    if (['hasTankWater', 'waterFishCount'].includes(m.goal.type)) assert.ok(['fresh', 'salt'].includes(m.goal.water));
-    if (m.goal.type === 'zukan') assert.ok(m.goal.count <= SOLD_FISH.length, `${m.id}: ずかん ${m.goal.count} は 売っている ${SOLD_FISH.length}しゅるい より 多い`);
+    if (['hasTankWater', 'waterFishCount', 'zukanWater', 'tanksWater'].includes(m.goal.type)) assert.ok(['fresh', 'salt', 'pond'].includes(m.goal.water));   // v0.6：いけ も
+    if (m.goal.type === 'zukan' && !m.gate) assert.ok(m.goal.count <= SOLD_FISH.length, `${m.id}: ずかん ${m.goal.count} は 売っている ${SOLD_FISH.length}しゅるい より 多い`);
   }
   assert.ok(missions.MISSION_VISIBLE >= 1);
 });
@@ -153,7 +155,7 @@ test('ヒント：when.type と action が わかる もの・{like} は 飾り�
 test('チュートリアル：wait・target・魚・どうぐの id が ただしく、うけとる どうぐは プレゼント（0コイン）', () => {
   const T = tutorial.TUTORIAL;
   const WAITS = /^(tap|openShop|buyFish|openTank|feedEaten|buyItem:[a-z_]+)$/;
-  const TARGETS = /^(shopButton|shopFish|tank|feedButton|meters|coins|shopItem:[a-z_]+)$/;
+  const TARGETS = /^(shopButton|shopFish|tank|feedButton|meters|coins|helpButton|shopItem:[a-z_]+)$/;   // v0.6：helpButton
   for (const id of T.firstFish) assert.ok(fishById[id]?.price != null, `firstFish ${id}`);
   assert.ok(T.firstFish.includes(T.recommend));
   const firstMax = Math.max(...T.firstFish.map((id) => fishById[id].price));

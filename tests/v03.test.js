@@ -402,7 +402,7 @@ test('ミッション：gadgetCount は ぜんぶの すいそうの 器具を �
   const t2 = sim.addTank(st, 'fresh', []);
   sim.buyItem(st, 'auto_feeder', t2);
   assert.equal(sim.missionProgress(st, m).now, 2);
-  assert.equal(missions.MISSIONS.length, 27);
+  assert.equal(missions.MISSIONS.filter((x) => x.order < 30).length, 27);   // v0.6 で ふえた ものは order 30 から
 });
 
 // ---------------- v0.2 セーブの 移行 ----------------

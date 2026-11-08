@@ -206,6 +206,9 @@ export const UNLOCK = {
     // まだの とき、お店の かぎつき カードに 出す
     lockedLine: '1つめの すいそうに 6ぴき いると あえるよ（エビも かいも かぞえるよ）',  // その下に「4／6」の ように いまの かずも 出す
   },
+  // v0.6 ぼうけん（ぼうけん係）：これまでに あつめた ハート（heartsTotal）が 300 で ひらく。しらべるのは js/adventure.js
+  // （state.unlocks.adventure ＝ その日。いけの すいそう tank_pond の unlock にも つかう）
+  adventure: { heartsTotal: 300 },
 };
 
 // ---------------- すいそう ----------------
@@ -306,4 +309,54 @@ export const VITAMIN = {
   // そだち の +growHours は GROW.feedBonusPerDay（ふつうの えさの ボーナス 1日4かい）とは べつ枠
   // ふつうの えさの かわりには ならない：えさやり の コイン・なつき・ミッション feed には 数えない
   // すいそうの 魚が ぜんぶ dislike なら ボタンを おしても おとさない（へらない）。VITAMIN_LINES.allDislike を 出す
+};
+
+// ================================================================
+// v0.6 ぼうけん（ぼうけん係）。しくみは js/adventure.js、画面は js/ui/adventure.js
+// ================================================================
+
+// ---------------- 水の しゅるい ----------------
+// t.water は この キーの どれか。items＝その すいそうに 入れられる 飾り・器具の water（items.js）。
+// 「salt か それ以外」の 2つだけの 書きかたは しない。ここを 見る（sim.waterInfo / sim.itemFitsWater）。
+export const WATERS = {
+  fresh: { name: 'かわ', items: ['fresh', 'both'] },
+  salt:  { name: 'うみ', items: ['salt', 'both'] },
+  pond:  { name: 'いけ', items: ['fresh', 'both'] },
+};
+
+// ---------------- ぼうけん ----------------
+// 数は Codex と agy に 相談して まんなかを とった（つりの 重み Codex 50/28/15/6/1・agy 42/28/17/9/4 など）。
+export const ADVENTURE = {
+  openHearts: UNLOCK.adventure.heartsTotal,   // 300。これまでに あつめた ハート（heartsTotal。つかっても へらない）が この かずで ひらく
+  // ひらいた とき もらえる もの：いけの すいそう（sim.addTank(state,'pond')。へやが いっぱいなら そうこ）と ガサガサの あみ
+  gifts: { pondTank: true, items: ['gasa_net'] },
+  pondTankIncludes: ['air_pump'],   // プレゼントの いけの すいそうに はじめから 入っている もの（ヒーターなし＝へやの おんど）
+  // 行き先（ui の カードの じゅん）。あとで しんかい などを 足すときは ここに 1つ 足して、js/adventure.js の MODES に しくみを 書く
+  places: [
+    { id: 'sea', name: 'うみ', mode: 'fishing', bg: 'assets/adventure/bg_sea.jpg', line: 'つりざおで つりを しよう' },
+    { id: 'pond', name: 'いけ', mode: 'gasagasa', bg: 'assets/adventure/bg_pond.jpg', line: 'あみで ガサガサ しよう' },
+  ],
+  fishing: {
+    obtain: 'fishing',         // fish.js の obtain が これの 生きものが つれる（water: 'salt'）
+    rod: 'fishing_rod',        // はじめて うみに 入ったとき プレゼント
+    bait: 'bait',              // state.inv.bait（こ）。1かい つるのに 1こ
+    firstBait: 3,              // はじめての えさは 3こ プレゼント
+    baitPrice: 100,            // つぎからは 1こ 100コイン（ユーザーの ことば。Codex 50・agy 80 は やすく したい 意見）
+    buyPacks: [1, 5],          // まとめがい（わりびき なし）
+    baitMax: 30,               // もてる かず（Codex・agy とも 30）
+    // レア度ごとの 出やすさ（%）。まず レア度を きめて、その中の しゅるいは おなじ 出やすさ。
+    // その レア度の しゅるいが まだ ない ときは のこりで わける。★4〜5 で 10%
+    weights: { 1: 46, 2: 28, 3: 16, 4: 7, 5: 3 },
+    pity: { every: 10, minRarity: 4 },   // ★4いじょうが 9かい つづけて 出なければ 10かいめは ★4いじょう（Codex 10・agy 12）
+  },
+  gasagasa: {
+    obtain: 'gasagasa',        // fish.js の obtain が これ（water: 'pond'）
+    net: 'gasa_net',
+    perDay: 1,                 // 1日 1かい（あさ 6:00 で もどる）
+    weights: { 1: 36, 2: 28, 3: 21, 4: 10, 5: 5 },   // 1日1かい なので つりより すこし レアが 出やすい（★4〜5 で 15%）
+    pity: { every: 7, minRarity: 4 },    // 6かい つづけて ★4いじょうが なければ 7かいめ（1しゅうかん）は ★4いじょう
+  },
+  // つりの 演出（ミリびょう）。タイミングで しっぱい しない。「ひく」は おしても おさなくても つれる
+  fishingAnim: { cast: 700, wait: [1300, 2000], bite: 1600, reel: 800, rareExtra: 900 },
+  gasaAnim: { sweep: 2100, lift: 700, rareExtra: 900 },
 };

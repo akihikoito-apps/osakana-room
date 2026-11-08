@@ -1,4 +1,4 @@
-/* v0.5 ゲーム係：ミニゲーム・かりすいそう・プレイヤー */
+/* v0.5 ゲーム係：ミニゲーム・おやすみすいそう・プレイヤー */
 
 /* ---------- へやの ボタン：5つに なったら スマホ横は 2れつ（もとの 3つは みぎはし のまま） ---------- */
 @media (max-height: 500px) {
@@ -16,13 +16,13 @@
   @keyframes tipIn { 0%, 100% { transform: translate(-50%, 30%); } 50% { transform: translate(-50%, calc(30% - 5px)); } }
 }
 /* ゲーム係の シートでは おしらせを 下に（名前や えに かぶらない ように） */
-body.on-sheet:has(#scr-box:not([hidden]), #scr-minigame:not([hidden]), #scr-player:not([hidden])) #toasts { top: auto; bottom: calc(var(--safe-b) + 10px); }
+body.on-sheet:has(#scr-box:not([hidden]), #scr-minigame:not([hidden]), #scr-player:not([hidden]), #scr-storage:not([hidden]), #scr-missions:not([hidden])) #toasts { top: auto; bottom: calc(var(--safe-b) + 10px); }
 
-/* ---------- 魚カードの「かりすいそうへ」 ---------- */
+/* ---------- 魚カードの「おやすみすいそうへ」 ---------- */
 .card .c-tobox { width: 100%; min-height: 44px; margin-top: 6px; font-size: 15px; padding: 0 8px; }
 @media (max-height: 500px) { .card:has(.c-tobox) { max-height: 236px; } .card .c-tobox { margin-top: 4px; font-size: 14px; } }
 
-/* ---------- かりすいそう ---------- */
+/* ---------- おやすみすいそう ---------- */
 #scr-box .sheet-head .tabs { margin-left: auto; }
 #scr-box .tab { min-width: 72px; }
 .box-item {
@@ -197,4 +197,69 @@ body.on-sheet:has(#scr-box:not([hidden]), #scr-minigame:not([hidden]), #scr-play
   .pl-hero-n b { font-size: 72px; }
   .pl-grid { flex: none; grid-auto-rows: minmax(130px, auto); }
   .pl-ic { font-size: 30px; } .pl-lb { font-size: 15px; } .pl-val { font-size: 24px; } .pl-sub { font-size: 13px; }
+}
+
+/* ---------- v0.6 へやの ボタンが 6つ（おやすみすいそうは 2ぎょう） ---------- */
+#room-nav .nav-btn[data-go="box"] .lb { line-height: 1.05; text-align: center; font-size: 12px; }
+#room-nav .nav-btn[data-go="storage"] { background: #f3ecdf; }
+@media (max-height: 500px) {
+  #room-nav .nav-btn[data-go="box"] .nav-ic { font-size: 20px; }
+  #room-nav .nav-btn[data-go="box"] .lb { font-size: 11px; }
+}
+
+/* ---------- v0.6 そうこ ---------- */
+.stg-head { margin: 6px 2px 2px; font-size: var(--fs); }
+.stg-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 8px; }
+.stg-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); text-align: center; min-width: 0; }
+.stg-card.empty { background: rgba(255, 255, 255, 0.5); box-shadow: none; border: 2px dashed #d5e2dd; justify-content: center; color: var(--ink-soft); }
+.stg-card.store { background: #fbf6ec; }
+.stg-pic { position: relative; width: 100%; height: 52px; display: flex; align-items: center; justify-content: center; }
+.stg-pic img { max-width: 90%; max-height: 100%; object-fit: contain; display: block; }
+.stg-alt { font-size: 30px; color: var(--ink-soft); }
+.stg-n { position: absolute; right: 2px; top: 0; font-size: 12px; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow); }
+.stg-name { font-size: 13px; line-height: 1.2; font-weight: 700; }
+.stg-btn { min-height: 44px; width: 100%; margin-top: 4px; font-size: 14px; padding: 0 6px; }
+.stg-btn.cant { opacity: 0.5; }
+.stg-empty { padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.7); color: var(--ink-soft); font-size: var(--fs-s); line-height: 1.5; }
+@media (min-height: 600px) and (min-width: 900px) {
+  .stg-row { grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .stg-pic { height: 80px; } .stg-name { font-size: 15px; } .stg-btn { font-size: 16px; }
+}
+
+/* ---------- v0.6 ミッション：5つでも スマホ横で 見やすく（1つ 50px くらいに つめる） ---------- */
+.mission .m-count { font-size: 13px; font-weight: 700; color: var(--ink); }
+.mission[data-lane] .m-ic { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; font-size: 22px; flex: none; }
+.mission[data-lane="care"] .m-ic { background: #ffe2a8; }
+.mission[data-lane="grow"] .m-ic { background: #c6ecd4; }
+.mission[data-lane="zukan"] .m-ic { background: #c7e6f7; }
+.mission[data-lane="room"] .m-ic { background: #ead9bd; }
+.mission[data-lane="play"] .m-ic { background: #ffd0de; }
+@media (max-height: 500px) {
+  #mission-list { gap: 5px; }
+  .mission { padding: 4px 10px; gap: 8px; min-height: 50px; }
+  .mission[data-lane] .m-ic { width: 32px; height: 32px; font-size: 18px; }
+  .mission .m-body { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; }
+  .mission .m-title { font-size: 15px; white-space: nowrap; }
+  .mission .m-prog { margin: 0; font-size: 13px; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+  .mission .m-face { display: none; }
+  .mission .m-bar { grid-column: 1 / -1; height: 6px; margin-top: 3px; }
+  .mission .btn { min-height: 44px; padding: 0 12px; }
+  .mission .m-reward { padding: 2px 8px; font-size: 13px; }
+}
+@media (max-height: 500px) {
+  /* そうこ：へやの 6わくを 1れつに（したの そうこが すぐ 見える ように） */
+  .stg-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .stg-card { padding: 4px 4px 6px; border-radius: 12px; }
+  .stg-pic { height: 34px; }
+  .stg-name { font-size: 12px; }
+  .stg-card .water-tag { font-size: 11px; line-height: 1.4; }
+  .stg-btn { min-height: 40px; margin-top: 2px; font-size: 13px; padding: 0 2px; }
+  .stg-head { margin: 2px 2px 0; font-size: 15px; }
+}
+
+/* ヘルプの ばしょを チュートリアルの ときと かえない（プレイヤーは うしろに。agy の 点検） */
+#btn-player { order: 5; }
+@media (max-height: 500px) {
+  #room-nav .nav-btn[data-go="box"] .nav-ic { font-size: 22px; }
+  #room-nav .nav-btn[data-go="box"] .lb { font-size: 12px; }
 }

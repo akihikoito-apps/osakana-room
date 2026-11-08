@@ -15,7 +15,9 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/help.css">   <!-- v0.5 案内係：ヘルプ・こうしん りれき -->
-<link rel="stylesheet" href="css/play.css">   <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう・プレイヤー -->
+<link rel="stylesheet" href="css/play.css">   <!-- v0.5 ゲーム係：ミニゲーム・おやすみすいそう・プレイヤー・v0.6 そうこ -->
+<link rel="stylesheet" href="css/size.css">   <!-- v0.6 個体差係：おおきさ・キラキラ・えさを えらぶ -->
+<link rel="stylesheet" href="css/adventure.css">   <!-- v0.6 ぼうけん係：ぼうけん・つり・ガサガサ・いけの すいそう -->
 </head>
 <body>
 <div id="app">
@@ -42,9 +44,10 @@
       <button class="nav-btn" data-go="shop"><span class="nav-ic">🛒</span><span class="lb">おみせ</span></button>
       <button class="nav-btn" data-go="dex"><span class="nav-ic">📖</span><span class="lb">ずかん</span></button>
       <button class="nav-btn" data-go="missions"><span class="nav-ic">⭐</span><span class="lb">ミッション</span><span class="badge" hidden></span></button>
-      <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう（G.addScreen で とうろく）-->
+      <!-- v0.5 ゲーム係：ミニゲーム・おやすみすいそう（G.addScreen で とうろく）・v0.6 そうこ -->
       <button class="nav-btn" data-go="minigame" hidden><span class="nav-ic">🎮</span><span class="lb">ミニゲーム</span></button>
-      <button class="nav-btn" data-go="box" hidden><span class="nav-ic">📦</span><span class="lb">かりすいそう</span></button>
+      <button class="nav-btn" data-go="box" hidden><span class="nav-ic">💤</span><span class="lb">おやすみ<br>すいそう</span></button>
+      <button class="nav-btn" data-go="storage" hidden><span class="nav-ic">📦</span><span class="lb">そうこ</span></button>
     </nav>
     <!-- v0.5：へやの すみの ちいさな ボタン（プレイヤー＝ゲーム係、ヘルプ・こうしん りれき＝案内係）-->
     <div id="room-corner">
@@ -125,15 +128,21 @@
     <div id="log-list" class="list"></div>
   </section>
 
-  <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう・プレイヤー（js/ui/minigame.js・box.js・player.js） -->
+  <!-- v0.5 ゲーム係：ミニゲーム・おやすみすいそう・プレイヤー（js/ui/minigame.js・box.js・player.js） -->
   <section id="scr-minigame" class="screen sheet" data-screen="minigame" hidden>
     <div class="sheet-head"><h2>ミニゲーム</h2></div>
     <div id="mg-body" class="mg-menu"></div>
   </section>
 
   <section id="scr-box" class="screen sheet" data-screen="box" hidden>
-    <div class="sheet-head"><h2>かりすいそう</h2><div id="box-count" class="rate"></div><div id="box-tabs" class="tabs"></div></div>
+    <div class="sheet-head"><h2>おやすみすいそう</h2><div id="box-count" class="rate"></div><div id="box-tabs" class="tabs"></div></div>
     <div id="box-list" class="grid"></div>
+  </section>
+
+  <!-- v0.6 ゲーム係：そうこ（js/ui/storage.js）-->
+  <section id="scr-storage" class="screen sheet" data-screen="storage" hidden>
+    <div class="sheet-head"><h2>そうこ</h2><div id="storage-count" class="rate"></div></div>
+    <div id="storage-body" class="list"></div>
   </section>
 
   <section id="scr-player" class="screen sheet" data-screen="player" hidden>

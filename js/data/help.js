@@ -24,6 +24,8 @@ export function helpTopics(B = {}) {
   const unlock = B.UNLOCK?.tank6?.count ?? 6;
   const tanksMax = B.TANKS?.max ?? 6;
   const vitDay = B.VITAMIN?.perTankPerDay ?? 1;
+  const AD = B.ADVENTURE || {};
+  const adv = { open: AD.openHearts ?? 300, firstBait: AD.fishing?.firstBait ?? 3, baitPrice: AD.fishing?.baitPrice ?? 100, baitMax: AD.fishing?.baitMax ?? 30, pity: AD.fishing?.pity?.every ?? 10, perDay: AD.gasagasa?.perDay ?? 1 };   // v0.6 ぼうけん
   const steps = (B.THERMO?.steps || [{ temp: 23 }, { temp: 25 }, { temp: 27 }]).map((s) => s.temp);
 
   return [
@@ -137,9 +139,40 @@ export function helpTopics(B = {}) {
           `へやには すいそうを ${tanksMax}つまで おけるよ。`,
           'おみせの「すいそう」で かえるよ。',
         ] },
-        { h: 'かりすいそう', lines: [
+        { h: 'おやすみすいそう', lines: [
           'さかなを いまの すがたの まま あずけられるよ。',
           'すいそうを あけたい ときに つかってね。いつでも もどせるよ。',
+        ] },
+        { h: 'そうこ', lines: [
+          'すいそうを なかの いきものごと しまっておけるよ。しまって いる あいだは じかんが とまるよ。',
+          'へやが いっぱいの ときに すいそうを かうと、そうこに はいるよ。',
+          'へやの「そうこ」ボタンで しまう・だす が できるよ。',
+        ] },
+      ],
+    },
+    {
+      // v0.6 ぼうけん係
+      id: 'adventure', ic: '🧭', label: 'ぼうけん', pic: 'assets/items/adventure.png',
+      topics: [
+        { h: 'ぼうけんの ひらきかた', lines: [
+          `これまでに あつめた ハートが ${adv.open}こに なると「ぼうけん」に いけるよ。`,
+          'ハートは つかっても へらないよ。さかなを なでて あつめよう。',
+          'ひらくと いけの すいそう と ガサガサの あみ が もらえるよ。',
+        ], note: 'へやの ひだりしたの「ぼうけん」ボタンに いまの かずが でます（クイズで つかった ハートも かぞえます）。' },
+        { h: 'うみで つり', pic: 'assets/items/fishing_rod.png', lines: [
+          'はじめて うみに いくと つりざおが もらえるよ。',
+          `つるには えさが 1こ いるよ。はじめは ${adv.firstBait}こ プレゼント、そのあとは 1こ ${adv.baitPrice}コイン。`,
+          'なにが つれるかは おたのしみ。タコや イカは めったに つれないよ。',
+        ], note: `★4いじょうが ${adv.pity - 1}かい つづけて でないと、つぎは かならず ★4いじょうが つれます。えさは ${adv.baitMax}こ まで もてます。` },
+        { h: 'いけで ガサガサ', pic: 'assets/items/gasa_net.png', lines: [
+          `あみで みずくさを ガサガサ すると 1ぴき つかまるよ。1にち ${adv.perDay}かい。`,
+          `あさ ${dayStart}じに また できるよ。`,
+          'つかまえた こは いけの すいそうで くらすよ。',
+        ] },
+        { h: 'つかまえた こ', pic: 'assets/items/tank_pond.png', lines: [
+          'いれる すいそうを えらべるよ。',
+          'すいそうが ない・いっぱいの ときは おやすみすいそうで まっていて くれるよ。',
+          'いけの すいそうは はんぶん りくち。カメや カエルが ひなたぼっこ するよ。',
         ] },
       ],
     },
@@ -147,7 +180,7 @@ export function helpTopics(B = {}) {
       id: 'more', ic: '🎵', label: 'おんがく ほか', pic: 'assets/items/bgm.png',
       topics: [
         { h: 'おんがく', pic: 'assets/items/bgm.png', lines: [
-          'へやの ひだりしたの ボタンで おんがくを えらべるよ。',
+          'へやの ひだりうえの ボタンで おんがくを えらべるよ。',   // v0.6：ひだりしたは ぼうけん
           'とめる ことも できるよ。',
         ] },
         { h: 'こうしん りれき', lines: [

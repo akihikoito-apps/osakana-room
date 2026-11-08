@@ -1,14 +1,15 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
   './', 'index.html', 'manifest.json', 'css/style.css', 'css/help.css', 'css/play.css',
   'icon-180.png', 'icon-192.png', 'icon-512.png', 'stay-awake.mp4',
   'js/main.js', 'js/state.js', 'js/sim.js', 'js/version.js', 'js/bgm.js',
-  'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js', 'js/ui/awake.js', 'js/ui/bgm-ui.js', 'js/ui/minigame.js', 'js/ui/box.js', 'js/ui/player.js', 'js/ui/help.js', 'js/ui/changelog.js', 'js/data/help.js', 'js/data/changelog.js', 'assets/ui/help_bg.jpg',
+  'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js', 'js/ui/awake.js', 'js/ui/bgm-ui.js', 'js/ui/minigame.js', 'js/ui/box.js', 'js/ui/player.js', 'js/ui/storage.js', 'js/storage.js', 'js/adventure.js', 'js/ui/adventure.js', 'css/adventure.css', 'assets/adventure/bg_sea.jpg', 'assets/adventure/bg_pond.jpg', 'assets/adventure/rod_scene.png', 'assets/items/adventure.png', 'assets/items/fishing_rod.png', 'assets/items/bait.png', 'assets/items/gasa_net.png', 'assets/items/tank_pond.png', 'js/ui/help.js', 'js/ui/changelog.js', 'js/data/help.js', 'js/data/changelog.js', 'assets/ui/help_bg.jpg',
   'js/data/fish.js', 'js/data/items.js', 'js/data/compat.js', 'js/data/balance.js', 'js/data/missions.js', 'js/data/hints.js', 'js/data/tutorial.js',
+  'css/size.css', 'js/size.js', 'js/data/sizes.js', 'assets/items/food_bloodworm.png', 'assets/items/food_brine.png', 'assets/items/food_veggie.png', 'assets/items/food_krill.png',   // v0.6 個体差係
   'js/aquarium/index.js', 'js/aquarium/tank.js', 'js/aquarium/swim.js', 'js/aquarium/fishModel.js', 'js/aquarium/fx.js', 'js/aquarium/fallbackArt.js', 'js/aquarium/speciesDefaults.js', 'js/aquarium/clean.js',
   'vendor/three.module.min.js',
   'assets/bgm/pokapoka.m4a', 'assets/bgm/hidamari.m4a', 'assets/bgm/yurayura.m4a', 'assets/bgm/suichu.m4a', 'assets/bgm/ohirune.m4a',
@@ -23,8 +24,18 @@ const FILES = [
   'assets/fish/yamato_shrimp.png', 'assets/fish/kanoko.png', 'assets/fish/green_chromis.png', 'assets/fish/tomato_clown.png', 'assets/fish/pajama_cardinal.png',
   'assets/fish/banggai_cardinal.png', 'assets/fish/royal_gramma.png', 'assets/fish/vagabond_butterfly.png', 'assets/fish/flame_angel.png', 'assets/fish/boxfish.png',
   'assets/fish/moorish_idol.png', 'assets/fish/peppermint_shrimp.png', 'assets/fish/white_socks.png', 'assets/fish/magaki.png',
+  // v0.6 図鑑係：うみの つり 17・いけの ガサガサ 22
+  'assets/fish/mahaze.png', 'assets/fish/aji.png', 'assets/fish/nenbutsudai.png', 'assets/fish/yadokari.png', 'assets/fish/kusafugu.png',
+  'assets/fish/kisu.png', 'assets/fish/kasago.png', 'assets/fish/mebaru.png', 'assets/fish/kyusen.png', 'assets/fish/umitanago.png',
+  'assets/fish/mejina.png', 'assets/fish/kawahagi.png', 'assets/fish/kurodai.png', 'assets/fish/ishidai.png', 'assets/fish/madai.png',
+  'assets/fish/aoriika.png', 'assets/fish/madako.png',
+  'assets/fish/tanishi.png', 'assets/fish/sujiebi.png', 'assets/fish/zarigani.png', 'assets/fish/otamajakushi.png', 'assets/fish/motsugo.png',
+  'assets/fish/dojou.png', 'assets/fish/funa.png', 'assets/fish/oikawa.png', 'assets/fish/tonosamagaeru.png', 'assets/fish/amagaeru.png',
+  'assets/fish/yago.png', 'assets/fish/yoshinobori.png', 'assets/fish/sawagani.png', 'assets/fish/tanago.png', 'assets/fish/donko.png',
+  'assets/fish/mizukamakiri.png', 'assets/fish/hotokedojou.png', 'assets/fish/namazu.png', 'assets/fish/gengorou.png', 'assets/fish/tagame.png', 'assets/fish/kusagame.png', 'assets/fish/ishigame.png',
   'assets/items/seaweed.png', 'assets/items/anemone.png', 'assets/items/shell.png', 'assets/items/coral_stone.png', 'assets/items/color_stone.png', 'assets/items/pot.png',
   'assets/items/ukikusa.png', 'assets/items/sponge_filter.png', 'assets/items/coral_tree.png', 'assets/items/filter_tower.png',
+  'assets/items/clean_robot.png',
   'assets/items/air_pump.png', 'assets/items/auto_feeder.png', 'assets/items/bgm.png', 'assets/items/co2_kit.png', 'assets/items/coral.png',
   'assets/items/dirt_bits.png', 'assets/items/driftwood.png', 'assets/items/fan.png', 'assets/items/filter.png', 'assets/items/food_flake.png',
   'assets/items/food_sinking.png', 'assets/items/food_vitamin.png', 'assets/items/food_vitamin_set.png', 'assets/items/heart.png', 'assets/items/heater.png', 'assets/items/light.png',

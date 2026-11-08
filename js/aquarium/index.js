@@ -294,6 +294,10 @@ export function createAquarium(canvas, opts = {}) {
       u.uBend.value = THREE.MathUtils.clamp(-a.yawRate * 0.22, -0.5, 0.5);
       u.uDull.value = a.dull;
       u.uFlash.value = a.flash;
+      // v0.6 キラキラ（個体差係）：つや＋4〜8びょうに 1かい ちいさな ✦
+      u.uShiny.value = a.shiny ? 1 : 0;
+      u.uTime.value = simTime;
+      if (a.shiny) { a.shineT = (a.shineT ?? Math.random() * 4) - dt; if (a.shineT <= 0) { a.shineT = 4 + Math.random() * 4; fx.spawn('shine', anchorFor(a.uid)); } }
     }
     fx.update(dt);
     // 見回し：しばらく触らないと正面に戻る

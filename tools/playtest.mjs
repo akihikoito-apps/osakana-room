@@ -221,7 +221,9 @@ async function run(browser, base, W, H) {
   await shot('07_tut_meters');
   await p.click('#guide .guide-ok'); await p.waitForTimeout(400);
   await shot('08_tut_coins');
-  await p.click('#guide .guide-ok'); await p.waitForTimeout(400);
+  await p.click('#guide .guide-ok'); await p.waitForTimeout(1200);
+  // v0.6：さいごは へやで ヘルプの ばしょを おしえる（t_help）
+  if (!(await st()).done) { await shot('08b_tut_help'); await p.click('#guide .guide-ok'); await p.waitForTimeout(400); }
   const afterTut = await st();
   if (!afterTut.done) notes.push('【不具合】チュートリアルが おわらない: ' + JSON.stringify(afterTut));
   await shot('09_tut_done');

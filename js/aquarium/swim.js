@@ -32,6 +32,8 @@ export class FishAgent {
     this.isSnail = spec.kind === 'snail';
     this.onFloor = this.isShrimp || this.isSnail;   // 底を歩く・這う
     this.habit = spec.swim?.habit || (this.isSnail ? 'crawl' : null);
+    if (this.habit === 'land') this.onFloor = true;   // v0.6 ぼうけん係：カメ・カエル（いけの りくちで やすむ・ときどき みずに 入る）
+    this.landMode = 'land';
     this.surf = 'ground';   // 貝：'ground'（砂・石の上）か 'glass'（奥のガラス）
     this.cling = null; this.clingCool = rand(3, 8);
     this.layer = spec.swim?.layer || 'any';
@@ -68,6 +70,13 @@ export class FishAgent {
       this.pos.y = bounds.sandY(this.pos.x, this.pos.z) + rand(0.3, SNAIL_GLASS_MAX - 0.3);
       this.yaw = Math.random() < 0.5 ? 0 : Math.PI;
     }
+    if (this.habit === 'land' && bounds.land) {   // v0.6：はじめは りくちに いる
+      const L = bounds.land;
+      this.pos.x = rand(L.x1 + 0.4, L.xMax - 0.3);
+      this.pos.y = (bounds.groundY || bounds.sandY)(this.pos.x, this.pos.z);
+      this.target.copy(this.pos); this.pauseT = rand(1, 4); this.retarget = rand(4, 9);
+      return;
+    }
     this.pickTarget(bounds, true);
   }
 
@@ -75,7 +84,9 @@ export class FishAgent {
     this.stage = info.stage ?? 1;
     this.health = clamp(info.health ?? 100, 0, 100);
     this.happy = clamp(info.happy ?? 60, 0, 100);
-    this.targetLen = fishLength(this.spec, this.stage);
+    // v0.6 個体差（個体差係）：sizeMul＝その子の おおきさ（sim.lookScaleOf。0.75〜1.3）、shiny＝キラキラ
+    this.targetLen = fishLength(this.spec, this.stage) * clamp(Number.isFinite(info.sizeMul) ? info.sizeMul : 1, 0.6, 1.4);
+    this.shiny = !!info.shiny;
     const weak = this.health < 35;
     if (this.wasWeak !== undefined && weak !== this.wasWeak) { this.retarget = 0; this.pauseT = 0; }
     this.wasWeak = weak;
@@ -160,6 +171,7 @@ export class FishAgent {
     this.dull += (targetDull - this.dull) * Math.min(1, dt);
     this.flash = Math.max(0, this.flash - dt * 1.8);
 
+    if (this.habit === 'land' && b.land) { this.updateLand(dt, ctx, hf * speedScale, holdStill); return; }   // v0.6 いけの りくち
     if (this.isSnail) { this.updateSnail(dt, ctx, holdStill); return; }
     if (this.isShrimp) { this.updateShrimp(dt, ctx, hf * speedScale, holdStill); return; }
     if (this.habit === 'cling' && this.updateCling(dt, ctx, r)) return;
@@ -280,6 +292,84 @@ export class FishAgent {
     this.checkEat(ctx, dt);
   }
 
+  /**
+   * v0.6 ぼうけん係：swim.habit 'land'（カメ・カエル）。いけの すいそうの りくち（bounds.land）で やすみ、ときどき みずに 入って およぐ。
+   * りくちでは 地面を あるき、みずの 中では 底から 水面の あいだを およぐ。さかを とおって のぼりおり する。
+   */
+  pickLandTarget(b) {
+    const L = b.land;
+    const m = this.len * 0.6 + 0.3;
+    const z = rand(b.minZ + 0.4, b.maxZ - 0.4);
+    const onLand = this.pos.x >= L.shore;
+    const goLand = onLand ? Math.random() < 0.7 : Math.random() < 0.5;
+    if (goLand) {
+      const sp = L.spots && L.spots.length && Math.random() < 0.6 ? L.spots[Math.floor(Math.random() * L.spots.length)] : null;
+      const x = sp ? sp.x + rand(-0.5, 0.5) : rand(L.x1 + 0.3, L.xMax - m);
+      const zz = sp ? clamp(sp.z + rand(-0.5, 0.5), b.minZ + 0.3, b.maxZ - 0.3) : z;
+      this.target.set(clamp(x, L.x1 + 0.2, L.xMax - m), 0, zz);
+      this.landMode = 'land';
+    } else {
+      const x = rand(b.minX + m, L.x0 - 0.4);
+      const lo = b.sandY(x, z) + 0.4, hi = L.waterTop - 0.5;
+      this.target.set(x, rand(lo, Math.max(lo, hi)), z);
+      this.landMode = 'water';
+    }
+    this.retarget = rand(6, 12);
+  }
+
+  updateLand(dt, ctx, sp, holdStill) {
+    const b = ctx.bounds, L = b.land;
+    const groundAt = (x, z) => (b.groundY || b.sandY)(x, z);
+    this.retarget -= dt;
+    const inWater = this.pos.x < L.shore - 0.05;
+    if (inWater) this.seekFood(ctx, dt); else this.food = null;
+    const tgt = this.food ? this.food.pos : this.target;
+    const dx = tgt.x - this.pos.x, dz = tgt.z - this.pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (this.pauseT > 0 && !this.food) {
+      this.pauseT -= dt;
+      this.speed += (0 - this.speed) * Math.min(1, dt * 4);
+      if (this.pauseT <= 0) this.pickLandTarget(b);
+    } else if (!this.food && (dist < 0.25 || this.retarget <= 0)) {
+      const onLand = this.pos.x >= L.shore;
+      this.pauseT = this.weak ? rand(5, 10) : onLand ? rand(3, 8) : rand(0.6, 2);   // りくちでは ゆっくり ひなたぼっこ
+    }
+    // むき（よこむき を きほんに）
+    if (dist > 0.05 && (this.pauseT <= 0 || this.food)) {
+      let dYaw = Math.atan2(-dz, dx);
+      const base = Math.cos(dYaw) >= 0 ? 0 : Math.PI;
+      dYaw = base + clamp(wrap(dYaw - base), -0.9, 0.9);
+      if (this.faceYaw !== null) dYaw = this.faceYaw;
+      const diff = wrap(dYaw - this.yaw);
+      this.yaw = wrap(this.yaw + clamp(diff * 3, -2.4, 2.4) * dt);
+    }
+    // はやさ：りくちは あるく（おそい）、みずの 中は およぐ
+    const swimming = this.pos.x < L.shore - 0.05;
+    let cruise = (swimming ? 0.75 : 0.42) * Math.max(0.5, this.speedMul) * sp * (this.food ? 1.6 : 1);
+    if ((this.pauseT > 0 && !this.food) || holdStill) cruise = 0;
+    else if (dist < 0.8) cruise *= 0.4 + 0.6 * (dist / 0.8);
+    this.speed += (cruise - this.speed) * Math.min(1, dt * 3);
+    if (dist > 1e-3) { this.pos.x += (dx / dist) * this.speed * dt; this.pos.z += (dz / dist) * this.speed * dt; }
+    // たかさ：りくち・さかは 地面の うえ。みずの 中は めあての たかさへ（底より した には いかない）
+    const ground = groundAt(this.pos.x, this.pos.z);
+    if (this.pos.x >= L.shore - 0.05 || ground > L.waterTop - this.bodyH) {
+      this.pos.y += (ground + this.bodyH * 0.35 - this.pos.y) * Math.min(1, dt * 8);   // 地面に めりこまない
+      this.pitch += (0 - this.pitch) * Math.min(1, dt * 3);
+    } else {
+      const toLand = this.landMode === 'land' && !this.food;
+      const wantY = this.food ? tgt.y : toLand ? L.waterTop - 0.6 : tgt.y;
+      this.pos.y += clamp(wantY - this.pos.y, -1, 1) * 1.2 * dt;
+      this.pos.y = clamp(this.pos.y, ground + this.bodyH * 0.5, L.waterTop - 0.2);
+      this.pitch += (clamp((wantY - this.pos.y) * 0.4, -0.3, 0.3) - this.pitch) * Math.min(1, dt * 2);
+    }
+    this.pos.x = clamp(this.pos.x, b.minX + this.len * 0.45, L.xMax - this.len * 0.45);
+    this.pos.z = clamp(this.pos.z, b.minZ, b.maxZ);
+    // あし・ひれ
+    this.wave += dt * (this.speed > 0.05 ? (swimming ? 7 : 5) : 1.5);
+    this.amp += ((swimming ? 0.045 : 0.02) - this.amp) * Math.min(1, dt * 3);
+    this.checkEat(ctx, dt);
+  }
+
   updateShrimp(dt, ctx, sp, holdStill) {
     const b = ctx.bounds;
     this.retarget -= dt;
@@ -353,7 +443,7 @@ export class FishAgent {
 
   clampToTank(b, onSand = false) {
     const m = this.len * 0.45;
-    this.pos.x = clamp(this.pos.x, b.minX + m, b.maxX - m);
+    this.pos.x = clamp(this.pos.x, b.minX + m, (this.habit === 'land' && b.land ? b.land.xMax : b.maxX) - m);   // v0.6：カメ・カエルは りくちまで
     const zMin = (this.isSnail || this.cling || this.clingGo) && b.glassZ !== undefined ? b.glassZ + this.len * 0.1 : b.minZ;
     this.pos.z = clamp(this.pos.z, zMin, b.maxZ);
     if (!onSand) {

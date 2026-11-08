@@ -28,7 +28,8 @@ export function newState(init = {}) {
       decor: [], equip: [],
       fish: [],
     }],
-    box: [],                 // v0.5 かりすいそう（あずけた 生きもの。水槽の 魚と おなじ 形・時間は すすまない）
+    box: [],                 // v0.5 おやすみすいそう（あずけた 生きもの。水槽の 魚と おなじ 形・時間は すすまない）
+    storage: [],             // v0.6 そうこ（しまった すいそう。中身ごと・時間は すすまない）
     quiz: null,              // v0.5 ミニゲームの とちゅう（とじても つづきから）
     hearts: 0,               // なでて もらった ハート（いまの かず。あとで つかう よてい）
     heartsTotal: 0,          // つうさんの ハート（つかっても へらない）
@@ -73,7 +74,7 @@ export function migrate(raw, init) {
   out.ui = { ...base.ui, ...(isObj(s.ui) ? s.ui : {}) };
   out.hearts = Number.isFinite(s.hearts) ? Math.max(0, Math.floor(s.hearts)) : 0;
   out.heartsTotal = Number.isFinite(s.heartsTotal) ? Math.max(out.hearts, Math.floor(s.heartsTotal)) : out.hearts;
-  // v0.5 かりすいそう：古い セーブには ない → []
+  // v0.5 おやすみすいそう：古い セーブには ない → []
   out.box = Array.isArray(s.box) ? s.box.filter((f) => isObj(f) && typeof f.speciesId === 'string').map((f) => ({
     ...f, uid: typeof f.uid === 'string' ? f.uid : newUid(), stage: [0, 1, 2].includes(f.stage) ? f.stage : 0,
   })) : [];
@@ -87,7 +88,12 @@ export function migrate(raw, init) {
     if (k < 0) { k = 0; while (used.has(k) && k < 6) k++; }
     t.slot = k; used.add(k);
   }
+  // v0.6 そうこ（しまった すいそう）：古い セーブには ない → []。へやに はいりきらない すいそうも すてずに そうこへ
+  const stored = Array.isArray(s.storage) ? s.storage.filter(isObj).map((t, i) => ({ ...fixTank(t, base.tanks[0], 100 + i), slot: -1 })) : [];
+  out.storage = stored.concat(out.tanks.filter((t) => t.slot >= 6).map((t) => ({ ...t, slot: -1 })));
   out.tanks = out.tanks.filter((t) => t.slot < 6);
+  const ids = new Set(out.tanks.map((t) => t.id));
+  for (const t of out.storage) { while (ids.has(t.id)) t.id = 't' + Math.random().toString(36).slice(2, 7); ids.add(t.id); }
   if (!out.tanks.some((t) => t.id === out.ui.tankId)) out.ui.tankId = out.tanks[0].id;
   return out;
 }
@@ -97,7 +103,8 @@ function fixTank(t, b, i) {
   return {
     ...b, ...t,
     id: typeof t.id === 'string' ? t.id : 't' + (i + 1),
-    water: t.water === 'salt' ? 'salt' : 'fresh',
+    // v0.6 ぼうけん係：'pond' など あたらしい 水も のこす（しらない 水の チェックは sim の WATERS。ここは 形だけ）
+    water: typeof t.water === 'string' && /^[a-z]{2,12}$/.test(t.water) ? t.water : 'fresh',
     name: typeof t.name === 'string' ? t.name.slice(0, 16) : '',
     slot: Number.isInteger(t.slot) ? t.slot : i,
     temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99), waste: n(t.waste, 0, 0, 99),

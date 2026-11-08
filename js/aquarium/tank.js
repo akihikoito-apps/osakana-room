@@ -10,7 +10,12 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const WATER_COLORS = {
   fresh: { top: new THREE.Color('#a4e4e8'), mid: new THREE.Color('#3a98ad'), deep: new THREE.Color('#1b5873'), fog: new THREE.Color('#4aa2b4'), sand: new THREE.Color('#d7c7a2') },
   salt:  { top: new THREE.Color('#b4ecff'), mid: new THREE.Color('#2a8fd6'), deep: new THREE.Color('#123f8a'), fog: new THREE.Color('#3b9be0'), sand: new THREE.Color('#f6f2e8') },
+  // v0.6 いけ（ぼうけん係）：みどりがかった 水・どろっぽい 茶色の 底
+  pond:  { top: new THREE.Color('#cfe8b4'), mid: new THREE.Color('#5f9c74'), deep: new THREE.Color('#2c5a45'), fog: new THREE.Color('#6fa27a'), sand: new THREE.Color('#8a6c4c') },
 };
+// v0.6 いけの すいそう：半分 りくち・半分 みず（Codex・agy に 相談：みぎに りくち 約4わり＋なだらかな さか、奥行きは ぜんぶ。
+// 水位は agy の あんで さげる（りくちの 上に カメ・カエルが のる すきまを のこす）。x は 横幅 W に たいする わりあい）
+export const POND = { waterTop: 5.0, landTop: 5.6, slopeFrom: -0.05, slopeTo: 0.13, soil: '#8a6a45', wet: '#5b4631', grass: '#78b04f', grass2: '#a5d061' };
 const MURK = new THREE.Color('#6d8a3c');
 const NIGHT = new THREE.Color('#132a55');
 
@@ -97,6 +102,36 @@ function gradientTexture(w, h, stops, vertical = true) {
   return t;
 }
 
+/** v0.6 いけ：りくちの 断面（手前の ガラスごしに 見える 土）。下＝0、上＝hTot の 高さ。うえに 草の ふち、水ぎわは ぬれた 色 */
+function landStrataTexture(hTot, wt) {
+  const H = 256, Wc = 128;
+  const cv = document.createElement('canvas');
+  cv.width = Wc; cv.height = H;
+  const g = cv.getContext('2d');
+  const yOf = (h) => clamp(H * (1 - h / hTot), 0, H);
+  const gr = g.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, '#86c457');
+  gr.addColorStop(yOf(hTot - 0.42) / H, '#73b04a');
+  gr.addColorStop(yOf(hTot - 0.55) / H, '#b48d62');
+  gr.addColorStop(yOf(wt + 0.2) / H, '#a37e57');
+  gr.addColorStop(yOf(wt - 0.1) / H, '#87684a');
+  gr.addColorStop(1, '#6e5238');
+  g.fillStyle = gr; g.fillRect(0, 0, Wc, H);
+  // 土の 中の 小石（大きめで まばら。穴の あつまりに 見えない ように）
+  const R = rng(5);
+  // 土の しま（うすい よこの すじ。つぶつぶは 描かない）
+  for (let i = 0; i < 4; i++) { g.fillStyle = 'rgba(255, 235, 200, 0.08)'; g.fillRect(0, yOf(wt * 0.25 + i * wt * 0.22), Wc, 4); }
+  // （石の もようは 横に のびて 穴に 見えたので 描かない。りくちの 石は 3D で 上に のせる）
+  void R;
+  // 草の ふち
+  g.fillStyle = '#8cc95a';
+  for (let x = 0; x < Wc; x += 4) { const hh = 4 + R() * 7; g.beginPath(); g.moveTo(x, yOf(hTot - 0.38)); g.lineTo(x + 2, yOf(hTot - 0.38) - hh); g.lineTo(x + 4, yOf(hTot - 0.38)); g.fill(); }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+const LAND_COL = { soil: new THREE.Color('#8a6a45'), wet: new THREE.Color('#5b4631'), g1: new THREE.Color('#78b04f'), g2: new THREE.Color('#a5d061') };
+
 function rayTexture() {
   const cv = document.createElement('canvas');
   cv.width = 64; cv.height = 256;
@@ -150,6 +185,8 @@ export class Tank {
     this.scene = scene;
     this.waterType = WATER_COLORS[waterType] ? waterType : 'fresh';
     this.colors = WATER_COLORS[this.waterType];
+    this.waterTop = this.waterType === 'pond' ? POND.waterTop : WATER_TOP;   // v0.6 いけは 水位が ひくい
+    this.land = null;                                                        // v0.6 いけ：{ x0 さかの はじまり, x1 たいらな ところ, shore 水ぎわ, top }
     this.W = 16;
     this.group = new THREE.Group();
     this.decorGroup = new THREE.Group();
@@ -159,7 +196,7 @@ export class Tank {
     this.time = 0;
     this.caustic = makeCausticTexture();
     this.rayTex = rayTexture();
-    this.uniforms = { uTime: { value: 0 }, uCaustic: { value: this.caustic }, uCausticAmt: { value: 0.35 }, uLight: { value: 1 }, uHalfW: { value: 8 }, uGrain: { value: waterType === 'salt' ? 22 : 38 } };
+    this.uniforms = { uTime: { value: 0 }, uCaustic: { value: this.caustic }, uCausticAmt: { value: 0.35 }, uLight: { value: 1 }, uHalfW: { value: 8 }, uGrain: { value: waterType === 'salt' ? 22 : waterType === 'pond' ? 52 : 38 }, uWaterTop: { value: 99 } };
     this.sandSeed = Math.random() * 100;
 
     // 光
@@ -170,7 +207,7 @@ export class Tank {
     scene.fog = new THREE.Fog(this.colors.fog.clone(), 10, 40);
 
     this.rocks = [];
-    this.bounds = { minX: -7, maxX: 7, minZ: -2.6, maxZ: 2.7, top: WATER_TOP, glassZ: -TANK_D / 2 + 0.12, sandY: (x, z) => this.sandHeight(x, z), groundY: (x, z) => this.groundHeight(x, z) };
+    this.bounds = { minX: -7, maxX: 7, minZ: -2.6, maxZ: 2.7, top: this.waterTop, glassZ: -TANK_D / 2 + 0.12, sandY: (x, z) => this.sandHeight(x, z), groundY: (x, z) => this.groundHeight(x, z) };
 
     // 泡
     this.bubbleTex = bubbleTexture();
@@ -212,6 +249,15 @@ export class Tank {
     this.foodMesh.frustumCulled = false;
     const fc = [new THREE.Color('#c8742e'), new THREE.Color('#e2a24a'), new THREE.Color('#a5582a'), new THREE.Color('#d9893c')];
     for (let i = 0; i < this.maxFood; i++) this.foodMesh.setColorAt(i, fc[i % 4]);
+    this.foodFlakeColors = fc;
+    // v0.6 えさの しゅるい（個体差係）：いろ・おおきさ・しずむ はやさ（aq.feed の kind）
+    this.foodKinds = {
+      bloodworm: { colors: ['#c4202f', '#a3152a', '#d8323a'], scale: [0.7, 0.55, 1.9], sink: 0.85 },   // ほそながい あかい むし
+      brine: { colors: ['#ff9a5c', '#ff7f6a', '#ffb072'], scale: [0.6, 0.6, 0.6], sink: 0.45 },         // ちいさな オレンジの つぶ・ゆっくり
+      veggie: { colors: ['#4f9a3a', '#3f8a35', '#5fae46'], scale: [1.5, 0.45, 1.5], sink: 1.4 },        // ひらたい みどりの タブレット・はやく しずむ
+      krill: { colors: ['#ff8f7a', '#f47a63', '#ffa58a'], scale: [1.7, 0.9, 0.9], sink: 0.75 },         // ピンクの 小えび・おおきめ
+    };
+    for (const k of Object.values(this.foodKinds)) k.colors = k.colors.map((c) => new THREE.Color(c));
     this.foodMesh.count = 0;
     scene.add(this.foodMesh);
     const vgeo = new THREE.IcosahedronGeometry(0.085, 1);
@@ -250,7 +296,58 @@ export class Tank {
     // 手前が低く、奥に向かってゆるく盛り上がる
     const d = (z + TANK_D / 2) / TANK_D;            // 0=奥 1=手前
     const back = 0.75 + (1 - d) * (1 - d) * 0.9;
-    return back + (vnoise(x * 0.35 + this.sandSeed, z * 0.35) - 0.5) * 0.3;
+    const y = back + (vnoise(x * 0.35 + this.sandSeed, z * 0.35) - 0.5) * 0.3;
+    const L = this.land;
+    if (!L) return y;
+    // v0.6 いけ：みぎは りくち（なだらかな さかで あがる。上は ほぼ たいら＋ひくい でこぼこ）
+    const t = clamp((x - L.x0) / (L.x1 - L.x0), 0, 1), k = t * t * (3 - 2 * t);
+    const top = L.top + (vnoise(x * 0.45 + 7, z * 0.5 + 3) - 0.5) * 0.35;
+    return y + (top - y) * k;
+  }
+
+  /** v0.6 いけ：水の ある ところの 右はし（水ぎわ）。りくちが ない すいそうは 右の ガラス */
+  get waterMaxX() { return this.land ? this.land.shore : this.W / 2; }
+
+  /** v0.6 いけ：りくちの ばしょを きめる（build の さいしょ）。bounds.land は カメ・カエル（swim.habit 'land'）が つかう */
+  setupLand(W) {
+    if (this.waterType !== 'pond') { this.land = null; this.bounds.land = null; return; }
+    const x0 = POND.slopeFrom * W, x1 = POND.slopeTo * W;
+    this.land = { x0, x1, top: POND.landTop, shore: x1 };
+    for (let x = x0; x <= x1; x += 0.05) if (this.sandHeight(x, 0) >= this.waterTop) { this.land.shore = x; break; }
+    // りくちで やすむ 点（たいらな ところ）
+    const spots = [];
+    for (let i = 0; i < 6; i++) { const x = x1 + 0.6 + ((W / 2 - 0.8) - (x1 + 0.6)) * ((i % 3) + 0.5) / 3, z = i < 3 ? -1.2 : 1.0; spots.push({ x, z }); }
+    this.bounds.land = { x0, x1, shore: this.land.shore, xMax: W / 2 - 0.5, waterTop: this.waterTop, spots };
+  }
+
+  /** v0.6 いけ：底の 色（水の 中＝どろ、水ぎわ＝ぬれた 土、うえ＝土と 草） */
+  landColor(x, z, y) {
+    const wt = this.waterTop, c = this.colors.sand.clone();
+    if (y < wt - 0.35) return c;
+    if (y < wt + 0.12) return c.lerp(LAND_COL.wet, clamp((y - (wt - 0.35)) / 0.35, 0, 1));
+    const gk = clamp(clamp((y - (wt + 0.12)) / 0.3, 0, 1) * (0.7 + vnoise(x * 1.3, z * 1.3) * 0.6), 0, 1);
+    return LAND_COL.soil.clone().lerp(LAND_COL.g1.clone().lerp(LAND_COL.g2, vnoise(x * 2.1 + 5, z * 2.1)), gk);
+  }
+
+  /** v0.6 いけ：りくちの 草・小石・やすむ 石（飾りでは ない。いけの すいそうに いつも ある） */
+  buildLandDeco() {
+    if (this.landDeco) { this.scene.remove(this.landDeco); this.landDeco.traverse((o) => { o.geometry?.dispose(); if (o.material && !o.material.userData.shared) o.material.dispose(); }); this.landDeco = null; }
+    if (!this.land) return;
+    const g = new THREE.Group();
+    const L = this.land, W = this.W;
+    const R = rng(808);
+    // 草むら（奥と はし。まんなか手前は カメが よく 見えるように あける）
+    const tufts = [[0.82, -2.6], [0.55, -2.8], [0.95, -0.4], [0.3, -2.2], [0.7, 2.4]];
+    tufts.forEach(([f, z], i) => { const x = L.x1 + (W / 2 - 0.5 - L.x1) * f; g.add(this.makeBlades(x, z, 900 + i, { blades: 10, hMin: 0.6, hMax: 1.6 + R() * 0.6, w: 0.13, spread: 0.7, cA: '#4f8f2f', cB: '#a6d65a', sway: 0.6 })); });
+    // 水ぎわの 小石（りくちの ふち。さかの とちゅうには おかない）
+    for (let i = 0; i < 3; i++) g.add(this.makeStones(L.x1 + 0.4 + i * 0.9, -1.6 + i * 1.3, 820 + i, true));
+    // やすむ ための ひらたい 石（りくちの まんなか）
+    const flat = new THREE.Mesh(this.rockGeometry(840, 0.9, 0.35), new THREE.MeshLambertMaterial({ color: '#9b9488', flatShading: true }));
+    const fx = L.x1 + (W / 2 - L.x1) * 0.45;
+    flat.position.set(fx, this.sandHeight(fx, 0.2) + 0.05, 0.2);
+    g.add(flat);
+    this.landDeco = g;
+    this.scene.add(g);
   }
 
   /** 砂と石・ライブロックの上の高さ（貝・はりつく魚用）。 */
@@ -271,7 +368,9 @@ export class Tank {
     const H = TANK_H, D = TANK_D, col = this.colors;
     const b = this.bounds;
     this.uniforms.uHalfW.value = W / 2;
-    b.minX = -W / 2 + 0.35; b.maxX = W / 2 - 0.35; b.minZ = -D / 2 + 0.9; b.maxZ = D / 2 - 0.7;
+    this.setupLand(W);
+    this.uniforms.uWaterTop.value = this.land ? this.waterTop : 99;
+    b.minX = -W / 2 + 0.35; b.maxX = (this.land ? this.land.x0 - 0.15 : W / 2) - 0.35;   // v0.6 いけ：ふつうの 魚は さかの てまえまで b.minZ = -D / 2 + 0.9; b.maxZ = D / 2 - 0.7;
 
     // 奥と横の壁（水の色のグラデーション）
     const wallTex = gradientTexture(4, 256, [[0, '#' + col.top.getHexString()], [0.45, '#' + col.mid.getHexString()], [1, '#' + col.deep.getHexString()]]);
@@ -298,6 +397,7 @@ export class Tank {
       p.setY(i, this.sandHeight(x, z));
       const n = 0.9 + hash2(x * 13.1, z * 7.7) * 0.2;
       sc[i * 3] = col.sand.r * n; sc[i * 3 + 1] = col.sand.g * n; sc[i * 3 + 2] = col.sand.b * n;
+      if (this.land) { const c = this.landColor(x, z, p.getY(i)).multiplyScalar(n); sc[i * 3] = c.r; sc[i * 3 + 1] = c.g; sc[i * 3 + 2] = c.b; }
     }
     sg.setAttribute('color', new THREE.BufferAttribute(sc, 3));
     sg.computeVertexNormals();
@@ -308,7 +408,7 @@ export class Tank {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;')
         .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWp = (modelMatrix * vec4(transformed,1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-        varying vec3 vWp; uniform float uTime; uniform sampler2D uCaustic; uniform float uCausticAmt; uniform float uLight; uniform float uHalfW; uniform float uGrain;
+        varying vec3 vWp; uniform float uTime; uniform sampler2D uCaustic; uniform float uCausticAmt; uniform float uLight; uniform float uHalfW; uniform float uGrain; uniform float uWaterTop;
         float sgrain(vec2 p){ return fract(sin(dot(floor(p), vec2(12.9898,78.233))) * 43758.5453); }`)
         .replace('#include <color_fragment>', `#include <color_fragment>
           float gr = sgrain(vWp.xz * uGrain) * 0.5 + sgrain(vWp.xz * uGrain * 0.45 + 3.1) * 0.5;
@@ -317,7 +417,7 @@ export class Tank {
           vec2 cu = vWp.xz * 0.16;
           float c1 = texture2D(uCaustic, cu + vec2(uTime * 0.021, uTime * 0.013)).r;
           float c2 = texture2D(uCaustic, cu * 1.31 + vec2(-uTime * 0.017, uTime * 0.019) + 0.37).r;
-          float cc = (min(c1, c2) * 1.3 + c1 * c2 * 0.9) * smoothstep(0.0, 1.6, uHalfW - abs(vWp.x)) * smoothstep(0.0, 1.2, 3.5 - abs(vWp.z));
+          float cc = (min(c1, c2) * 1.3 + c1 * c2 * 0.9) * smoothstep(0.0, 1.6, uHalfW - abs(vWp.x)) * smoothstep(0.0, 1.2, 3.5 - abs(vWp.z)) * step(vWp.y, uWaterTop);
           totalEmissiveRadiance += vec3(0.85, 1.0, 0.95) * cc * uCausticAmt;`);
     };
     const sand = new THREE.Mesh(sg, sandMat);
@@ -327,12 +427,12 @@ export class Tank {
     const fg = new THREE.PlaneGeometry(W, 1, sx, 1);
     const fp = fg.attributes.position;
     for (let i = 0; i < fp.count; i++) { const x = fp.getX(i); fp.setY(i, fp.getY(i) > 0 ? this.sandHeight(x, D / 2) : 0); }
-    const strata = gradientTexture(4, 64, [[0, '#' + col.sand.clone().multiplyScalar(0.95).getHexString()], [0.5, '#' + col.sand.clone().multiplyScalar(0.78).getHexString()], [1, '#' + col.sand.clone().multiplyScalar(0.55).getHexString()]]);
+    const strata = this.land ? landStrataTexture(this.land.top + 0.35, this.waterTop) : gradientTexture(4, 64, [[0, '#' + col.sand.clone().multiplyScalar(0.95).getHexString()], [0.5, '#' + col.sand.clone().multiplyScalar(0.78).getHexString()], [1, '#' + col.sand.clone().multiplyScalar(0.55).getHexString()]]);
     strata.colorSpace = THREE.SRGBColorSpace;
     const front = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: strata, fog: false }));
     front.position.set(0, 0, D / 2 - 0.02);
     // UV を高さにあわせる
-    for (let i = 0; i < fp.count; i++) fg.attributes.uv.setY(i, fp.getY(i) / 1.2);
+    for (let i = 0; i < fp.count; i++) fg.attributes.uv.setY(i, fp.getY(i) / (this.land ? this.land.top + 0.35 : 1.2));
     this.group.add(front);
 
     // 水面（下から見たゆらぎ）
@@ -351,17 +451,18 @@ export class Tank {
         }`,
       transparent: true, side: THREE.DoubleSide, depthWrite: false,
     });
-    const surf = new THREE.Mesh(new THREE.PlaneGeometry(W, D), surfMat);
+    const wW = this.waterMaxX + W / 2 + (this.land ? 0.4 : 0), wC = -W / 2 + wW / 2;   // v0.6 いけ：水の ある はば
+    const surf = new THREE.Mesh(new THREE.PlaneGeometry(wW, D), surfMat);
     surf.rotation.x = Math.PI / 2;
-    surf.position.y = WATER_TOP;
+    surf.position.set(wC, this.waterTop, 0);
     surf.renderOrder = 1;
     this.group.add(surf);
 
     // 水面より上（ふたの裏）
     const lid = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ color: 0x3d4c55, fog: false }));
     lid.rotation.x = Math.PI / 2; lid.position.y = H - 0.01;
-    const air = new THREE.Mesh(new THREE.PlaneGeometry(W, H - WATER_TOP), new THREE.MeshBasicMaterial({ color: 0xcfe9ee, fog: false }));
-    air.position.set(0, (H + WATER_TOP) / 2, -D / 2 + 0.01);
+    const air = new THREE.Mesh(new THREE.PlaneGeometry(W, H - this.waterTop), new THREE.MeshBasicMaterial({ color: 0xcfe9ee, fog: false }));
+    air.position.set(0, (H + this.waterTop) / 2, -D / 2 + 0.01);
     this.group.add(lid, air);
 
     // 光の筋
@@ -370,8 +471,8 @@ export class Tank {
     for (let i = 0; i < 6; i++) {
       const w = 1.0 + rr() * 2.2;
       const m = new THREE.MeshBasicMaterial({ map: this.rayTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: 0.1, color: 0xeafff8 });
-      const ray = new THREE.Mesh(new THREE.PlaneGeometry(w, WATER_TOP - 0.6), m);
-      ray.position.set((rr() - 0.5) * W * 0.9, (WATER_TOP + 0.6) / 2, -D / 2 + 0.6 + rr() * (D - 1.8));
+      const ray = new THREE.Mesh(new THREE.PlaneGeometry(w, this.waterTop - 0.6), m);
+      ray.position.set(wC + (rr() - 0.5) * wW * 0.9, (this.waterTop + 0.6) / 2, -D / 2 + 0.6 + rr() * (D - 1.8));
       ray.rotation.z = -0.12 + rr() * 0.08;
       ray.userData = { x0: ray.position.x, ph: rr() * 6, base: 0.04 + rr() * 0.06 };
       ray.renderOrder = 4;
@@ -396,7 +497,7 @@ export class Tank {
       this.group.add(e);
     }
     const menMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, fog: false, depthWrite: false });
-    const men = new THREE.Mesh(new THREE.PlaneGeometry(W, 0.06), menMat); men.position.set(0, WATER_TOP, fz - 0.005); men.renderOrder = 11;
+    const men = new THREE.Mesh(new THREE.PlaneGeometry(wW, 0.06), menMat); men.position.set(wC, this.waterTop, fz - 0.005); men.renderOrder = 11;
     this.group.add(men);
     // ガラスの映りこみ（うすい斜めの光）
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({
@@ -405,13 +506,13 @@ export class Tank {
     glare.position.set(0, H / 2, fz + 0.005); glare.renderOrder = 11;
     this.group.add(glare);
     // にごり（手前に一枚かぶせる）
-    this.murk = new THREE.Mesh(new THREE.PlaneGeometry(W, WATER_TOP), new THREE.MeshBasicMaterial({ color: MURK, transparent: true, opacity: 0, depthWrite: false, depthTest: false, fog: false }));
-    this.murk.position.set(0, WATER_TOP / 2, D / 2 - 0.05); this.murk.renderOrder = 9;
+    this.murk = new THREE.Mesh(new THREE.PlaneGeometry(wW, this.waterTop), new THREE.MeshBasicMaterial({ color: MURK, transparent: true, opacity: 0, depthWrite: false, depthTest: false, fog: false }));
+    this.murk.position.set(wC, this.waterTop / 2, D / 2 - 0.05); this.murk.renderOrder = 9;
     this.group.add(this.murk);
 
     // 浮遊物の位置
     const mp = this.motes.geometry.attributes.position;
-    for (let i = 0; i < this.moteCount; i++) { const ph = this.motePh[i]; mp.setXYZ(i, (ph[0] - 0.5) * W, 1 + ph[1] * (WATER_TOP - 1.4), (ph[2] - 0.5) * D); }
+    for (let i = 0; i < this.moteCount; i++) { const ph = this.motePh[i]; mp.setXYZ(i, wC + (ph[0] - 0.5) * wW, 1 + ph[1] * (this.waterTop - 1.4), (ph[2] - 0.5) * D); }
     mp.needsUpdate = true;
 
     this.setDecor(this.decorIds, true);
@@ -426,7 +527,8 @@ export class Tank {
     const R = rng(55), W = this.W;
     const N = 9;
     for (let i = 0; i < N; i++) {
-      const x = (-0.4 + (0.8 * (i + 0.2 + R() * 0.6)) / N) * W;
+      let x = (-0.4 + (0.8 * (i + 0.2 + R() * 0.6)) / N) * W;
+      if (this.land) { const a = -W / 2 + 0.9, b2 = this.land.x0 - 0.6; x = a + ((x / W) + 0.4) / 0.8 * (b2 - a); }   // v0.6 いけ：水の 底だけ
       const z = -0.5 + R() * 1.0;
       const sz = 0.7 + R() * 0.35;
       const g = new THREE.PlaneGeometry(sz, sz);
@@ -467,7 +569,17 @@ export class Tank {
     this.emitters = [];
     this.swayMats = [];
     this.heaterGlow = null;
-    this.feeder = null; this.fanBlades = null;
+    this.feeder = null; this.fanBlades = null; this.robot = null;
+    // v0.6 いけ：飾りは 水の ある ところ（りくちの てまえ）に ちぢめて ならべる。W と sandHeight を 水の はばで かりに かえて つくり、あとで ずらす
+    const realW = this.W, pond = !!this.land;
+    let dOff = 0;
+    if (pond) {
+      const Ww = this.land.x0 - 0.5 + realW / 2;
+      dOff = -realW / 2 + Ww / 2;
+      this.W = Ww;
+      const base = Tank.prototype.sandHeight.bind(this);
+      this.sandHeight = (x, z) => base(x + dOff, z);
+    }
     const W = this.W, D = TANK_D;
     const used = {};
     const restFrom = [];
@@ -501,6 +613,7 @@ export class Tank {
       fan: () => this.makeFan(0.3 * W),
       co2_kit: () => this.makeCo2(-0.36 * W, -2.4),
       skimmer: () => (this.waterType === 'salt' ? this.makeSkimmer(-0.45 * W, -D / 2 + 0.5) : null),
+      clean_robot: () => this.makeCleanRobot(-0.12 * W, 0.3),   // v0.6：そこの ごみの 帯の 手前がわ（z 0.15〜0.5、飾りの ない 通り道）を うごく
     };
     for (const id of ids) {
       const n = used[id] = (used[id] ?? -1) + 1;
@@ -517,6 +630,16 @@ export class Tank {
         if (sp) for (const k of ['rest', 'coral', 'cling']) if (sp[k]) extra[k].push(...sp[k]);
       }
     }
+    if (pond) {
+      this.W = realW;
+      delete this.sandHeight;
+      for (const e of this.emitters) e.x += dOff;
+      for (const k of ['rest', 'coral', 'cling']) for (const sp of extra[k]) sp.x += dOff;
+      if (this.feeder) this.feeder.x += dOff;
+    }
+    this.decorGroup.position.x = dOff;
+    this.decorGroup.updateMatrixWorld(true);
+    this.buildLandDeco();
     // 休む場所（石・水草・流木の手前、底から少し上）
     const spots = [];
     for (const o of restFrom) {
@@ -527,7 +650,7 @@ export class Tank {
       spots.push({ x: cx, z, y: sand + clamp((bx.max.y - sand) * 0.5, 0.9, 2.2) });
     }
     spots.push(...extra.rest);
-    if (!spots.length) for (const fx of [-0.3, 0.3]) spots.push({ x: fx * W, z: -0.5, y: this.sandHeight(fx * W, -0.5) + 1.3 });
+    if (!spots.length) for (const fx of [-0.3, 0.3]) spots.push({ x: fx * W + dOff, z: -0.5, y: this.sandHeight(fx * W + dOff, -0.5) + 1.3 });
     this.bounds.restSpots = spots;
     // 石の上の高さ（貝が上を這う）
     this.rocks = [];
@@ -543,7 +666,7 @@ export class Tank {
     // はりつく場所（奥のガラス・流木の手前・石の上）
     const cs = [];
     const gz = this.bounds.glassZ;
-    for (let i = 0; i < 6; i++) { const x = (-0.38 + i * 0.15) * W; cs.push({ x, y: this.sandHeight(x, gz) + 0.9 + (i % 3) * 1.1, z: gz, glass: true }); }
+    for (let i = 0; i < 6; i++) { const x = (-0.38 + i * 0.15) * W + dOff; cs.push({ x, y: this.sandHeight(x, gz) + 0.9 + (i % 3) * 1.1, z: gz, glass: true }); }
     for (const o of woodFrom) { const bx = new THREE.Box3().setFromObject(o); for (const f of [0.3, 0.6]) cs.push({ x: bx.min.x + (bx.max.x - bx.min.x) * f, y: bx.min.y + (bx.max.y - bx.min.y) * 0.35, z: Math.min(bx.max.z, this.bounds.maxZ - 0.3) }); }
     for (const r of this.rocks) if (r.top - r.base > 0.4) cs.push({ x: r.x, y: r.top + 0.12, z: r.z + r.rz * 0.4 });
     cs.push(...extra.cling);
@@ -555,7 +678,10 @@ export class Tank {
 
   _ensureAutoStone() {
     if (this.autoStone || this.emitters.some((e) => e.kind === 'air')) return;
-    this.autoStone = this.makeAirStone(0.27 * this.W, -2.5);
+    const gx = this.decorGroup.position.x;   // v0.6 いけ：飾りの グループは ずれている
+    this.autoStone = this.makeAirStone((this.land ? this.land.x0 - 1.4 : 0.27 * this.W) - gx, -2.5);
+    const em = this.emitters[this.emitters.length - 1];
+    if (em && gx) em.x += gx;
     this.decorGroup.add(this.autoStone);
   }
 
@@ -1018,7 +1144,7 @@ export class Tank {
   makeUkikusa(x, z, n = 0) {
     const grp = new THREE.Group();
     const R = rng(1201 + n * 17);
-    const top = WATER_TOP - 0.06;
+    const top = this.waterTop - 0.06;
     // はっぱ（つぶした 円ばん。うらも 見える ように 両面）
     const leafMat = new THREE.MeshLambertMaterial({ color: '#86cc4f', emissive: '#3f7a1f', emissiveIntensity: 0.55, side: THREE.DoubleSide });
     const leaves = [];
@@ -1280,14 +1406,95 @@ export class Tank {
     body.scale.z = 0.6;
     body.position.set(x - 0.75, TANK_H - 1.55, z);
     const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.5, 10), mat);
-    lip.rotation.z = Math.PI / 2; lip.position.set(x - 1.3, WATER_TOP - 0.45, z + 0.15);
+    lip.rotation.z = Math.PI / 2; lip.position.set(x - 1.3, this.waterTop - 0.45, z + 0.15);
     const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.4, 8), mat);
     pipe.position.set(x - 0.75, TANK_H - 2.6 - 2.2, z + 0.05);
     const grate = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.7, 10), new THREE.MeshLambertMaterial({ color: '#5c6a70' }));
     grate.position.set(x - 0.75, TANK_H - 7.2, z + 0.05);
     grp.add(body, lip, pipe, grate);
-    this.emitters.push({ kind: 'filter', x: x - 1.55, y: WATER_TOP - 0.45, z: z + 0.2, rate: 7, spread: 0.25, size: [0.05, 0.1], acc: 0 });
+    this.emitters.push({ kind: 'filter', x: x - 1.55, y: this.waterTop - 0.45, z: z + 0.2, rate: 7, spread: 0.25, size: [0.05, 0.1], acc: 0 });
     return grp;
+  }
+
+  /** v0.6 おそうじロボ（インテリア係）：まるい ドーム（アイコンと おなじ 白・水色の帯・ランプ・車輪・すいこみ口）。そこの ごみの 帯の 手前がわ（かいがら などと かさならない 通り道）を ゆっくり うごき、見えている ごみの 上で すこし とまって あわを だす。目・口は つけない。 */
+  makeCleanRobot(x, z) {
+    const grp = new THREE.Group();
+    const body = new THREE.Group();
+    // 足もとの やわらかい かげ（白い 砂でも 見うしなわない・うかんで 見えない）
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.85, 32), new THREE.MeshBasicMaterial({ color: '#1d3340', transparent: true, opacity: 0.28, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; shadow.renderOrder = 1;
+    const white = new THREE.MeshLambertMaterial({ color: '#eef3f6' });
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.68, 0.3, 36), new THREE.MeshLambertMaterial({ color: '#cfd9df' }));
+    skirt.position.y = 0.17;
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.66, 36, 14, 0, Math.PI * 2, 0, Math.PI / 2), white);
+    dome.scale.y = 0.55; dome.position.y = 0.32;
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.67, 0.06, 10, 44), new THREE.MeshLambertMaterial({ color: '#2fb2e6' }));
+    band.rotation.x = Math.PI / 2; band.position.y = 0.32;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.035, 8, 24), white);
+    rim.rotation.x = Math.PI / 2; rim.position.y = 0.68;
+    const lampMat = new THREE.MeshLambertMaterial({ color: '#9fe8ff', emissive: '#4fc9f2', emissiveIntensity: 0.8 });
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), lampMat);
+    lamp.position.y = 0.69; lamp.scale.y = 0.65;
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.06), new THREE.MeshLambertMaterial({ color: '#3c474d' }));
+    slot.position.set(0, 0.12, 0.66);   // まえの 下の すいこみ口（よこに 1本だけ）
+    body.add(shadow, skirt, dome, band, rim, lamp, slot);
+    for (const sx of [-1, 1]) {   // よこの 車輪（アイコンと おなじ 灰色）
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.12, 20), new THREE.MeshLambertMaterial({ color: '#7d878d' }));
+      wheel.rotation.z = Math.PI / 2; wheel.position.set(sx * 0.68, 0.17, 0.12);
+      body.add(wheel);
+    }
+    grp.add(body);
+    const em = { kind: 'robot', x, y: 0.5, z, rate: 0, spread: 0.3, size: [0.08, 0.14], acc: 0 };
+    this.emitters.push(em);
+    this.robot = { grp, body, lampMat, em, x, z, tx: x, tz: z, wait: 1.5, ang: 0.6, t: 0 };
+    this.placeRobot();
+    return grp;
+  }
+
+  /** ロボの 下の 砂の たかさ（まんなかと まわり 4てんの いちばん 高い ところ。砂に うまらない ように） */
+  robotGround(x, z) {
+    let y = this.sandHeight(x, z);
+    for (const [ox, oz] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) y = Math.max(y, this.sandHeight(x + ox, z + oz));
+    return y;
+  }
+
+  placeRobot() {
+    const r = this.robot;
+    const g = this.robotGround(r.x, r.z);
+    r.body.position.set(r.x, g, r.z);
+    r.body.rotation.y = r.ang;
+    r.em.x = r.x - Math.sin(r.ang) * 0.6; r.em.z = r.z - Math.cos(r.ang) * 0.6; r.em.y = g + 0.45;
+  }
+
+  /** つぎの いきさき：見えている ごみの うち いちばん ちかい もの。なければ 帯の はしから はしへ。通り道は z 0.15〜0.5（かいがらの 手前）。 */
+  pickRobotTarget() {
+    const r = this.robot, lim = 0.36 * this.W;
+    const vis = (this.dirtPatches || []).filter((p) => p.mesh.visible && !p.caught && Math.abs(p.x) < lim && Math.hypot(p.x - r.x, p.z - r.z) > 0.3);
+    if (vis.length) { vis.sort((a, b) => Math.hypot(a.x - r.x, a.z - r.z) - Math.hypot(b.x - r.x, b.z - r.z)); r.tx = vis[0].x; r.tz = clamp(vis[0].z, 0.15, 0.5); r.onDirt = true; return; }
+    r.tx = r.x > 0 ? -lim * (0.6 + Math.random() * 0.4) : lim * (0.6 + Math.random() * 0.4);
+    r.tz = 0.15 + Math.random() * 0.35; r.onDirt = false;
+  }
+
+  updateCleanRobot(dt) {
+    const r = this.robot;
+    r.t += dt;
+    r.lampMat.emissiveIntensity = 0.55 + Math.sin(r.t * 2) * 0.25;   // ランプが ゆっくり ひかる
+    if (r.wait > 0) {
+      r.wait -= dt;
+      r.em.rate = r.onDirt ? 4 : 0;   // ごみの 上では あわが ぷくぷく
+      if (r.wait <= 0) this.pickRobotTarget();
+      this.placeRobot();
+      return;
+    }
+    r.em.rate = 0;
+    const dx = r.tx - r.x, dz = r.tz - r.z, d = Math.hypot(dx, dz);
+    if (d < 0.05) { r.wait = r.onDirt ? 2.5 : 1.5; this.placeRobot(); return; }
+    // むきを ゆっくり かえてから すすむ（はやさ 0.4／びょう：はしから はしまで 30びょう くらい）
+    const want = Math.atan2(dx, dz);
+    let da = want - r.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+    r.ang += clamp(da, -dt * 1.2, dt * 1.2);
+    if (Math.abs(da) < 0.5) { const st = Math.min(d, 0.4 * dt); r.x += Math.sin(r.ang) * st; r.z = clamp(r.z + Math.cos(r.ang) * st, 0.15, 0.5); }
+    this.placeRobot();
   }
 
   /** 自動えさやり機：前のふち（左）に のっている箱。ドラムが回って えさが落ちる。 */
@@ -1379,7 +1586,7 @@ export class Tank {
     const fd = this.feeder;
     const x = fd ? fd.x : 0.3 * this.W, z = fd ? fd.z - 0.4 : 0.5;
     if (fd) fd.spin = 1.2;
-    setTimeout(() => { if (!this.disposed) this.dropFood(x, clamp(z, this.bounds.minZ, this.bounds.maxZ), kind, 3, WATER_TOP - 0.05); }, fd ? 450 : 0);
+    setTimeout(() => { if (!this.disposed) this.dropFood(x, clamp(z, this.bounds.minZ, this.bounds.maxZ), kind, 3, this.waterTop - 0.05); }, fd ? 450 : 0);
     return { x, z };
   }
 
@@ -1447,7 +1654,8 @@ export class Tank {
    * 粒を落とす。kind: 'flake'（ふつう）| 'vitamin'（カラフル・きらきら）| 'sinking'（早く沈む）
    * y を渡すと水面ではなくその高さから（自動えさやり機の口など）。
    */
-  dropFood(x, z, kind = 'flake', n = 0, y = WATER_TOP - 0.05) {
+  dropFood(x, z, kind = 'flake', n = 0, y = this.waterTop - 0.05) {
+    if (this.land) x = Math.min(x, this.waterMaxX - 0.6);   // v0.6 いけ：えさは 水の ある ところだけ
     // 粒の数は 生きものの数に合わせる（みんなに行きわたるように。5〜12粒）
     if (!n) n = clamp((this.creatures || 4) + 1, 5, 12);
     // 底の生きもの（エビ・貝・コリドラスなど）がいるときは、何粒かを「底のぶん」にする。
@@ -1457,7 +1665,7 @@ export class Tank {
     for (let i = 0; i < n; i++) {
       let f = this.foods.find((q) => !q.alive && q.gone);
       if (!f) { if (this.foods.length >= this.maxFood) { f = this.foods.find((q) => q.landed) || this.foods[0]; } else { f = { pos: new THREE.Vector3() }; this.foods.push(f); } }
-      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: (kind === 'sinking' ? 1.3 : 0.6) + Math.random() * 0.15 + (i < reserve ? 0.35 : 0), fade: 1, kind, reserved: i < reserve, snailOnly: i < snailOnly });
+      Object.assign(f, { alive: true, gone: false, landed: false, age: -i * 0.12, claims: 0, sway: Math.random() * 6, vy: (kind === 'sinking' ? 1.3 : this.foodKinds?.[kind]?.sink ?? 0.6) + Math.random() * 0.15 + (i < reserve ? 0.35 : 0), fade: 1, kind, reserved: i < reserve, snailOnly: i < snailOnly });
       f.pos.set(clamp(x + (Math.random() - 0.5) * 0.9, this.bounds.minX + 0.3, this.bounds.maxX - 0.3), y, clamp(z + (Math.random() - 0.5) * 0.9, this.bounds.minZ, this.bounds.maxZ));
     }
     this.addRipple(x, z);
@@ -1472,7 +1680,7 @@ export class Tank {
       r = { m }; this.ripples.push(r);
     }
     r.alive = true; r.t = 0;
-    r.m.position.set(x, WATER_TOP - 0.02, z);
+    r.m.position.set(x, this.waterTop - 0.02, z);
     r.m.visible = true;
   }
 
@@ -1504,12 +1712,16 @@ export class Tank {
         m4.compose(f.pos, q, s);
         this.vitMesh.setMatrixAt(nv++, m4);
       } else {
+        const fk = this.foodKinds?.[f.kind];
+        if (fk) s.multiply(_fs.set(fk.scale[0], fk.scale[1], fk.scale[2]));
         m4.compose(f.pos, q, s);
+        this.foodMesh.setColorAt(n, fk ? fk.colors[n % fk.colors.length] : this.foodFlakeColors[n % 4]);
         this.foodMesh.setMatrixAt(n++, m4);
       }
     }
     this.foodMesh.count = n;
     this.foodMesh.instanceMatrix.needsUpdate = true;
+    if (this.foodMesh.instanceColor) this.foodMesh.instanceColor.needsUpdate = true;
     this.vitMesh.count = nv;
     this.vitMesh.instanceMatrix.needsUpdate = true;
     for (const r of this.ripples) {
@@ -1548,6 +1760,7 @@ export class Tank {
       if (fr.t <= 0) { fr.t = 0.7; this.addRipple(fr.x + (Math.random() - 0.5) * 1.2, clamp(fr.z + (Math.random() - 0.5), this.bounds.minZ, this.bounds.maxZ)); }   // 風で水面がゆれる
     }
     if (this.feeder && this.feeder.spin > 0) { this.feeder.spin -= dt; this.feeder.drum.rotation.y += dt * 6; }
+    if (this.robot) this.updateCleanRobot(dt);
     // 浮遊物
     const mp = this.motes.geometry.attributes.position;
     for (let i = 0; i < this.moteCount; i++) {
@@ -1570,7 +1783,7 @@ export class Tank {
         bb.vy = 1.4 + bb.s * 4 + Math.random() * 0.6; bb.ph = Math.random() * 6; bb.kind = e.kind;
         if (e.kind === 'filter') { bb.vx = -0.8 - Math.random() * 0.6; bb.vy = 0.1; } else bb.vx = 0;
         if (e.kind === 'co2') bb.vy = 0.8 + Math.random() * 0.3;
-        bb.maxY = e.maxY ?? WATER_TOP - 0.05; bb.cx = e.x; bb.inTube = e.kind === 'skimmer' || !!e.tube; bb.tubeR = e.tubeR ?? 0.25; bb.tubeTop = e.tubeTop ?? Infinity;
+        bb.maxY = e.maxY ?? this.waterTop - 0.05; bb.cx = e.x; bb.inTube = e.kind === 'skimmer' || !!e.tube; bb.tubeR = e.tubeR ?? 0.25; bb.tubeTop = e.tubeTop ?? Infinity;
       }
     }
     const bp = this.bubblePoints.geometry.attributes;
@@ -1611,3 +1824,4 @@ export class Tank {
 }
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
+const _fs = new THREE.Vector3();   // v0.6 えさの しゅるいの かたち

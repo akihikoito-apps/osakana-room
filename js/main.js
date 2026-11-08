@@ -187,7 +187,7 @@ async function boot() {
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
   // v0.5：ヘルプ・こうしん りれき（案内係）／ミニゲーム・かりすいそう・プレイヤー（ゲーム係）。無くても うごく
-  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js'].map(optional))) m.init?.(G);
+  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js'].map(optional))) m.init?.(G);
 
   // ずっと押していると出るメニューや、ダブルタップの拡大を止める
   document.addEventListener('contextmenu', (e) => e.preventDefault());

@@ -6,7 +6,7 @@ import { sim, S, freshState, addFish, seeded, read, uiStrings, htmlTexts, KANJI,
 const fishById = Object.fromEntries(FISH.map((f) => [f.id, f]));
 
 // ---------------- かりすいそう ----------------
-test('かりすいそう：あずけると そのままの すがたで ボックスへ・水槽に あきが できて また かえる', () => {
+test('おやすみすいそう：あずけると そのままの すがたで ボックスへ・水槽に あきが できて また かえる', () => {
   const st = freshState({ coins: 99999 });
   const t = st.tanks[0];
   for (let i = 0; i < 6; i++) addFish(st, 'medaka', t);
@@ -23,7 +23,7 @@ test('かりすいそう：あずけると そのままの すがたで ボッ�
   assert.ok(sim.canBuyFish(st, 'guppy', t).ok, 'あきが できたら かえる');
 });
 
-test('かりすいそう：中では 時間が すすまない（おなか・けんこう・そだちが かわらない）', () => {
+test('おやすみすいそう：中では 時間が すすまない（おなか・けんこう・そだちが かわらない）', () => {
   const st = freshState({ coins: 99999 });
   const t = st.tanks[0];
   const f = addFish(st, 'medaka', t);
@@ -34,7 +34,7 @@ test('かりすいそう：中では 時間が すすまない（おなか・け
   assert.equal(JSON.stringify(st.box[0]), before);
 });
 
-test('かりすいそう：もどせるのは 水が あって あきの ある 水槽だけ（りゆうつき）', () => {
+test('おやすみすいそう：もどせるのは 水が あって あきの ある 水槽だけ（りゆうつき）', () => {
   const st = freshState({ coins: 99999 });
   const fresh = st.tanks[0];
   const clown = addFish(st, 'clownfish');          // うみの すいそうが できる
@@ -67,27 +67,27 @@ test('かりすいそう：もどせるのは 水が あって あきの ある 
   assert.equal(salt.fish.find((x) => x.uid === clown.uid).boxedAt, undefined);
 });
 
-test('かりすいそう：ずかん・ハートの 合計・6ぴき かいほうは もどらない', () => {
+test('おやすみすいそう：ずかん・ハートの 合計・6ぴき かいほうは もどらない', () => {
   const st = freshState({ coins: 99999 });
   const t = st.tanks[0];
   for (let i = 0; i < 6; i++) addFish(st, i % 2 ? 'medaka' : 'guppy', t);
   assert.ok(st.unlocks.tank6);
   st.heartsTotal = 42;
-  const dex = JSON.stringify(st.dex);
+  const dex = JSON.stringify(Object.keys(st.dex).sort().map((k) => [k, st.dex[k].count]));   // v0.6：個体差係が dex に きろくを 足すので かずだけ くらべる
   for (const f of t.fish.slice()) assert.ok(sim.toBox(st, t, f.uid).ok);
   assert.equal(t.fish.length, 0);
   assert.equal(st.box.length, 6);
   sim.normalize(st);           // よみこみ なおしても
   assert.ok(st.unlocks.tank6, 'いちど ひらいたら もどさない');
-  assert.equal(JSON.stringify(st.dex), dex);
+  assert.equal(JSON.stringify(Object.keys(st.dex).sort().map((k) => [k, st.dex[k].count])), dex);
   assert.equal(st.heartsTotal, 42);
   // もどしても ずかんの かずは ふえない（かったのでは ない）
   sim.fromBox(st, st.box[0].uid, t);
-  assert.equal(JSON.stringify(st.dex), dex);
+  assert.equal(JSON.stringify(Object.keys(st.dex).sort().map((k) => [k, st.dex[k].count])), dex);
   assert.equal(sim.allCreatures(st).length, 6);
 });
 
-test('かりすいそう：ミッションの「エビ ◯ひき」なども ボックスの 子を かぞえる', () => {
+test('おやすみすいそう：ミッションの「エビ ◯ひき」なども ボックスの 子を かぞえる', () => {
   const st = freshState({ coins: 99999 });
   const t = st.tanks[0];
   addFish(st, 'minami_shrimp', t); const e2 = addFish(st, 'minami_shrimp', t);
@@ -97,7 +97,7 @@ test('かりすいそう：ミッションの「エビ ◯ひき」なども ボ
   assert.equal(sim.missionProgress(st, m).now, 2);
 });
 
-test('かりすいそう：上限・チュートリアル中は あずけられない', () => {
+test('おやすみすいそう：上限・チュートリアル中は あずけられない', () => {
   const st = freshState({ coins: 99999, tutorialDone: false });
   const f = addFish(st, 'medaka', st.tanks[0]);
   assert.equal(sim.canToBox(st, st.tanks[0], f.uid).reason, 'tutorial');

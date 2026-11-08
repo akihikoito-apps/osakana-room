@@ -7,7 +7,7 @@ let G = null;
 let tab = 'fish';
 let focus = null;
 
-const WATER = { fresh: 'かわ', salt: 'うみ', both: 'どちらでも' };
+const WATER = { fresh: 'かわ', salt: 'うみ', pond: 'いけ', both: 'どちらでも' };   // v0.6 pond（ぼうけん係）
 const KIND_IC = { fish: '🐟', shrimp: '🦐', snail: '🐚' };
 
 export function init(g) {
@@ -57,7 +57,7 @@ function groupsOf(kind) {
   if (kind === 'food') return [{ key: 'food', head: '', items: ITEMS.filter((i) => i.type === 'food' && i.price != null) }];
   const tanks = ITEMS.filter((i) => i.type === 'tank' && i.price != null);
   if (kind === 'tanks') return [{ key: 'tanks', head: '', items: tanks }];
-  const gear = ITEMS.filter((i) => i.type !== 'food' && i.type !== 'tank' && i.price != null && (i.water === 'both' || i.water === t.water));
+  const gear = ITEMS.filter((i) => i.type !== 'food' && i.type !== 'tank' && i.price != null && (G.sim.itemFitsWater ? G.sim.itemFitsWater(i, t.water) : (i.water === 'both' || i.water === t.water)));   // v0.6 WATERS（いけは かわの 飾りも）
   return [{ key: 'gear', head: '', items: gear }];
 }
 
@@ -73,7 +73,7 @@ function renderTankBar() {
   bar.hidden = !s.tutorial.done;
   bar.querySelector('.st-prev').hidden = !many;
   bar.querySelector('.st-next').hidden = !many;
-  bar.querySelector('.st-name').replaceChildren(el('span', { class: 'water-tag ' + t.water, text: WATER[t.water] }), G.sim.tankName(s, t));
+  bar.querySelector('.st-name').replaceChildren(el('span', { class: 'water-tag ' + t.water, text: WATER[t.water] || G.sim.balance().WATERS?.[t.water]?.name || '' }), G.sim.tankName(s, t));
   // 定員：いっぱいの ものは ことばで
   const c = G.sim.capacityOf(t);
   const fishFull = c.full ?? (c.space >= c.capacity - 1e-9), snailFull = c.snail >= c.snailMax;
@@ -130,7 +130,7 @@ function render() {
       el('div', { class: 'nm', text: locked && isFish ? '？？？' : it.name }),
       locked ? el('div', { class: 'lock-line', text: '🔒 もうすこし' })
         : short ? short
-        : it.uses ? el('div', { class: 'lock-line vit-note', text: `${it.uses}かいぶん・おなかは ふえないよ。げんきの もと` })
+        : it.uses ? el('div', { class: 'lock-line vit-note', text: it.effect?.fill ? `${it.uses}かいぶん・いろいろ あげると おおきく そだつよ` : `${it.uses}かいぶん・おなかは ふえないよ。げんきの もと` })   // v0.6 個体差係：えいようの ある えさ
         : c.reason === 'needs' ? el('div', { class: 'lock-line', text: `${sim.data().itemById[c.item]?.name || ''}が いるよ` })
         : isFish ? el('div', { class: 'stars', text: stars(it.rarity || 1) }) : (count && it.max > 1 ? el('div', { class: 'tagline', text: `いれた かず ${count}/${it.max}` }) : null),
       !s.tutorial.done && tut?.recommend === it.id ? el('span', { class: 'rec', text: 'おすすめ' }) : null,
@@ -158,14 +158,16 @@ function reasonText(c, it) {
     case 'full': return sim.hintText('tankFull') || 'すいそうが いっぱいだよ';
     case 'max': return 'もう これいじょう いれられないよ';
     case 'have': return 'もう もっているよ';
-    case 'water': return (it.water === 'salt' ? L.wrongWater : L.wrongWaterFresh || '').replaceAll('{name}', name) || 'この すいそうの みずには あわないよ';
+    case 'water': if (it.water === 'pond') return `${name}は いけの すいそうで くらすよ。いけの すいそうを えらんでね。`;   // v0.6
+      return (it.water === 'salt' ? L.wrongWater : L.wrongWaterFresh || '').replaceAll('{name}', name) || 'この すいそうの みずには あわないよ';
     case 'needs': return (L.needs || '').replaceAll('{name}', name).replaceAll('{item}', sim.data().itemById[c.item]?.name || '');
-    case 'locked': return L.locked || '1つめの すいそうに 6ぴき いると あえるよ';
+    case 'locked': if (it.unlock === 'adventure') return `ハートを ${sim.balance().ADVENTURE?.openHearts ?? 300} あつめて ぼうけんが ひらくと かえるよ`;   // v0.6 いけの すいそう
+      return L.locked || '1つめの すいそうに 6ぴき いると あえるよ';
     case 'snailFull': return L.snailFull || 'かいは 1つの すいそうに 2ひき までだよ。';
     case 'co2Salt': return L.co2Salt || 'かわの すいそうで つかうよ。';
     case 'skimmerFresh': return L.skimmerFresh || 'うみの すいそうで つかうよ。';
     case 'vitaminFull': return L.vitaminFull || 'まだ のこっているよ。';
-    case 'tankMax': return L.tankMax || 'へやに すいそうが いっぱいだよ';
+    case 'tankMax': return 'へやと そうこに すいそうが いっぱいだよ';   // v0.6：へや＋そうこ の 上限
     default: return 'まだ うっていないよ';
   }
 }
@@ -194,7 +196,9 @@ async function onPick(it, isFish) {
     return;
   }
   // どの 水槽に 入るか を ことばで（水槽が 2つ以上 あるとき）
-  if ((isFish || it.inTank) && s.tanks.length > 1) body.push(el('div', { class: 'small', style: { marginTop: '4px' } }, el('span', { class: 'water-tag ' + t.water, text: WATER[t.water] }), ` ${sim.tankName(s, t)}に いれるよ`));
+  if ((isFish || it.inTank) && s.tanks.length > 1) body.push(el('div', { class: 'small', style: { marginTop: '4px' } }, el('span', { class: 'water-tag ' + t.water, text: WATER[t.water] || G.sim.balance().WATERS?.[t.water]?.name || '' }), ` ${sim.tankName(s, t)}に いれるよ`));
+  // v0.6：へやが いっぱいなら そうこに はいる（かう まえに おしらせ：Codex の あん）
+  if (it.type === 'tank' && c.toStorage) body.push(el('div', { class: 'small', style: { marginTop: '4px', color: '#b4553f' }, text: 'へやが いっぱい だから、そうこに はいるよ' }));
   const yes = await dialog(body, [
     { label: 'やめる', value: false, kind: 'soft' },
     { label: price === 0 ? 'うけとる' : `かう（${price}）`, value: true, kind: 'primary' },
@@ -207,6 +211,7 @@ async function onPick(it, isFish) {
   if (isFish && r.friends?.length) { G.queueReact(r.fish.uid, 'heart'); r.friends.forEach((u, i) => G.queueReact(u, 'heart', 150 * (i + 1))); }
   if (!isFish && r.fans?.length) r.fans.forEach((u, i) => G.queueReact(u, 'spin', 200 * i));
   if (isFish) toast(r.first ? `${it.name}が なかまに なったよ！ ずかんに のったよ` : `${it.name}が なかまに なったよ！`, 'gold');
+  else if (it.type === 'tank' && r.stored) toast('あたらしい すいそうが そうこに はいったよ！', 'gold');
   else if (it.type === 'tank') { toast(sim.data().SHOP_LINES?.newTank || 'あたらしい すいそうが へやに きたよ！', 'gold'); if (r.tank) G.setTank(r.tank.id); }
   else toast(it.inTank ? `${it.name}を すいそうに いれたよ` : `${it.name}を てに いれたよ`);
   G.markDirty(); G.saveNow();
