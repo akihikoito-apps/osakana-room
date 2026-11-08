@@ -27,16 +27,21 @@ const FALLBACK = {
   BOND: { feed: 2, feedPerDay: 5, pet: 1, petPerDay: 5, petCooldownRealSec: 30, waterChange: 1, waterChangePerDay: 2, heartStep: 20 },
   NAKAYOSHI: { value: { 0: 20, 1: 60, 2: 100 }, alone: 50, aloneSchool: 40 },
   GROW: { goodHour: { onaka: 20, health: 60, tempInRange: true }, feedBonusHours: 2, feedBonusPerDay: 4, hoursPerGrowDay: 20 },
-  COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, pet: { chance: 0.3, coin: 6, perDay: 8 }, thanks: { chancePerHour: 0.15, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
+  COIN: { care: { feed: { coin: 12, perDay: 4 }, waterChange: { coin: 20, perDay: 3, cleanBelow: 85 } }, careDailyCap: 100, pet: { chance: 0.3, coin: 6, perDay: 8 }, thanks: { chancePerHour: 0.15, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
   UNLOCK: { tank6: { tankIndex: 0, count: 6, banner: ['うみの すいそうが かえるように なったよ！'], lockedLine: '1つめの すいそうに 6ぴき いると あえるよ' } },
   TANKS: { max: 6, newTank: { temp: 25, clean: 100, air: 70, leftover: 0 } },
-  MULTI_TANK: { careDailyCapPerExtraTank: 25, thanksAllTanksBase: 4, thanksAllTanksPerExtra: 3, emptyTankNoCareCoin: true },
+  MULTI_TANK: { careDailyCapPerExtraTank: 50, thanksAllTanksBase: 4, thanksAllTanksPerExtra: 3, emptyTankNoCareCoin: true },
   SNAIL: { cleanPerHour: 0.15, leftoverPerHour: 0.06 },
   HEART: { perPet: 1, perFishEveryGameHours: 1, perDay: 20, need: { health: 40 }, max: 99999 },
   SCOOP: { animRealSec: 2.0, allowWhenEmpty: true },
   THERMO: { steps: [{ id: 'cool', label: 'すずしい', temp: 23 }, { id: 'normal', label: 'ふつう', temp: 25 }, { id: 'warm', label: 'あたたかい', temp: 27 }], perfectRange: 1, perfectMood: 5, defaultStep: 'normal', perHour: 1, safeOnly: true, resetOnUnsafe: true },
   CLEAN_FLOOR: { minNetDirtPerHour: 0.4 },
   VITAMIN: { perTankPerDay: 1, usesPerBuy: 5, eatEvenIfFull: true, effect: { love: { health: 15, growHours: 6, mood: 10, natsuki: 3, react: ['jump', 'heart'] }, ok: { health: 10, growHours: 4, mood: 5, natsuki: 1, react: ['happy'] }, dislike: { react: ['turn'] } } },
+  // v0.5 かりすいそう（ボックス）・ミニゲーム（balance.js に BOX・MINIGAME が あれば そちら）
+  // Codex・agy とも「にがせない ので 上限は なし」→ じっしつ なしの 300。
+  // クイズ：5もん・1もん 8コイン＋ぜんもん せいかい 10（さいだい 50。Codex 25／agy 60 の あいだ）
+  BOX: { max: 300 },
+  MINIGAME: { quiz: { cost: 10, questions: 5, coinPerCorrect: 8, perfectBonus: 10, choices: 3, minPool: 6 } },
   WATER_LABELS: { fresh: 'みずの すいそう', salt: 'うみの すいそう' },
   SHOP_TABS: [{ kind: 'fish', label: 'さかな' }, { kind: 'shrimp', label: 'エビ' }, { kind: 'snail', label: 'かい' }],
   REACTION: { petCooldownRealSec: 3, idleEveryHours: 4, sadEveryHours: 3, sleepyEveryHours: 5, nightSleepy: { from: 22, to: 6, chancePerHour: 0.2 } },
@@ -150,6 +155,10 @@ export function normalize(state) {
   delete state.heartDay;
   state.ui ||= {};
   if (!state.tanks.some((t) => t.id === state.ui.tankId)) state.ui.tankId = state.tanks[0]?.id;
+  // v0.5 かりすいそう：魚の 形は 水槽の 中と おなじ（時間は すすまない）
+  state.box = (Array.isArray(state.box) ? state.box : []).filter((f) => f && D.fishById[f.speciesId]);
+  for (const f of state.box) normFish(f);
+  if (state.quiz && !(Array.isArray(state.quiz.qs) && state.quiz.qs.length)) state.quiz = null;
   checkUnlock(state);          // 読み込んだ 直後にも しらべる（v0.1 で もう 6ぴき なら ここで ひらく）
   return state;
 }
@@ -747,7 +756,8 @@ export function buyItem(state, id, t = state.tanks[0]) {
 export function missionProgress(state, m) {
   const g = m.goal || {};
   // 水槽が いくつ あっても、ぜんぶ まとめて かぞえる（なかよし・みんな げんき は どれか 1つの 水槽で）
-  const allFish = state.tanks.flatMap((x) => x.fish);
+  // かりすいそうの 生きものも「もっている」ので かぞえる（いれかえで ミッションが もどらない ように）
+  const allFish = state.tanks.flatMap((x) => x.fish).concat(state.box || []);
   const t = { fish: allFish, decor: state.tanks.flatMap((x) => x.decor) };
   const st = state.stats;
   const cnt = (k) => ({ now: Math.min(st[k] || 0, g.count), need: g.count });
@@ -987,3 +997,160 @@ export const vitaminActive = (now = Date.now()) => !!vsession && now <= vsession
 
 /** じどう えさやりの いり／きり */
 export function setFeeder(t, on) { t.feederOn = !!on; return t.feederOn; }
+
+// ---------------- かりすいそう（ボックス・v0.5） ----------------
+// 水槽の 生きものを そのままの すがた（そだち・なつき・けんこう …）で あずける。中では 時間が すすまない
+// （tick は state.tanks しか 見ない）。あずけると 水槽に あきが できるので また かえる。
+// 1つめの 水槽の 6ぴき かいほう・ずかん・ハートの 合計は いちど ふえたら もどらない。
+export const boxMax = () => B.BOX?.max ?? 60;
+
+/** あずけられるか。{ ok, reason: 'none'|'boxFull'|'tutorial' } */
+export function canToBox(state, t, uid) {
+  if (!state.tutorial.done) return { ok: false, reason: 'tutorial' };
+  if (!t || !t.fish.some((f) => f.uid === uid)) return { ok: false, reason: 'none' };
+  if ((state.box || []).length >= boxMax()) return { ok: false, reason: 'boxFull' };
+  return { ok: true };
+}
+
+/** 水槽 → かりすいそう。{ ok, fish, events } */
+export function toBox(state, t, uid) {
+  const c = canToBox(state, t, uid);
+  if (!c.ok) return c;
+  const i = t.fish.findIndex((f) => f.uid === uid);
+  const [f] = t.fish.splice(i, 1);
+  f.boxedAt = state.clock.min;
+  f.from = t.id;
+  (state.box ||= []).push(f);
+  inc(state, 'toBox');
+  return { ok: true, fish: f, events: done(state) };
+}
+
+/** かりすいそう → 水槽 に もどせるか。{ ok, reason: 'none'|'water'|'full'|'snailFull'|'needs', item } */
+export function canFromBox(state, uid, t) {
+  const f = (state.box || []).find((x) => x.uid === uid);
+  if (!f || !t) return { ok: false, reason: 'none' };
+  const sp = D.fishById[f.speciesId];
+  if (!sp) return { ok: false, reason: 'none' };
+  if (sp.water !== t.water) return { ok: false, reason: 'water' };
+  if (sp.kind === 'snail') {
+    if (snailCount(t) >= (B.TANK.snailMax ?? 2)) return { ok: false, reason: 'snailFull' };
+  } else if (spaceUsed(t) + (sp.space ?? 1) > B.TANK.capacity + 1e-9 || (t.fish.length - snailCount(t)) >= (B.TANK.fishMax ?? 1e9)) return { ok: false, reason: 'full' };
+  const need = (sp.needs || []).find((id) => !t.decor.includes(id));
+  if (need) return { ok: false, reason: 'needs', item: need };
+  return { ok: true };
+}
+
+/** かりすいそう → 水槽。{ ok, fish, events } */
+export function fromBox(state, uid, t) {
+  const c = canFromBox(state, uid, t);
+  if (!c.ok) return c;
+  const i = state.box.findIndex((x) => x.uid === uid);
+  const [f] = state.box.splice(i, 1);
+  delete f.boxedAt; delete f.from;
+  f.lastHeartMin = Math.min(f.lastHeartMin ?? -1e9, state.clock.min);
+  dayBucket(state, f);
+  t.fish.push(f);
+  inc(state, 'fromBox');
+  const events = [];
+  if (fixThermo(t)) events.push({ type: 'thermoReset', tankId: t.id });
+  checkUnlock(state, events);
+  checkMissions(state, events);
+  return { ok: true, fish: f, events };
+}
+
+/** もどせる 水槽の いちらん：[{ tank, ok, reason, item }]（へやの わくの じゅん） */
+export function boxTargets(state, uid) {
+  return state.tanks.slice().sort((a, b) => a.slot - b.slot).map((t) => ({ tank: t, ...canFromBox(state, uid, t) }));
+}
+
+/** そだてている 生きもの ぜんぶ（水槽＋かりすいそう） */
+export const allCreatures = (state) => state.tanks.flatMap((t) => t.fish).concat(state.box || []);
+
+// ---------------- ミニゲーム：さかな あて クイズ（v0.5） ----------------
+// ハートを つかって あそぶ（state.hearts だけ へる。heartsTotal は へらない）。
+// 問題は state.quiz に のこすので、とちゅうで とじても つづきから。
+export const quizRule = () => B.MINIGAME?.quiz || {};
+
+/** あそべるか。{ ok, reason: 'hearts'|'tutorial', need（あと なんこ）} */
+export function canPlayQuiz(state) {
+  const Q = quizRule();
+  if (!state.tutorial.done) return { ok: false, reason: 'tutorial' };
+  if (state.quiz) return { ok: true, resume: true };
+  const cost = Q.cost ?? 10;
+  if ((state.hearts || 0) < cost) return { ok: false, reason: 'hearts', need: cost - (state.hearts || 0) };
+  return { ok: true };
+}
+
+/** 出題に つかう 生きもの：ずかんに のった もの。すくなければ ふつう〜すこし めずらしい ものを たして minPool しゅるいに */
+export function quizPool(state) {
+  const Q = quizRule();
+  const sold = D.FISH.filter((f) => f.price != null && f.texture);
+  const got = sold.filter((f) => state.dex?.[f.id]);
+  if (got.length >= (Q.minPool ?? 6)) return got;
+  const extra = sold.filter((f) => !state.dex?.[f.id] && isUnlocked(state, f.unlock)).sort((a, b) => (a.rarity || 1) - (b.rarity || 1) || (a.price || 0) - (b.price || 0));
+  return got.concat(extra.slice(0, (Q.minPool ?? 6) - got.length));
+}
+
+// まちがいの こうほ：おなじ なかま（さかな／エビ／かい）を さきに。名前の はじめが おなじ ものは さける
+function quizChoices(answer, rnd, n) {
+  const all = D.FISH.filter((f) => f.price != null && f.texture && f.id !== answer.id);
+  const head = (s) => s.slice(0, 2);
+  const okName = (f) => head(f.name) !== head(answer.name) && !f.name.includes(answer.name) && !answer.name.includes(f.name);
+  const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // おなじ なかま → その中でも おなじ 水を さきに
+  const same = shuffle(all.filter((f) => (f.kind || 'fish') === (answer.kind || 'fish') && okName(f))).sort((a, b) => (a.water === answer.water ? 0 : 1) - (b.water === answer.water ? 0 : 1));
+  const other = shuffle(all.filter((f) => (f.kind || 'fish') !== (answer.kind || 'fish') && okName(f)));
+  const wrong = [];
+  for (const f of same.concat(other)) { if (wrong.length >= n - 1) break; if (!wrong.some((w) => head(w.name) === head(f.name))) wrong.push(f); }
+  return shuffle([answer, ...wrong]).map((f) => f.id);
+}
+
+/** はじめる：ハートを はらって 問題を つくる。{ ok, quiz, reason, need } */
+export function startQuiz(state, rnd = Math.random) {
+  const c = canPlayQuiz(state);
+  if (!c.ok) return c;
+  if (state.quiz) return { ok: true, quiz: state.quiz, resume: true };
+  const Q = quizRule();
+  const pool = quizPool(state);
+  const n = Math.min(Q.questions ?? 5, pool.length);
+  const order = pool.slice();
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  const qs = order.slice(0, n).map((f) => ({ answer: f.id, choices: quizChoices(f, rnd, Q.choices ?? 3), pick: null }));
+  state.hearts -= Q.cost ?? 10;
+  state.quiz = { kind: 'quiz', qs, i: 0, correct: 0 };
+  inc(state, 'quizPlays');
+  return { ok: true, quiz: state.quiz };
+}
+
+/** こたえる。{ ok, right, answer, last } */
+export function answerQuiz(state, pickId) {
+  const q = state.quiz;
+  if (!q || q.i >= q.qs.length) return { ok: false };
+  const cur = q.qs[q.i];
+  cur.pick = pickId;
+  const right = pickId === cur.answer;
+  if (right) q.correct++;
+  q.i++;
+  return { ok: true, right, answer: cur.answer, last: q.i >= q.qs.length };
+}
+
+/** コインの けいさん（せいかい × coinPerCorrect、ぜんもん せいかいで perfectBonus） */
+export function quizCoins(correct, total) {
+  const Q = quizRule();
+  return correct * (Q.coinPerCorrect ?? 10) + (total > 0 && correct >= total ? (Q.perfectBonus ?? 0) : 0);
+}
+
+/** おわり：コインを もらって きろくを のこす。とちゅうで やめても、こたえた ぶんは もらえる。{ ok, correct, total, coin, best, newBest } */
+export function finishQuiz(state) {
+  const q = state.quiz;
+  if (!q) return { ok: false };
+  const total = q.qs.length, answered = q.i;
+  const coin = addCoin(state, quizCoins(q.correct, answered >= total ? total : Infinity));
+  const prev = state.stats.quizBest || 0;
+  const newBest = answered >= total && q.correct > prev;
+  if (newBest) state.stats.quizBest = q.correct;
+  if (answered >= total && q.correct >= total) inc(state, 'quizPerfect');
+  inc(state, 'quizCorrect', q.correct);
+  state.quiz = null;
+  return { ok: true, correct: q.correct, total, answered, coin, best: state.stats.quizBest || 0, newBest, events: done(state) };
+}

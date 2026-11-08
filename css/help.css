@@ -1,1 +1,123 @@
 /* v0.5 案内係：ヘルプ・こうしん りれき */
+
+/* ---------- へやの すみの ちいさな ボタン（ひだりうえ、じかんの したに よこならび） ---------- */
+#room-corner {
+  position: absolute; z-index: 20; display: flex; gap: 8px;
+  left: calc(var(--safe-l) + 12px); top: calc(var(--safe-t) + var(--hud-h) + 22px);
+}
+.corner-btn {
+  display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px 0 8px;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow);
+  font-size: var(--fs-s); font-weight: 700; color: var(--ink); white-space: nowrap;
+}
+.corner-btn .nav-ic { font-size: 20px; line-height: 1; }
+.corner-btn:active { transform: translateY(2px); }
+#btn-help { background: rgba(214, 240, 250, 0.94); }
+#btn-log { background: rgba(255, 244, 214, 0.94); }
+body.zooming #room-corner { opacity: 0; transition: opacity 200ms; }
+@media (max-height: 500px) {
+  #room-corner { top: calc(var(--safe-t) + var(--hud-h) + 16px); gap: 6px; }
+  .corner-btn { min-height: 40px; padding: 0 10px 0 6px; font-size: 13px; }
+  .corner-btn .nav-ic { font-size: 18px; }
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  .corner-btn { min-height: 50px; padding: 0 16px 0 10px; font-size: 17px; }
+  .corner-btn .nav-ic { font-size: 24px; }
+}
+
+/* ---------- ヘルプ・りれき の シート（うしろに うみの え） ---------- */
+#scr-help, #scr-changelog {
+  background: #cdeef7 url(../assets/ui/help_bg.jpg) center bottom / cover no-repeat;
+}
+#scr-help .sheet-head h2, #scr-changelog .sheet-head h2 {
+  padding: 2px 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.88); box-shadow: var(--shadow);
+}
+.help-sub { padding: 3px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.7); font-size: var(--fs-s); color: var(--ink-soft); }
+
+/* ヘルプ：ひだりに みだし、みぎに カード。りょうはしの さかなが すこし みえるように まんなかに よせる */
+.help-wrap {
+  flex: 1; min-height: 0; display: flex; gap: 10px;
+  width: 100%; max-width: 860px; margin: 0 auto;
+}
+#help-nav { flex: none; width: 168px; gap: 6px; padding: 2px 4px 10px; }
+.help-tab {
+  display: flex; align-items: center; gap: 6px; min-height: 46px; padding: 4px 10px; flex: none;
+  border-radius: 16px; background: rgba(255, 255, 255, 0.82); box-shadow: var(--shadow);
+  font-size: var(--fs-s); font-weight: 700; color: var(--ink); text-align: left; line-height: 1.2;
+}
+.help-tab-ic { font-size: 22px; line-height: 1; flex: none; }
+.help-tab.on { background: var(--main); outline: 3px solid #fff; box-shadow: var(--shadow-strong); }
+
+#help-body {
+  flex: 1 1 auto; align-self: flex-start; max-height: 100%; min-width: 0; gap: 10px; padding: 12px 16px 16px;
+  border-radius: var(--r-card); background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow-strong);
+}
+.help-title { display: flex; align-items: center; gap: 10px; }
+.help-title h3 { margin: 0; font-size: var(--fs-h); }
+.help-title-pic { width: 56px; height: 40px; object-fit: contain; }
+.help-title-ic { font-size: 32px; }
+.help-topic { padding: 8px 12px 10px; border-radius: 16px; background: rgba(240, 249, 252, 0.95); border: 2px solid #d7eef5; }
+.help-h { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.help-h h4 { margin: 0; font-size: var(--fs); color: #1f6f8b; }
+.help-h-pic { width: 32px; height: 32px; object-fit: contain; flex: none; }
+.help-h-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--main-deep); flex: none; margin: 0 4px; }
+.help-topic ul { margin: 0; padding-left: 1.3em; }
+.help-topic li { font-size: var(--fs); line-height: 1.55; word-break: keep-all; overflow-wrap: anywhere; }
+.help-topic li::marker { color: var(--main-deep); }
+.help-note { margin: 6px 0 0; padding: 5px 10px; border-radius: 10px; background: #fff7e3; font-size: 13px; line-height: 1.5; color: var(--ink-soft); word-break: keep-all; overflow-wrap: anywhere; }
+.help-note-lb { display: inline-block; margin-right: 6px; padding: 0 8px; border-radius: 999px; background: var(--coin); color: var(--ink); font-weight: 700; }
+
+/* ---------- こうしん りれき ---------- */
+#log-list { width: 100%; max-width: 760px; margin: 0 auto; gap: 10px; }
+.log-card { flex: none; border-radius: var(--r-card); background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow); overflow: hidden; }
+.log-card.newest { background: rgba(255, 255, 255, 0.95); outline: 3px solid var(--coin-deep); outline-offset: -3px; box-shadow: var(--shadow-strong); }
+.log-head { width: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 10px 14px; text-align: left; color: var(--ink); min-height: 48px; }
+.log-ver { padding: 1px 10px; border-radius: 999px; background: var(--main); font-weight: 700; font-size: var(--fs-s); }
+.log-new { padding: 1px 10px; border-radius: 999px; background: var(--coin); font-weight: 700; font-size: var(--fs-s); }
+.log-date { font-size: 13px; color: var(--ink-soft); }
+.log-name { flex-basis: 100%; font-size: var(--fs); font-weight: 700; word-break: keep-all; overflow-wrap: anywhere; }
+.log-card:not(.newest) .log-name { flex-basis: auto; flex: 1; }
+.log-more { margin-left: auto; color: var(--main-deep); font-size: 14px; transition: transform 150ms; }
+.log-card.open .log-more { transform: rotate(180deg); }
+.log-items { display: none; margin: 0; padding: 0 16px 12px 2.2em; }
+.log-card.open .log-items { display: block; }
+.log-items li { font-size: var(--fs-s); line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* したに つづきが ある あいず（スクロールの とちゅうだけ） */
+.more-cue { position: sticky; bottom: -12px; flex: none; margin-top: -34px; height: 34px; pointer-events: none;
+  display: flex; align-items: flex-end; justify-content: center; }
+.more-cue[hidden] { display: none; }
+.more-cue span { padding: 2px 14px; border-radius: 999px; background: var(--main-deep); color: #fff; font-size: 13px; font-weight: 700;
+  box-shadow: var(--shadow); animation: cue-bob 1.6s ease-in-out infinite; }
+#log-list .more-cue { bottom: 0; }
+@keyframes cue-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .more-cue span { animation: none; } }
+
+/* スマホ横（ひくい がめん） */
+@media (max-height: 500px) {
+  #scr-help.sheet, #scr-changelog.sheet { padding-top: calc(var(--safe-t) + var(--hud-h) + 12px); }
+  #scr-help .sheet-head, #scr-changelog .sheet-head { margin-bottom: 6px; }
+  #scr-help .sheet-head h2, #scr-changelog .sheet-head h2 { font-size: 20px; }
+  .help-sub { font-size: 13px; }
+  #help-nav { width: 148px; gap: 4px; padding-bottom: 4px; }
+  .help-tab { min-height: 36px; font-size: 14px; padding: 2px 8px; border-radius: 13px; }
+  .help-tab-ic { font-size: 19px; }
+  #help-body { padding: 8px 12px 12px; gap: 8px; }
+  .help-title h3 { font-size: 19px; }
+  .help-title-pic { width: 44px; height: 30px; }
+  .help-topic { padding: 6px 10px 8px; }
+  .help-h h4 { font-size: 16px; }
+  .help-h-pic { width: 26px; height: 26px; }
+  .help-topic li { font-size: 15px; line-height: 1.5; }
+  .help-note { font-size: 12px; }
+  .log-head { padding: 8px 12px; min-height: 44px; }
+  .log-name { font-size: 16px; }
+  .log-items li { font-size: 14px; }
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  #help-nav { width: 200px; gap: 8px; }
+  .help-tab { min-height: 56px; font-size: 17px; }
+  .help-tab-ic { font-size: 26px; }
+  .help-topic li { font-size: 19px; }
+  .help-note { font-size: 14px; }
+}

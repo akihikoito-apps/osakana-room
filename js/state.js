@@ -28,6 +28,8 @@ export function newState(init = {}) {
       decor: [], equip: [],
       fish: [],
     }],
+    box: [],                 // v0.5 かりすいそう（あずけた 生きもの。水槽の 魚と おなじ 形・時間は すすまない）
+    quiz: null,              // v0.5 ミニゲームの とちゅう（とじても つづきから）
     hearts: 0,               // なでて もらった ハート（いまの かず。あとで つかう よてい）
     heartsTotal: 0,          // つうさんの ハート（つかっても へらない）
     unlocks: {},             // 解放ずみ { tank6: その日 }（いちど ひらいたら もどさない）
@@ -71,6 +73,11 @@ export function migrate(raw, init) {
   out.ui = { ...base.ui, ...(isObj(s.ui) ? s.ui : {}) };
   out.hearts = Number.isFinite(s.hearts) ? Math.max(0, Math.floor(s.hearts)) : 0;
   out.heartsTotal = Number.isFinite(s.heartsTotal) ? Math.max(out.hearts, Math.floor(s.heartsTotal)) : out.hearts;
+  // v0.5 かりすいそう：古い セーブには ない → []
+  out.box = Array.isArray(s.box) ? s.box.filter((f) => isObj(f) && typeof f.speciesId === 'string').map((f) => ({
+    ...f, uid: typeof f.uid === 'string' ? f.uid : newUid(), stage: [0, 1, 2].includes(f.stage) ? f.stage : 0,
+  })) : [];
+  out.quiz = isObj(s.quiz) && Array.isArray(s.quiz.qs) ? s.quiz : null;
   out.unlocks = isObj(s.unlocks) ? s.unlocks : {};
   out.notices = isObj(s.notices) ? s.notices : {};
   // 水槽の わく（0〜5）が かさならない ように

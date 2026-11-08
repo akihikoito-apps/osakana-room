@@ -111,6 +111,36 @@
     <div id="mission-list" class="list"></div>
   </section>
 
+  <!-- v0.5 案内係：ヘルプ（うしろは うみの え）・こうしん りれき -->
+  <section id="scr-help" class="screen sheet" data-screen="help" hidden>
+    <div class="sheet-head"><h2>ヘルプ</h2><span class="help-sub">こまったら ここを みてね</span></div>
+    <div class="help-wrap">
+      <nav id="help-nav" class="list" role="tablist" aria-label="ヘルプの みだし"></nav>
+      <div id="help-body" class="list" role="tabpanel"></div>
+    </div>
+  </section>
+
+  <section id="scr-changelog" class="screen sheet" data-screen="changelog" hidden>
+    <div class="sheet-head"><h2>こうしん りれき</h2><span class="help-sub">あたらしく なった ところ</span></div>
+    <div id="log-list" class="list"></div>
+  </section>
+
+  <!-- v0.5 ゲーム係：ミニゲーム・かりすいそう・プレイヤー（js/ui/minigame.js・box.js・player.js） -->
+  <section id="scr-minigame" class="screen sheet" data-screen="minigame" hidden>
+    <div class="sheet-head"><h2>ミニゲーム</h2></div>
+    <div id="mg-body" class="mg-menu"></div>
+  </section>
+
+  <section id="scr-box" class="screen sheet" data-screen="box" hidden>
+    <div class="sheet-head"><h2>かりすいそう</h2><div id="box-count" class="rate"></div><div id="box-tabs" class="tabs"></div></div>
+    <div id="box-list" class="grid"></div>
+  </section>
+
+  <section id="scr-player" class="screen sheet" data-screen="player" hidden>
+    <div class="sheet-head"><h2>プレイヤー</h2><span class="pl-sub-head">きみの おせわ きろく</span></div>
+    <div id="player-body" class="list"></div>
+  </section>
+
   <!-- チュートリアルの ふきだし -->
   <div id="guide" hidden><div class="guide-face">🐟</div><div class="guide-text"></div><button class="guide-ok pill" hidden>OK</button></div>
   <div id="guide-arrow" hidden>👇</div>

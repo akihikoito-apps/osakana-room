@@ -545,6 +545,10 @@ function renderCard() {
       ? el('div', { class: 'c-row' }, el('span', { class: 'c-lb', text: 'そだち' }), el('div', { class: 'c-grow' }, el('i', { style: { width: Math.max(4, gr * 100) + '%' } })))
       : null,
     el('div', { class: 'c-msg', text: cardMessage(f, sp) }),
+    // v0.5 かりすいそうへ（チュートリアルの あと）
+    G.toBoxAsk && G.state.tutorial.done && !tutorialOn()
+      ? el('button', { class: 'btn soft c-tobox', text: '📦 かりすいそうへ', onclick: async () => { clearTimeout(cardTimer); if (await G.toBoxAsk(f.uid)) { selected = null; renderCard(); } else armCardClose(); } })
+      : null,
   );
   card.hidden = false;
 }

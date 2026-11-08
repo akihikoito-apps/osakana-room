@@ -1,13 +1,13 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
   './', 'index.html', 'manifest.json', 'css/style.css', 'css/help.css', 'css/play.css',
   'icon-180.png', 'icon-192.png', 'icon-512.png', 'stay-awake.mp4',
   'js/main.js', 'js/state.js', 'js/sim.js', 'js/version.js', 'js/bgm.js',
-  'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js', 'js/ui/awake.js', 'js/ui/bgm-ui.js',
+  'js/ui/common.js', 'js/ui/room.js', 'js/ui/tank.js', 'js/ui/shop.js', 'js/ui/dex.js', 'js/ui/missions.js', 'js/ui/photo.js', 'js/ui/tutorial.js', 'js/ui/awake.js', 'js/ui/bgm-ui.js', 'js/ui/minigame.js', 'js/ui/box.js', 'js/ui/player.js', 'js/ui/help.js', 'js/ui/changelog.js', 'js/data/help.js', 'js/data/changelog.js', 'assets/ui/help_bg.jpg',
   'js/data/fish.js', 'js/data/items.js', 'js/data/compat.js', 'js/data/balance.js', 'js/data/missions.js', 'js/data/hints.js', 'js/data/tutorial.js',
   'js/aquarium/index.js', 'js/aquarium/tank.js', 'js/aquarium/swim.js', 'js/aquarium/fishModel.js', 'js/aquarium/fx.js', 'js/aquarium/fallbackArt.js', 'js/aquarium/speciesDefaults.js', 'js/aquarium/clean.js',
   'vendor/three.module.min.js',
@@ -24,6 +24,7 @@ const FILES = [
   'assets/fish/banggai_cardinal.png', 'assets/fish/royal_gramma.png', 'assets/fish/vagabond_butterfly.png', 'assets/fish/flame_angel.png', 'assets/fish/boxfish.png',
   'assets/fish/moorish_idol.png', 'assets/fish/peppermint_shrimp.png', 'assets/fish/white_socks.png', 'assets/fish/magaki.png',
   'assets/items/seaweed.png', 'assets/items/anemone.png', 'assets/items/shell.png', 'assets/items/coral_stone.png', 'assets/items/color_stone.png', 'assets/items/pot.png',
+  'assets/items/ukikusa.png', 'assets/items/sponge_filter.png', 'assets/items/coral_tree.png', 'assets/items/filter_tower.png',
   'assets/items/air_pump.png', 'assets/items/auto_feeder.png', 'assets/items/bgm.png', 'assets/items/co2_kit.png', 'assets/items/coral.png',
   'assets/items/dirt_bits.png', 'assets/items/driftwood.png', 'assets/items/fan.png', 'assets/items/filter.png', 'assets/items/food_flake.png',
   'assets/items/food_sinking.png', 'assets/items/food_vitamin.png', 'assets/items/food_vitamin_set.png', 'assets/items/heart.png', 'assets/items/heater.png', 'assets/items/light.png',

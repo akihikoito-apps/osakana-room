@@ -143,12 +143,12 @@ export const GROW = {
 // ---------------- コイン ----------------
 export const COIN = {
   care: {
-    feed:        { coin: 6,  perDay: 4 },  // その えさやりで、おなか < 80 の魚が 1ぴき以上 たべた
-    waterChange: { coin: 10, perDay: 3, cleanBelow: 85 },  // みずかえ前の きれいさ < 85
+    feed:        { coin: 12, perDay: 4 },  // v0.5 で 6→12。その えさやりで、おなか < 80 の魚が 1ぴき以上 たべた
+    waterChange: { coin: 20, perDay: 3, cleanBelow: 85 },  // v0.5 で 10→20。みずかえ前の きれいさ < 85
     // そうじ は コイン なし（わざと よごす ことで かせげないように）
   },
   pet: { chance: 0.3, coin: 6, perDay: 8 },   // v0.4：なでて ハートが 出たとき 30% で +6（v0.5 で 3→6 に 2ばい）（ハートの まち時間が あるので れんだ では ふえない。1日 8かい まで）
-  careDailyCap: 50,              // お世話で もらえるのは 1日 50 まで（つぎの日 6:00 に もどる）
+  careDailyCap: 100,             // お世話で もらえるのは 1日 100 まで（v0.5 で コインと いっしょに 50→100）（つぎの日 6:00 に もどる）
   thanks: {
     chancePerHour: 0.15,         // 条件を みたす魚 1ぴきごと、1じかんに 15%（v0.4 で 10%→15%）
     need: { health: 70, mood: 70, onaka: 40 },
@@ -221,7 +221,7 @@ export const TANKS = {
 // お世話の 回数の 上限（COIN.care の perDay）は すいそう ごと。
 // 1日の お世話コインの 合計上限は すいそうが ふえると すこし ふえる。
 export const MULTI_TANK = {
-  careDailyCapPerExtraTank: 25,  // 生きものが いる すいそうが 2つめ いこう 1つ ふえるごとに +25（6つで 50+125=175）。からの すいそうは 数えない
+  careDailyCapPerExtraTank: 50,  // 生きものが いる すいそうが 2つめ いこう 1つ ふえるごとに +50（6つで 100+250=350。v0.5 で 2ばい）。からの すいそうは 数えない
   thanksAllTanksBase: 4,         // ありがとう は すいそう ごとに 1日4かい（COIN.thanks.perTankPerDay）、
   thanksAllTanksPerExtra: 3,     // ぜんぶで 1日「4 + 3 ×（生きものが いる すいそう − 1）」かい まで（6つで 19）
   emptyTankNoCareCoin: true,     // 生きものが いない すいそうの みずかえ・えさ は コイン なし

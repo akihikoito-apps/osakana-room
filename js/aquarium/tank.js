@@ -472,6 +472,7 @@ export class Tank {
     const used = {};
     const restFrom = [];
     const rockFrom = [], coralFrom = [], woodFrom = [];
+    const extra = { rest: [], coral: [], cling: [] };   // v0.5：せの たかい 飾りが もつ、まんなかの たかさの 点
     const builders = {
       stone: (i) => this.makeStones(i === 0 ? -0.24 * W : 0.12 * W, -1.2 - i * 0.6, 21 + i),
       rock: (i) => this.makeStones(0.1 * W, -1.5, 31 + i),
@@ -486,6 +487,11 @@ export class Tank {
       coral_stone: (i) => this.makeCoralStone([-0.4, 0.23][i % 2] * W, [-1.8, -1.25][i % 2], i),
       color_stone: (i) => this.makeColorStones([-0.35, 0.07][i % 2] * W, [-0.95, -0.85][i % 2], i),
       pot: () => this.makePot(0.33 * W, -1.05),
+      // v0.5：せの たかい 飾り・器具（奥か はしに おいて、さかなを かくしすぎない）
+      ukikusa: (i) => this.makeUkikusa([-0.2, 0.12][i % 2] * W, [-2.2, -1.7][i % 2], i),
+      sponge_filter: () => this.makeSpongeFilter(-0.27 * W, -2.95),
+      coral_tree: (i) => this.makeCoralTree(-0.09 * W, -3.0, i),
+      filter_tower: () => this.makeFilterTower(0.19 * W, -3.0),
       air_pump: () => this.makeAirStone(0.27 * W, -2.5),
       air: () => this.makeAirStone(0.27 * W, -2.5),
       heater: () => this.makeHeater(-0.44 * W, -D / 2 + 0.35),
@@ -507,6 +513,8 @@ export class Tank {
         if (id === 'coral' || id === 'liverock' || id === 'anemone') coralFrom.push(obj);
         if (id === 'anemone') coralFrom.push(obj);   // イソギンチャクは 2回 入れて、クマノミが よく よる ように
         if (id === 'driftwood') woodFrom.push(obj);
+        const sp = obj.userData.spots;
+        if (sp) for (const k of ['rest', 'coral', 'cling']) if (sp[k]) extra[k].push(...sp[k]);
       }
     }
     // 休む場所（石・水草・流木の手前、底から少し上）
@@ -518,6 +526,7 @@ export class Tank {
       const sand = this.sandHeight(cx, z);
       spots.push({ x: cx, z, y: sand + clamp((bx.max.y - sand) * 0.5, 0.9, 2.2) });
     }
+    spots.push(...extra.rest);
     if (!spots.length) for (const fx of [-0.3, 0.3]) spots.push({ x: fx * W, z: -0.5, y: this.sandHeight(fx * W, -0.5) + 1.3 });
     this.bounds.restSpots = spots;
     // 石の上の高さ（貝が上を這う）
@@ -530,12 +539,14 @@ export class Tank {
     this.bounds.rocks = this.rocks;
     // サンゴ・ライブロックのそば（クマノミがいる場所）
     this.bounds.coralSpots = coralFrom.map((o) => { const bx = new THREE.Box3().setFromObject(o); return { x: (bx.min.x + bx.max.x) / 2, y: bx.max.y, z: Math.min(bx.max.z + 0.3, this.bounds.maxZ - 0.3) }; });
+    this.bounds.coralSpots.push(...extra.coral);
     // はりつく場所（奥のガラス・流木の手前・石の上）
     const cs = [];
     const gz = this.bounds.glassZ;
     for (let i = 0; i < 6; i++) { const x = (-0.38 + i * 0.15) * W; cs.push({ x, y: this.sandHeight(x, gz) + 0.9 + (i % 3) * 1.1, z: gz, glass: true }); }
     for (const o of woodFrom) { const bx = new THREE.Box3().setFromObject(o); for (const f of [0.3, 0.6]) cs.push({ x: bx.min.x + (bx.max.x - bx.min.x) * f, y: bx.min.y + (bx.max.y - bx.min.y) * 0.35, z: Math.min(bx.max.z, this.bounds.maxZ - 0.3) }); }
     for (const r of this.rocks) if (r.top - r.base > 0.4) cs.push({ x: r.x, y: r.top + 0.12, z: r.z + r.rz * 0.4 });
+    cs.push(...extra.cling);
     this.bounds.clingSpots = cs;
     // setWater で bubbles: true なのに エアポンプが無いときは、エアストーンを自動で置く
     this.autoStone = null;
@@ -979,6 +990,220 @@ export class Tank {
     return grp;
   }
 
+  // ---------------- v0.5 の せの たかい 飾り・器具（インテリア係）----------------
+  /** 管・球などを 1つの ゆれる メッシュに まとめる。parts = [{ g, phase, h(頂点→ゆれの つよさ), col(頂点→色) }] */
+  mergeSway(parts, sway) {
+    const pos = [], nor = [], col = [], ph = [], hs = [];
+    for (const { g, phase, h, col: cf } of parts) {
+      const ng = g.index ? g.toNonIndexed() : g;
+      const p = ng.attributes.position, q = ng.attributes.normal;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const c = cf(x, y, z);
+        pos.push(x, y, z); nor.push(q.getX(i), q.getY(i), q.getZ(i)); col.push(c.r, c.g, c.b);
+        ph.push(phase); hs.push(h(x, y, z));
+      }
+      g.dispose(); if (ng !== g) ng.dispose();
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('aPh', new THREE.Float32BufferAttribute(ph, 1));
+    g.setAttribute('aH', new THREE.Float32BufferAttribute(hs, 1));
+    return new THREE.Mesh(g, this.swayMaterial(sway));
+  }
+
+  /** うきくさ（川）：すいめんに うかぶ まるい はっぱ＋まんなか（y≈4）まで たれる ねっこ。ねっこは まばらで、さかなが すりぬけても めだたない。 */
+  makeUkikusa(x, z, n = 0) {
+    const grp = new THREE.Group();
+    const R = rng(1201 + n * 17);
+    const top = WATER_TOP - 0.06;
+    // はっぱ（つぶした 円ばん。うらも 見える ように 両面）
+    const leafMat = new THREE.MeshLambertMaterial({ color: '#86cc4f', emissive: '#3f7a1f', emissiveIntensity: 0.55, side: THREE.DoubleSide });
+    const leaves = [];
+    const L = 9;
+    for (let k = 0; k < L; k++) {
+      const a = (k / L) * Math.PI * 2 + R() * 0.5, rr = k === 0 ? 0 : 0.5 + R() * 0.55;
+      const r = 0.32 + R() * 0.16;
+      const g = new THREE.CylinderGeometry(r, r * 0.92, 0.05, 18);
+      const m = new THREE.Mesh(g, leafMat);
+      m.position.set(x + Math.cos(a) * rr, top - R() * 0.04, z + Math.sin(a) * rr * 0.7);
+      m.rotation.set((R() - 0.5) * 0.35, 0, (R() - 0.5) * 0.35);   // すこし かたむけて、下からも はっぱの かたちが 見える
+      leaves.push(m);
+    }
+    grp.add(mergeMeshes(leaves, leafMat));
+    // ねっこ（白っぽい ほそい 管。下ほど よく ゆれる）
+    const cTop = new THREE.Color('#f7f5ea'), cEnd = new THREE.Color('#dbe6c4');
+    const parts = [];
+    const N = 6;
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * Math.PI * 2 + R() * 0.6, rr = 0.15 + R() * 0.55;
+      const len = 2.8 + R() * 1.8;
+      const x0 = x + Math.cos(a) * rr, z0 = z + Math.sin(a) * rr * 0.6;
+      const pts = [];
+      for (let s = 0; s <= 5; s++) { const t = s / 5; pts.push(new THREE.Vector3(x0 + Math.sin(t * 3.2 + k * 1.7) * 0.28 * t, top - t * len, z0 + Math.cos(t * 2.6 + k) * 0.18 * t)); }
+      const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 14, 0.028, 5, false);
+      parts.push({ g, phase: R() * 6, h: (px, py) => clamp((top - py) / 2.2, 0, 2.2), col: (px, py) => cTop.clone().lerp(cEnd, clamp((top - py) / len, 0, 1)) });
+    }
+    const roots = this.mergeSway(parts, 0.8);
+    roots.material.transparent = true; roots.material.opacity = 0.8;
+    roots.position.set(0, 0, 0);
+    grp.add(roots);
+    // 休む場所：ねっこの 手前（はっぱの 下の まんなかの たかさ）
+    grp.userData.spots = { rest: [{ x, y: top - 3.0, z: Math.min(z + 0.9, this.bounds.maxZ - 0.3) }] };
+    return grp;
+  }
+
+  /** スポンジフィルター（川）：まるい 台に スポンジ 2だん、てっぺんから 透明な 管が y≈6.6 まで。管の 中を あわが のぼる。 */
+  makeSpongeFilter(x, z) {
+    const grp = new THREE.Group();
+    const base = this.sandHeight(x, z);
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.68, 0.22, 24), new THREE.MeshLambertMaterial({ color: '#f1f4f2' }));
+    foot.position.set(x, base + 0.08, z);
+    grp.add(foot);
+    const spongeMat = new THREE.MeshLambertMaterial({ color: '#c8df3a' });
+    let y = base + 0.19;
+    for (let k = 0; k < 1; k++) {
+      const h = 2.6;
+      const g = new THREE.CylinderGeometry(0.58, 0.58, h, 32, 24);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {   // ふとい よこみぞ 2本・かどを まるく（あなは あけない）
+        const t = (p.getY(i) + h / 2) / h;
+        let f = 1 - 0.09 * (Math.exp(-(((t - 0.33) / 0.035) ** 2)) + Math.exp(-(((t - 0.67) / 0.035) ** 2)));
+        f *= 1 - 0.1 * (Math.max(0, Math.abs(t - 0.5) - 0.45) / 0.05) ** 2;
+        p.setX(i, p.getX(i) * f); p.setZ(i, p.getZ(i) * f);
+      }
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, spongeMat);
+      m.position.set(x, y + h / 2, z);
+      grp.add(m);
+      y += h + 0.04;
+    }
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.16, 18), new THREE.MeshLambertMaterial({ color: '#f1f4f2' }));
+    cap.position.set(x, y + 0.04, z);
+    grp.add(cap);
+    // 透明な 管（のぼり管）＋さきの まがり
+    const tubeTop = 6.6;
+    const tubeMat = new THREE.MeshLambertMaterial({ color: '#e8f6ff', transparent: true, opacity: 0.4, depthWrite: false });
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, tubeTop - y, 12, 1, true), tubeMat);
+    tube.position.set(x, (tubeTop + y) / 2, z);
+    const bend = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.11, 8, 12, Math.PI / 2), tubeMat);
+    bend.position.set(x + 0.22, tubeTop, z); bend.rotation.z = Math.PI / 2;
+    grp.add(tube, bend);
+    // あわ（ブクブクの スイッチと かんけいなく いつも でる。管の 中を のぼって 先から でる）
+    this.emitters.push({ kind: 'sponge', x, y: y + 0.15, z, rate: 6, spread: 0.06, size: [0.1, 0.17], acc: 0, tube: true, tubeR: 0.05, tubeTop: tubeTop });
+    // 休む場所：スポンジの 横に はりつく／管の 横で 休む
+    grp.userData.spots = {
+      cling: [{ x: x + 0.05, y: base + 1.0, z: z + 0.6 }, { x: x - 0.1, y: base + 2.2, z: z + 0.6 }],
+      rest: [{ x: x + 0.9, y: 4.0, z: Math.min(z + 0.9, this.bounds.maxZ - 0.3) }],
+    };
+    return grp;
+  }
+
+  /** サンゴツリー（海）：小さな 岩から 幹が y≈5.8 まで のびて、先の まるい ふとい えだが 木のように ひろがる。えだの あいだは ひろく あける。ゆっくり ゆれる。 */
+  makeCoralTree(x, z, n = 0) {
+    const grp = new THREE.Group();
+    const R = rng(1301 + n * 7);
+    const base = this.sandHeight(x, z);
+    const rock = new THREE.Mesh(this.rockGeometry(1310 + n, 0.65, 0.55), new THREE.MeshLambertMaterial({ color: '#b79b86', flatShading: true }));
+    rock.position.set(x, base + 0.05, z);
+    grp.add(rock);
+    const cTrunk = new THREE.Color('#ef5a4a'), cTip = new THREE.Color('#ffb27a');
+    const yTop = 5.8;
+    const parts = [];
+    const tint = (py) => cTrunk.clone().lerp(cTip, clamp((py - base) / (yTop - base), 0, 1) ** 1.6);
+    const sway = (px, py) => clamp((py - base - 1) / 2.4, 0, 2);
+    const tube = (pts, r0, r1, phase, cap = true) => {
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const TS = 12, RS = 12;
+      const g = new THREE.TubeGeometry(curve, TS, 1, RS, false);
+      const p = g.attributes.position;
+      for (let i = 0; i <= TS; i++) {
+        const c = curve.getPointAt(i / TS), r = r0 + (r1 - r0) * (i / TS);
+        for (let j = 0; j <= RS; j++) { const k = i * (RS + 1) + j; p.setXYZ(k, c.x + (p.getX(k) - c.x) * r, c.y + (p.getY(k) - c.y) * r, c.z + (p.getZ(k) - c.z) * r); }
+      }
+      g.computeVertexNormals();
+      parts.push({ g, phase, h: sway, col: (px, py) => tint(py) });
+      if (!cap) return;
+      const tip = new THREE.SphereGeometry(r1, 14, 10);   // 先は 管と おなじ ふとさで まるく とじる（こぶに しない）
+      const e = pts[pts.length - 1]; tip.translate(e.x, e.y, e.z);
+      parts.push({ g: tip, phase, h: sway, col: (px, py) => tint(py) });
+    };
+    const V = (a, b, c) => new THREE.Vector3(a, b, c);
+    // 幹（ふとく みじかい）
+    const t0 = V(x, base + 0.25, z), t1 = V(x + 0.05, base + 1.1, z), t2 = V(x, base + 1.9, z);
+    tube([t0, t1, t2], 0.42, 0.34, 0, false);
+    // えだ 5本（ふとく、先は まるく。左右に ひろげ、手前・奥へは すこしだけ）
+    const BR = [[-0.95, 2.2, 5.2, 0.1], [-0.4, 1.0, 5.9, -0.15], [0.15, 0.2, 6.2, 0.05], [0.6, 1.1, 5.7, 0.15], [1.0, 2.3, 4.9, -0.1]];
+    BR.forEach(([dir, w, top, dz], i) => {
+      const s0 = V(x + dir * 0.2, t2.y - 0.15, z);
+      const e = V(x + Math.sign(dir || 1) * w * (Math.abs(dir) > 0.3 ? 1 : 0.4) + (dir === 0.15 ? 0 : 0), top + (R() - 0.5) * 0.2, z + dz);
+      if (i === 2) e.x = x + 0.1;
+      const m = V(s0.x + (e.x - s0.x) * 0.35, s0.y + (e.y - s0.y) * 0.55, z + dz * 0.5);
+      const ph = R() * 6;
+      tube([s0, m, e], 0.3, 0.21, ph);
+      if (i !== 2) {   // 小えだ 1本（外がわへ）
+        const s2 = s0.clone().lerp(e, 0.5);
+        const sd = Math.sign(dir);
+        const e2 = s2.clone().add(V(sd * 0.95, 0.85 + R() * 0.3, (R() - 0.5) * 0.3));
+        tube([s2, s2.clone().lerp(e2, 0.5).add(V(0, 0.08, 0)), e2], 0.22, 0.17, ph + 0.4);
+      }
+    });
+    grp.add(this.mergeSway(parts, 0.45));
+    // 休む場所：えだの 手前・よこの 空いた ところ（クマノミの なかまが あつまる）
+    grp.userData.spots = { coral: [{ x: x - 1.3, y: 4.6, z: Math.min(z + 1.2, this.bounds.maxZ - 0.3) }, { x: x + 1.3, y: 4.9, z: Math.min(z + 1.2, this.bounds.maxZ - 0.3) }] };
+    return grp;
+  }
+
+  /** ろかタワー（海）：とうめいな つつ（y≈6 まで）の 中に 大きな まるい ろ材が 5こ。上の 出口から あわ。 */
+  makeFilterTower(x, z) {
+    const grp = new THREE.Group();
+    const base = this.sandHeight(x, z);
+    const H = 5.6, r = 0.55;
+    const footMat = new THREE.MeshLambertMaterial({ color: '#8fd0e8' });
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.12, r + 0.18, 0.32, 28), footMat);
+    foot.position.set(x, base + 0.12, z);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(r, r, H, 28, 1, true), new THREE.MeshLambertMaterial({ color: '#e6f7ff', transparent: true, opacity: 0.36, side: THREE.DoubleSide, depthWrite: false }));
+    glass.position.set(x, base + 0.28 + H / 2, z); glass.renderOrder = 2;
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.08, r + 0.08, 0.28, 28), new THREE.MeshLambertMaterial({ color: '#f4f6f6' }));
+    lid.position.set(x, base + 0.28 + H + 0.1, z);
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.45, 12), new THREE.MeshLambertMaterial({ color: '#f4f6f6' }));
+    spout.rotation.z = Math.PI / 2; spout.position.set(x + r + 0.15, base + 0.28 + H - 0.05, z);
+    grp.add(foot, glass, lid, spout);
+    // ろ材：パステルの ひらたい 円ばん（アイコンと おなじ）。小さな 穴は あけない
+    const cols = ['#f3b6c4', '#f6e7c4', '#c9b3e3', '#f6e7c4', '#f3b6c4', '#c9b3e3'];
+    const nDisc = 6, dh = (H - 0.5) / nDisc;
+    for (let k = 0; k < nDisc; k++) {
+      const g = new THREE.CylinderGeometry(r - 0.08, r - 0.08, dh * 0.86, 28, 4);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) {   // ふちを まるく（まんじゅう がた）
+        const t = Math.abs(p.getY(i)) / (dh * 0.43);
+        const f = 1 - 0.18 * Math.max(0, t - 0.55) ** 2 / 0.2;
+        p.setX(i, p.getX(i) * f); p.setZ(i, p.getZ(i) * f);
+      }
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: cols[k] }));
+      m.position.set(x, base + 0.35 + dh * (k + 0.5), z);
+      m.userData.noGround = true;
+      grp.add(m);
+    }
+    // 筒の ふち（上と下の わ）
+    for (const yy of [base + 0.3, base + 0.28 + H - 0.05]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r + 0.01, 0.05, 8, 32), new THREE.MeshLambertMaterial({ color: '#dff4ff' }));
+      ring.rotation.x = Math.PI / 2; ring.position.set(x, yy, z); ring.userData.noGround = true;
+      grp.add(ring);
+    }
+    // あわ：つつの 中を のぼって、上の 出口の よこへ
+    this.emitters.push({ kind: 'tower', x, y: base + 0.4, z, rate: 10, spread: 0.3, size: [0.06, 0.11], acc: 0, tube: true, tubeR: 0.32, maxY: base + H });
+    this.emitters.push({ kind: 'tower', x: x + r + 0.4, y: base + 0.28 + H - 0.05, z, rate: 3, spread: 0.1, size: [0.1, 0.18], acc: 0 });
+    grp.userData.spots = {
+      cling: [{ x, y: base + 2.6, z: z + r + 0.05 }],
+      rest: [{ x: x - 1.0, y: 4.0, z: Math.min(z + 0.9, this.bounds.maxZ - 0.3) }],
+    };
+    return grp;
+  }
+
   makeDriftwood(x, z) {
     const grp = new THREE.Group();
     const mat = new THREE.MeshLambertMaterial({ color: '#6e4b2e', flatShading: true });
@@ -1345,7 +1570,7 @@ export class Tank {
         bb.vy = 1.4 + bb.s * 4 + Math.random() * 0.6; bb.ph = Math.random() * 6; bb.kind = e.kind;
         if (e.kind === 'filter') { bb.vx = -0.8 - Math.random() * 0.6; bb.vy = 0.1; } else bb.vx = 0;
         if (e.kind === 'co2') bb.vy = 0.8 + Math.random() * 0.3;
-        bb.maxY = e.maxY ?? WATER_TOP - 0.05; bb.cx = e.x; bb.inTube = e.kind === 'skimmer';
+        bb.maxY = e.maxY ?? WATER_TOP - 0.05; bb.cx = e.x; bb.inTube = e.kind === 'skimmer' || !!e.tube; bb.tubeR = e.tubeR ?? 0.25; bb.tubeTop = e.tubeTop ?? Infinity;
       }
     }
     const bp = this.bubblePoints.geometry.attributes;
@@ -1356,7 +1581,7 @@ export class Tank {
         bb.y += bb.vy * dt;
         bb.x += (Math.sin(bb.ph) * 0.25 + (bb.vx || 0)) * dt;
         if (bb.kind === 'filter') { bb.vx *= 1 - dt * 0.8; bb.vy += dt * 0.6; }
-        if (bb.inTube) bb.x = bb.cx + clamp(bb.x - bb.cx, -0.25, 0.25);
+        if (bb.inTube && bb.y < bb.tubeTop) bb.x = bb.cx + clamp(bb.x - bb.cx, -bb.tubeR, bb.tubeR);
         if (bb.y > bb.maxY || bb.x < this.bounds.minX) bb.alive = false;
       }
       bp.position.setXYZ(i, bb.x, bb.y, bb.z);

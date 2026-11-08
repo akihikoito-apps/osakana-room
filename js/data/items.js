@@ -138,6 +138,32 @@ export const ITEMS = [
     desc: 'よこに ねかせた やきものの つぼ。なかに かくれられる ひみつの おうち だよ。',
   },
 
+  // ---- v0.5：せの たかい 飾り・器具（さかなが およぐ たかさ まで とどく）。かわ 2・うみ 2。Codex と agy に そうだんして きめた ----
+  {
+    id: 'ukikusa', name: 'うきくさ', type: 'decor', price: 120, water: 'fresh', inTank: true, max: 2, tag: 'plant',
+    effect: { airPerHour: 0.5, cleanPerHour: 0.3 }, // 1こ あたり。すいめんに うかび、ねっこが まんなか まで たれる。ねっこが よごれを すう
+    icon: 'assets/items/ukikusa.png',
+    desc: 'みずに うかぶ まるい はっぱの くさ。ながい ねっこが たれて、さかなの かくれがに なるよ。',
+  },
+  {
+    id: 'sponge_filter', name: 'スポンジフィルター', type: 'decor', price: 180, water: 'fresh', inTank: true, max: 1, tag: 'stone', unlock: 'tank6',
+    effect: { airPerHour: 1.0, cleanPerHour: 0.4 }, // あわで みずを すいあげて、スポンジで こす（ブクブクより よわく、フィルターと ちがって よごれる はやさは かえない）
+    icon: 'assets/items/sponge_filter.png',
+    desc: 'せの たかい スポンジの フィルター。あわが ぽこぽこ のぼって、みずを きれいに するよ。エビや ちいさい さかなに やさしい。',
+  },
+  {
+    id: 'coral_tree', name: 'サンゴツリー', type: 'decor', price: 180, water: 'salt', inTank: true, max: 1, tag: 'coral', unlock: 'tank6',
+    effect: { airPerHour: 0.3, cleanPerHour: 0.2 }, // サンゴと おなじ くらい。せが たかく、まんなかの たかさに えだが ひろがる
+    icon: 'assets/items/coral_tree.png',
+    desc: 'きのように えだを のばす やわらかい サンゴ。さかなが えだの まわりに あつまるよ。',
+  },
+  {
+    id: 'filter_tower', name: 'ろかタワー', type: 'decor', price: 220, water: 'salt', inTank: true, max: 1, tag: 'liverock', unlock: 'tank6',
+    effect: { cleanPerHour: 0.6, airPerHour: 0.4 }, // とうめいな つつの なかの いしで みずを きれいに する（ライブロック 2こ ぶん くらい）
+    icon: 'assets/items/filter_tower.png',
+    desc: 'とうめいな つつに いしが はいった せの たかい タワー。うみの みずを きれいに して、あわも でるよ。',
+  },
+
   // ---- v0.3：ビタミン剤（へっていく えさ）----
   {
     id: 'food_vitamin', name: 'ビタミン', type: 'food', price: 100, water: 'both', inTank: false, max: 1,
