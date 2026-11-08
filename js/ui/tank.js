@@ -466,6 +466,7 @@ function onTapFish(uid) {
   if (r.ok && r.react) {
     aq.react(uid, r.react);
     if (r.heart) { flyHeart(uid); plusOne(uid); }
+    if (r.coin) { toast(`+${r.coin} コイン  なでて もらって うれしいな`, 'gold'); bumpCoins(); G.refreshHud(); }
     if (r.justFull || (r.dayFull && !heartDoneShown)) { heartDoneShown = true; toast(G.sim.balance().HEART?.doneLine || 'また あしたね'); }
     else if (r.weak && !r.heart) toast(G.sim.balance().HEART?.restLine || 'いまは やすんでいるよ');
     G.emit('action', { type: 'pet', uid });

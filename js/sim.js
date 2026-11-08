@@ -19,7 +19,7 @@ const FALLBACK = {
   START: { coins: 200, roomTemp: 20, waterTemp: 20, clean: 100, air: 70, leftover: 0, fish: { onaka: 60, health: 80, mood: 60, natsuki: 0 } },
   TANK: { capacity: 6, fishMax: 6, snailMax: 2 },
   TEMP: { towardRoomPerHour: 0.5, bestRange: 2, farOut: 3 },
-  CLEAN: { basePerHour: -0.3, perSpacePerHour: -0.4, perLeftoverPerHour: -1.5, leftoverMax: 5, wastePerSpacePerHour: 0.04, wasteMax: 9, perWastePerHour: -0.1, cleanerIds: [], cleanerLeftoverPerHour: 0.125, scoopClean: 0 },
+  CLEAN: { basePerHour: -0.3, perSpacePerHour: -0.4, perLeftoverPerHour: -1.5, leftoverMax: 5, wastePerSpacePerHour: 0.025, wasteMax: 9, perWastePerHour: -0.1, cleanerIds: [], cleanerLeftoverPerHour: 0.125, scoopClean: 0 },
   AIR: { naturalPerHour: 0.6, naturalCap: 60, perSpacePerHour: -0.5 },
   HUNGER: { perHour: -3.5, full: 90, rewardBelow: 80, leftoverIfHalfFull: 0.5, feedLockRealSec: 5 },
   HEALTH: { min: 10, max: 100, weak: 40, good: 70, bad: { tempOut: -2, tempFarOut: -3, dirty: -1.5, veryDirty: -3, airLow: -2, airVeryLow: -3, starving: -1.5, nigate: 0 }, badCapPerHour: -3, recoverPerHour: 4, recoverBestPerHour: 6, best: { clean: 70, air: 50, onaka: 30 } },
@@ -27,7 +27,7 @@ const FALLBACK = {
   BOND: { feed: 2, feedPerDay: 5, pet: 1, petPerDay: 5, petCooldownRealSec: 30, waterChange: 1, waterChangePerDay: 2, heartStep: 20 },
   NAKAYOSHI: { value: { 0: 20, 1: 60, 2: 100 }, alone: 50, aloneSchool: 40 },
   GROW: { goodHour: { onaka: 20, health: 60, tempInRange: true }, feedBonusHours: 2, feedBonusPerDay: 4, hoursPerGrowDay: 20 },
-  COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, thanks: { chancePerHour: 0.1, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
+  COIN: { care: { feed: { coin: 6, perDay: 4 }, waterChange: { coin: 10, perDay: 3, cleanBelow: 85 } }, careDailyCap: 50, pet: { chance: 0.3, coin: 3, perDay: 8 }, thanks: { chancePerHour: 0.15, need: { health: 70, mood: 70, onaka: 40 }, coinBase: 8, coinPerRarity: 2, perFishPerDay: 1, perTankPerDay: 4, minGapHours: 2, guaranteeHours: 12 }, max: 99999 },
   UNLOCK: { tank6: { tankIndex: 0, count: 6, banner: ['うみの すいそうが かえるように なったよ！'], lockedLine: '1つめの すいそうに 6ぴき いると あえるよ' } },
   TANKS: { max: 6, newTank: { temp: 25, clean: 100, air: 70, leftover: 0 } },
   MULTI_TANK: { careDailyCapPerExtraTank: 25, thanksAllTanksBase: 4, thanksAllTanksPerExtra: 3, emptyTankNoCareCoin: true },
@@ -336,7 +336,7 @@ function flowTank(state, t, h, events) {
   let dLeft = 0;
   for (const id of t.decor) {
     const e = items[id]?.effect || {};
-    const k = id === 'plant' || id === 'coral' ? L : 1;      // ライトで 1.5ばい（みずくさ・サンゴ）
+    const k = ['plant', 'coral', 'seaweed', 'anemone'].includes(id) ? L : 1;      // ライトで 1.5ばい（みずくさ・サンゴ・うみくさ・イソギンチャク）
     if (e.cleanPerHour) dClean += e.cleanPerHour * k;
     if (e.airPerHour) dAir += e.airPerHour * k * (id === 'plant' ? C : 1);   // シーオーツーは くうき だけ
     if (e.leftoverPerHour) dLeft -= e.leftoverPerHour;
@@ -612,7 +612,7 @@ export function scoop(state, t = state.tanks[0]) {
 const lastPet = new Map();     // uid → 実時間（ms）。セーブには入れない
 const lastPetBond = new Map();
 /** なでる。{ ok, react: 'happy'|'heart'|'spin'|'sleepy'|null, bond } */
-export function pet(state, uid, now = Date.now(), t = state.tanks[0]) {
+export function pet(state, uid, now = Date.now(), t = state.tanks[0], rnd = Math.random) {
   const f = t.fish.find((x) => x.uid === uid);
   if (!f) return { ok: false };
   if (now - (lastPet.get(uid) ?? -1e12) < B.REACTION.petCooldownRealSec * 1000) return { ok: true, react: null, bond: 0, events: [] };
@@ -636,11 +636,18 @@ export function pet(state, uid, now = Date.now(), t = state.tanks[0]) {
     state.hearts = Math.min(H.max ?? 99999, (state.hearts || 0) + n);
     state.heartsTotal = (state.heartsTotal || 0) + n;
   }
+  // コイン：ハートが 出たときに ときどき（1日 B.COIN.pet.perDay かい まで）
+  let coin = 0;
+  const P = B.COIN.pet;
+  if (heart && P && state.tutorial.done && (state.daily.petCoins || 0) < P.perDay && rnd() < P.chance) {
+    coin = addCoin(state, P.coin);
+    if (coin) state.daily.petCoins = (state.daily.petCoins || 0) + 1;
+  }
   // ハートが 出ない とき（まち時間・きょうの 上限）は ハート以外で よろこぶ（ハートが 出たと まちがえない ように）
   const react = f.health < B.HEALTH.weak ? 'sleepy' : heart ? (H.react || 'heart') : f.natsuki < 80 ? 'happy' : 'spin';
   const dayFull = !heart && (state.daily.hearts || 0) >= (H.perDay ?? 1e9);
   const justFull = heart && (state.daily.hearts || 0) >= (H.perDay ?? 1e9);
-  return { ok: true, react, bond, heart, dayFull, justFull, weak: f.health < (H.need?.health ?? B.HEALTH.weak), events: done(state) };
+  return { ok: true, react, bond, heart, coin, dayFull, justFull, weak: f.health < (H.need?.health ?? B.HEALTH.weak), events: done(state) };
 }
 
 // ---------------- お店 ----------------
@@ -707,7 +714,7 @@ export function canBuyItem(state, id, t = state.tanks[0]) {
   }
   if (it.water !== 'both' && it.water !== t.water) return { ok: false, reason: id === 'co2_kit' ? 'co2Salt' : id === 'skimmer' ? 'skimmerFresh' : 'water' };
   if (it.inTank) { if (countItem(t, id) >= (it.max ?? 1)) return { ok: false, reason: 'max' }; }
-  else if (it.uses) { if ((state.inv[id] || 0) > 0) return { ok: false, reason: 'vitaminFull' }; }    // ビタミン：つかいおわってから
+  else if (it.uses) { if ((state.inv[it.grants || id] || 0) > 0) return { ok: false, reason: 'vitaminFull' }; }    // ビタミン（セットも）：つかいおわってから
   else if (ownsTool(state, id)) return { ok: false, reason: 'have' };
   if (state.coins < priceOf(state, id)) return { ok: false, reason: 'coins' };
   return { ok: true };
@@ -727,7 +734,7 @@ export function buyItem(state, id, t = state.tanks[0]) {
     return { ok: true, item: it, price, tank, fans: [], events: done(state) };
   }
   if (it.inTank) t.decor.push(id);
-  else if (it.uses) state.inv[id] = Math.min(it.uses, (state.inv[id] || 0) + it.uses);   // ビタミン：5かいぶん
+  else if (it.uses) { const g = it.grants || id; state.inv[g] = (state.inv[g] || 0) + it.uses; state.owned[g] = true; }   // ビタミン 5かいぶん／ビタミンセットは food_vitamin を 30かいぶん
   else state.inv[id] = 1;
   state.owned[id] = true;
   inc(state, 'buyItem');

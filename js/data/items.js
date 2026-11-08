@@ -100,6 +100,44 @@ export const ITEMS = [
     desc: 'いろあざやかな サンゴ。うみの さかなが よろこぶよ。',
   },
 
+  // ---- v0.4：インテリアの 飾り（うみでも つかえる 石・くさ など）。ねだん・こうか は Codex と agy に そうだんして きめた ----
+  {
+    id: 'seaweed', name: 'うみくさ', type: 'decor', price: 60, water: 'salt', inTank: true, max: 4, tag: 'seaweed',
+    effect: { airPerHour: 0.8, cleanPerHour: 0.2 }, // 1こ あたり。みずくさ と おなじ（うみの すいそうの みずくさ）。ライトの 1.5ばいは sim.js しだい
+    icon: 'assets/items/seaweed.png',
+    desc: 'うみに はえる ほそながい くさ。ゆらゆら ゆれて、くうきを つくり、みずも すこし きれいに するよ。',
+  },
+  {
+    id: 'anemone', name: 'イソギンチャク', type: 'decor', price: 200, water: 'salt', inTank: true, max: 1, tag: 'anemone', unlock: 'tank6',
+    effect: { airPerHour: 0.3, cleanPerHour: 0.1 }, // サンゴ と おなじ くらい（からだの なかの ちいさな しょくぶつが ひかりで くうきを つくる）
+    icon: 'assets/items/anemone.png',
+    desc: 'しょくしゅが ふわふわ ゆれる うみの いきもの。クマノミの なかまが だいすき だよ。',
+  },
+  {
+    id: 'shell', name: 'かいがら', type: 'decor', price: 40, water: 'both', inTank: true, max: 2, tag: 'shell',
+    effect: {},
+    icon: 'assets/items/shell.png',
+    desc: 'ホタテや まきがいの かいがら。すなの うえに おくと かわいいよ。',
+  },
+  {
+    id: 'coral_stone', name: 'サンゴいし', type: 'decor', price: 50, water: 'salt', inTank: true, max: 2, tag: 'stone',
+    effect: {},
+    icon: 'assets/items/coral_stone.png',
+    desc: 'しろい サンゴの かけらの いし。うみの すいそうに ぴったり。そこの さかなが やすめるよ。',
+  },
+  {
+    id: 'color_stone', name: 'いろいし', type: 'decor', price: 40, water: 'both', inTank: true, max: 2, tag: 'stone',
+    effect: {},
+    icon: 'assets/items/color_stone.png',
+    desc: 'ピンクや みずいろの つやつやの こいし。すいそうが はなやかに なるよ。',
+  },
+  {
+    id: 'pot', name: 'つぼ', type: 'decor', price: 90, water: 'both', inTank: true, max: 1, tag: 'cave',
+    effect: {},
+    icon: 'assets/items/pot.png',
+    desc: 'よこに ねかせた やきものの つぼ。なかに かくれられる ひみつの おうち だよ。',
+  },
+
   // ---- v0.3：ビタミン剤（へっていく えさ）----
   {
     id: 'food_vitamin', name: 'ビタミン', type: 'food', price: 100, water: 'both', inTank: false, max: 1,
@@ -107,6 +145,16 @@ export const ITEMS = [
     effect: { fill: 0 },                        // おなか は ふえない。そだち・けんこう・ごきげん は balance.js VITAMIN（すききらいで かわる）
     icon: 'assets/items/food_vitamin.png',      // 絵はまだ無い（デザイン係へ）
     desc: 'えいようが たっぷりの とくべつな ごはん。そだちと げんきが ぐんと あがるよ。すききらいが あるよ。1つで 5かいぶん。',
+  },
+
+  // ---- v0.4：ビタミンセット（ふつうの 6ばいの かいすうで 5ばいの ねだん）----
+  {
+    id: 'food_vitamin_set', name: 'ビタミンセット', type: 'food', price: 500, water: 'both', inTank: false, max: 1,
+    uses: 30, grants: 'food_vitamin',           // かうと ビタミン（food_vitamin）が 30かいぶん ふえる。つかうのは ふつうの ビタミンと おなじ
+    deal: 'おとく',                              // お店の カードに 「おとく」の しるし
+    effect: { fill: 0 },
+    icon: 'assets/items/food_vitamin_set.png',
+    desc: 'ビタミンが 30かいぶん はいった おとくな セット。ふつうに かうより 100コイン おとく だよ。',
   },
 
   // ---- v0.3：器具 ----

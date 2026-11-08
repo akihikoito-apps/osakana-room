@@ -227,8 +227,10 @@ test('そうじ連打・なでる連打・みずかえ連打では コインが 
   assert.equal(st.stats.scoop, 1);
   // なでる
   let now = 1e10;
-  for (let i = 0; i < 200; i++) sim.pet(st, f.uid, now + i * 100);
+  for (let i = 0; i < 200; i++) sim.pet(st, f.uid, now + i * 100, st.tanks[0], () => 0);   // v0.4：コインは いつも あたりで ためす
   assert.ok(f.natsuki <= B.BOND.pet * B.BOND.petPerDay);
+  assert.ok(st.coins <= (B.COIN.pet?.coin ?? 0), `なでる連打で ${st.coins} コイン`);   // ハートは 1こ だけ → コインも 1かい まで
+  st.coins = 0;
   // みずかえ（きれいな みずでは コインなし）
   t.clean = 100;
   for (let i = 0; i < 20; i++) assert.equal(sim.waterChange(st).coin, 0);

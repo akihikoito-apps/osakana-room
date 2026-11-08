@@ -1,6 +1,6 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
@@ -20,9 +20,13 @@ const FILES = [
   'assets/fish/goldfish.png', 'assets/fish/guppy.png', 'assets/fish/ishimaki.png', 'assets/fish/mandarin.png', 'assets/fish/medaka.png',
   'assets/fish/minami_shrimp.png', 'assets/fish/neon_tetra.png', 'assets/fish/otocinclus.png', 'assets/fish/platy.png', 'assets/fish/ramshorn.png',
   'assets/fish/red_bee_shrimp.png', 'assets/fish/rummy_nose.png', 'assets/fish/shittaka.png', 'assets/fish/skunk_shrimp.png', 'assets/fish/yellow_tang.png',
+  'assets/fish/yamato_shrimp.png', 'assets/fish/kanoko.png', 'assets/fish/green_chromis.png', 'assets/fish/tomato_clown.png', 'assets/fish/pajama_cardinal.png',
+  'assets/fish/banggai_cardinal.png', 'assets/fish/royal_gramma.png', 'assets/fish/vagabond_butterfly.png', 'assets/fish/flame_angel.png', 'assets/fish/boxfish.png',
+  'assets/fish/moorish_idol.png', 'assets/fish/peppermint_shrimp.png', 'assets/fish/white_socks.png', 'assets/fish/magaki.png',
+  'assets/items/seaweed.png', 'assets/items/anemone.png', 'assets/items/shell.png', 'assets/items/coral_stone.png', 'assets/items/color_stone.png', 'assets/items/pot.png',
   'assets/items/air_pump.png', 'assets/items/auto_feeder.png', 'assets/items/bgm.png', 'assets/items/co2_kit.png', 'assets/items/coral.png',
   'assets/items/dirt_bits.png', 'assets/items/driftwood.png', 'assets/items/fan.png', 'assets/items/filter.png', 'assets/items/food_flake.png',
-  'assets/items/food_sinking.png', 'assets/items/food_vitamin.png', 'assets/items/heart.png', 'assets/items/heater.png', 'assets/items/light.png',
+  'assets/items/food_sinking.png', 'assets/items/food_vitamin.png', 'assets/items/food_vitamin_set.png', 'assets/items/heart.png', 'assets/items/heater.png', 'assets/items/light.png',
   'assets/items/liverock.png', 'assets/items/net.png', 'assets/items/plant.png', 'assets/items/skimmer.png', 'assets/items/stone.png',
   'assets/items/tank_fresh.png', 'assets/items/tank_salt.png', 'assets/items/water_change.png',
 ];

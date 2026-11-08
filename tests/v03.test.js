@@ -186,13 +186,13 @@ test('ビタミン：コイン・えさの なつき・ミッション feed・�
   assert.equal(st.stats.vitaminEat, 2); assert.equal(st.stats.vitaminLove, 1);
 });
 
-test('ビタミン：25しゅるい ぜんぶに すききらい（love 12・ok 9・dislike 4）', () => {
+test('ビタミン：39しゅるい ぜんぶに すききらい（love 19・ok 14・dislike 6）', () => {
   const sold = FISH.filter((f) => f.price != null);
-  assert.equal(sold.length, 25);
+  assert.equal(sold.length, 39);
   const cnt = { love: 0, ok: 0, dislike: 0 };
   for (const f of sold) { assert.ok(['love', 'ok', 'dislike'].includes(f.vitamin), `${f.id} vitamin=${f.vitamin}`); cnt[f.vitamin]++; }
-  assert.deepEqual(cnt, { love: 12, ok: 9, dislike: 4 });
-  for (const id of ['ishimaki', 'otocinclus', 'shittaka', 'mandarin']) assert.equal(fishById[id].vitamin, 'dislike', id);
+  assert.deepEqual(cnt, { love: 19, ok: 14, dislike: 6 });
+  for (const id of ['ishimaki', 'otocinclus', 'shittaka', 'mandarin', 'kanoko', 'moorish_idol']) assert.equal(fishById[id].vitamin, 'dislike', id);
   assert.equal(fishById.albino_corydoras.vitamin, 'ok');
 });
 

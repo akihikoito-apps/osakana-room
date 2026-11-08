@@ -12,14 +12,16 @@ const backOut = (t) => { const s = 1.70158; t -= 1; return t * t * ((s + 1) * t 
 
 const LAYERS = { top: [0.66, 1.0], middle: [0.3, 0.72], bottom: [0.0, 0.16], any: [0.05, 0.95] };
 const LATERAL = 0.75;
+const SALT_SCALE = 1.2;
 const SNAIL_GLASS_MAX = 1.6;   // 貝がガラスを上る高さの上限（底の近くだけ。高いと浮いて見える）     // 横向きからこれ以上ずれない（ラジアン）
 
 /** 種と育ち具合から水槽内の全長（ワールド単位）を決める。 */
 export function fishLength(spec, stage) {
   const s = clamp(stage | 0, 0, 2);
-  if (Array.isArray(spec.sizeCm) && spec.sizeCm[s]) return clamp(0.55 + spec.sizeCm[s] * 0.2, 0.8, 3.4);
+  const salt = spec.water === 'salt' && spec.kind === 'fish' ? SALT_SCALE : 1;   // v0.4：うみの さかなは すこし おおきく
+  if (Array.isArray(spec.sizeCm) && spec.sizeCm[s]) return clamp((0.55 + spec.sizeCm[s] * 0.2) * salt, 0.8, 3.4 * salt);
   const base = spec.kind === 'shrimp' ? 1.5 : spec.kind === 'snail' ? 0.95 : ({ goldfish: 2.0, angelfish: 1.55, betta: 1.55, corydoras: 1.4, albino_corydoras: 1.4, blue_tang: 1.9, yellow_tang: 1.7, mandarin: 1.3, otocinclus: 1.1 })[spec.id] || 1.45;
-  return base * [0.62, 0.82, 1.0][s];
+  return base * salt * [0.62, 0.82, 1.0][s];
 }
 
 export class FishAgent {

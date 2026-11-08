@@ -17,6 +17,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const OUT = resolve(arg('--out', join(os.tmpdir(), 'osakana-playtest')));
 const SIZES = arg('--size', '740x390,1024x768').split(',').map((s) => s.split('x').map(Number));
 const HEADED = process.argv.includes('--headed');
+const GPU = process.argv.includes('--gpu');   // ほんものの GPU で 描く（ソフト描画が おそくて とまるとき）
 mkdirSync(OUT, { recursive: true });
 
 // ---------------- playwright-core と ブラウザを さがす ----------------
@@ -308,11 +309,11 @@ async function run(browser, base, W, H) {
 
   // 8. v0.2：解放 → 大きな お知らせ → すいそうを かう → へやの わく → ズーム → ハート → そうじ → すいそうの きりかえ
   if (await p.evaluate(() => typeof G.sim.checkUnlock === 'function')) {
-    try { await v02(); } catch (e) { notes.push('【不具合？】v0.2 の ながれが とちゅうで とまった: ' + e.message.split('\n')[0]); await shot('99_v02_stopped').catch(() => {}); }
+    try { await v02(); } catch (e) { notes.push('【不具合？】v0.2 の ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v02_stopped').catch(() => {}); }
   }
   // 9. v0.3：かい 2ひき まで・ビタミン・おんど ダイヤル・じどう えさやり・おんがく
   if (await p.evaluate(() => typeof G.sim.vitaminStart === 'function')) {
-    try { await v03(); } catch (e) { notes.push('【不具合？】v0.3 の ながれが とちゅうで とまった: ' + e.message.split('\n')[0]); await shot('99_v03_stopped').catch(() => {}); }
+    try { await v03(); } catch (e) { notes.push('【不具合？】v0.3 の ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v03_stopped').catch(() => {}); }
   }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
@@ -614,7 +615,7 @@ const srv = await serve();
 const base = `http://127.0.0.1:${srv.address().port}`;
 console.log('ブラウザ:', exe);
 console.log('しゃしんの ばしょ:', OUT);
-const browser = await pw.chromium.launch({ executablePath: exe, headless: !HEADED, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const browser = await pw.chromium.launch({ executablePath: exe, headless: !HEADED, args: GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const results = [];
 let bad = 0;
 try {

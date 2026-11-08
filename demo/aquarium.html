@@ -53,9 +53,9 @@ if (q.get('ui') === '0') document.getElementById('ui').style.display = 'none';  
 // データ（fish.js）にまだ無い v0.2 の種も、水槽の予備の値で泳がせる
 const NEW_FRESH = ['platy', 'cherry_barb', 'otocinclus', 'dwarf_gourami', 'rummy_nose'];
 const NEW_SALT = ['clownfish', 'blue_tang', 'skunk_shrimp', 'yellow_tang', 'blue_damsel', 'firefish', 'mandarin'];
-const SNAILS = salt ? ['shittaka', 'shittaka'] : ['ishimaki', 'ramshorn'];
+const SNAILS = salt ? ['shittaka', 'magaki'] : ['ishimaki', 'ramshorn'];
 const SCHOOL = new Set(['cherry_barb', 'rummy_nose']);
-const ids = salt ? NEW_SALT : [...FISH.filter((s) => s.water !== 'salt').map((s) => s.id), ...NEW_FRESH];
+const ids = salt ? [...NEW_SALT, ...FISH.filter((s) => s.water === 'salt' && s.kind !== 'snail').map((s) => s.id)] : [...FISH.filter((s) => s.water !== 'salt').map((s) => s.id), ...NEW_FRESH];   // v0.4：海の 新しい種も fish.js から
 const fish = [];
 let n = 0;
 for (const id of [...new Set(ids)]) {

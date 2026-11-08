@@ -110,7 +110,7 @@ function render() {
       const c = status(it, isFish);
       const locked = c.reason === 'locked';
       let priceEl;
-      if (c.reason === 'vitaminFull') priceEl = el('span', { class: 'price', text: `のこり ${s.inv[it.id] || 0}かい` });
+      if (c.reason === 'vitaminFull') priceEl = el('span', { class: 'price', text: `のこり ${s.inv[it.grants || it.id] || 0}かい` });
       else if (c.reason === 'have' || c.reason === 'max') priceEl = el('span', { class: 'price', text: c.reason === 'have' ? 'もってる' : 'いっぱい' });
       else if (locked) priceEl = el('span', { class: 'price', text: '🔒' });
       else if (price === 0) priceEl = el('span', { class: 'price', text: '🎁 プレゼント' });
@@ -126,7 +126,7 @@ function render() {
         'data-id': it.id,
         onclick: () => onPick(it, isFish),
       },
-      pic,
+      pic, it.deal ? el('span', { class: 'deal-badge', text: it.deal }) : null,
       el('div', { class: 'nm', text: locked && isFish ? '？？？' : it.name }),
       locked ? el('div', { class: 'lock-line', text: '🔒 もうすこし' })
         : short ? short

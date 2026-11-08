@@ -264,6 +264,7 @@ body.photo #hud, body.photo #gauges, body.photo #care, body.photo #hint, body.ph
 .shop-item .nm, .dex-item .nm { font-size: var(--fs-s); line-height: 1.2; }
 .shop-item .price { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: var(--coin); font-size: var(--fs-s); }
 .shop-item .price .coin-ic { width: 18px; height: 18px; }
+.shop-item .deal-badge { position: absolute; top: 6px; left: 6px; z-index: 1; padding: 2px 10px; border-radius: 999px; background: #ff7a59; color: #fff; font-weight: 700; font-size: var(--fs-s); box-shadow: 0 2px 0 rgba(150, 50, 30, 0.35); transform: rotate(-6deg); }
 .shop-item.cant .price { background: #eef3f1; color: #4d6a74; }
 .shop-item.owned .price { background: var(--good); }
 .shop-item.locked { opacity: 0.6; }

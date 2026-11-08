@@ -14,6 +14,19 @@ export const SPECIES_DEFAULTS = {
   mandarin:      { kind: 'fish', water: 'salt', look: { lengthToHeight: 3.2, thickness: 0.26, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.45, school: false, habit: 'hover' } },
   skunk_shrimp:  { kind: 'shrimp', water: 'salt', look: { lengthToHeight: 4.0, thickness: 0.2, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.5, school: false } },
   shittaka:      { kind: 'snail', water: 'salt', look: { lengthToHeight: 1.25, thickness: 0.62, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.1, school: false, habit: 'crawl' } },
+  // 海水（v0.4）
+  green_chromis:      { kind: 'fish', water: 'salt', look: { lengthToHeight: 2.5, thickness: 0.18, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.1, school: true, habit: 'coral' } },
+  tomato_clown:       { kind: 'fish', water: 'salt', look: { lengthToHeight: 2.3, thickness: 0.25, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.8, school: false, habit: 'coral' } },
+  pajama_cardinal:    { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.9, thickness: 0.2, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.5, school: true } },
+  banggai_cardinal:   { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.7, thickness: 0.15, finStyle: 'tall' }, swim: { layer: 'middle', speed: 0.5, school: true, habit: 'coral' } },
+  royal_gramma:       { kind: 'fish', water: 'salt', look: { lengthToHeight: 3.3, thickness: 0.16, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.7, school: false, habit: 'hover' } },
+  vagabond_butterfly: { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.4, thickness: 0.12, finStyle: 'tall' }, swim: { layer: 'middle', speed: 0.8, school: false } },
+  flame_angel:        { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.9, thickness: 0.16, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.8, school: false } },
+  boxfish:            { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.6, thickness: 0.45, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.45, school: false } },
+  moorish_idol:       { kind: 'fish', water: 'salt', look: { lengthToHeight: 1.2, thickness: 0.12, finStyle: 'tall' }, swim: { layer: 'middle', speed: 0.8, school: false } },
+  peppermint_shrimp:  { kind: 'shrimp', water: 'salt', look: { lengthToHeight: 4.0, thickness: 0.2, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.5, school: false } },
+  white_socks:        { kind: 'shrimp', water: 'salt', look: { lengthToHeight: 3.8, thickness: 0.22, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.45, school: false } },
+  magaki:             { kind: 'snail', water: 'salt', look: { lengthToHeight: 1.6, thickness: 0.55, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.1, school: false, habit: 'crawl' } },
   // 淡水
   platy:         { kind: 'fish', water: 'fresh', look: { lengthToHeight: 2.7, thickness: 0.22, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.9, school: false } },
   cherry_barb:   { kind: 'fish', water: 'fresh', look: { lengthToHeight: 3.1, thickness: 0.2, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.0, school: true } },
@@ -22,6 +35,9 @@ export const SPECIES_DEFAULTS = {
   rummy_nose:    { kind: 'fish', water: 'fresh', look: { lengthToHeight: 4.3, thickness: 0.17, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.2, school: true } },
   ishimaki:      { kind: 'snail', water: 'fresh', look: { lengthToHeight: 1.3, thickness: 0.62, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.1, school: false, habit: 'crawl' } },
   ramshorn:      { kind: 'snail', water: 'fresh', look: { lengthToHeight: 1.15, thickness: 0.5, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.1, school: false, habit: 'crawl' } },
+  // 淡水（v0.4）
+  yamato_shrimp: { kind: 'shrimp', water: 'fresh', look: { lengthToHeight: 4.2, thickness: 0.2, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.55, school: false } },
+  kanoko:        { kind: 'snail', water: 'fresh', look: { lengthToHeight: 1.3, thickness: 0.6, finStyle: 'snail' }, swim: { layer: 'bottom', speed: 0.1, school: false, habit: 'crawl' } },
 };
 
 /** データ（fish.js）と予備をまぜる。データの値が優先。 */

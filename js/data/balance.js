@@ -43,9 +43,9 @@ export const CLEAN = {
   perSpacePerHour: -0.4,       // 魚の space 1 あたり（キンギョは space 2 なので -0.8）
   perLeftoverPerHour: -1.5,    // たべのこし 1こ あたり
   leftoverMax: 5,              // たべのこし は 5こ まで たまる
-  cleanerIds: ['corydoras', 'albino_corydoras', 'minami_shrimp', 'red_bee_shrimp', 'skunk_shrimp'],  // v0.2 で スカンクシュリンプを 足した（かい は SNAIL）
+  cleanerIds: ['corydoras', 'albino_corydoras', 'minami_shrimp', 'red_bee_shrimp', 'skunk_shrimp', 'yamato_shrimp', 'peppermint_shrimp', 'white_socks'],  // v0.2 で スカンク、v0.4 で ヤマト・ペパーミント・ホワイトソックスを 足した（かい は SNAIL）
   cleanerLeftoverPerHour: 0.125, // そうじやの魚 1ぴきで たべのこし を 8じかんで 1こ たべる
-  wastePerSpacePerHour: 0.04, // そこの ごみ（ふん）：魚の space 1 あたり。6ぴきで 1日に 6こ くらい（v0.3.1）
+  wastePerSpacePerHour: 0.025, // そこの ごみ（ふん）：魚の space 1 あたり。6ぴきで 1日に 3〜4こ（v0.4 で 0.04→0.025）
   wasteMax: 9,                 // そこの ごみ は 9こ まで（3D の ごみの かずと おなじ）
   perWastePerHour: -0.1,       // ごみ 1こ あたり きれいさ が すこし はやく へる
   scoopClean: 0,               // 「そうじ」（あみで たべのこしを すくう）：たべのこし 0 にするだけ（きれいさ は ふえない。コインも なし）
@@ -145,11 +145,12 @@ export const COIN = {
   care: {
     feed:        { coin: 6,  perDay: 4 },  // その えさやりで、おなか < 80 の魚が 1ぴき以上 たべた
     waterChange: { coin: 10, perDay: 3, cleanBelow: 85 },  // みずかえ前の きれいさ < 85
-    // そうじ・なでる は コイン なし（れんだ・わざと よごす ことで かせげないように）
+    // そうじ は コイン なし（わざと よごす ことで かせげないように）
   },
+  pet: { chance: 0.3, coin: 3, perDay: 8 },   // v0.4：なでて ハートが 出たとき 30% で +3（ハートの まち時間が あるので れんだ では ふえない。1日 8かい まで）
   careDailyCap: 50,              // お世話で もらえるのは 1日 50 まで（つぎの日 6:00 に もどる）
   thanks: {
-    chancePerHour: 0.10,         // 条件を みたす魚 1ぴきごと、1じかんに 10%
+    chancePerHour: 0.15,         // 条件を みたす魚 1ぴきごと、1じかんに 15%（v0.4 で 10%→15%）
     need: { health: 70, mood: 70, onaka: 40 },
     coinBase: 8, coinPerRarity: 2,   // 8 + 2×レアど（メダカ 10、レッドビー 16）
     perFishPerDay: 1,
