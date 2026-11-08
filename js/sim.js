@@ -690,19 +690,36 @@ export function canBuyFish(state, id, t = state.tanks[0]) {
   return { ok: true };
 }
 
+/**
+ * v0.6：生きものを 1ぴき つくる（おみせ・つり・ガサガサ・プレゼント… 手に入れかたは ぜんぶ ここを とおる）。
+ * まだ すいそうには 入れない。個体差（おおきさ・キラキラ）は 個体差係が ここで つける。
+ * opts.source: 'shop' | 'fishing' | 'gasagasa' | 'gift' など。opts.rnd: 乱数（テスト用）
+ */
+export function createFish(state, id, { source = 'shop', rnd = Math.random } = {}) {
+  const s = B.START.fish;
+  const f = { uid: newUid(), speciesId: id, stage: 0, onaka: s.onaka, health: s.health, mood: s.mood, natsuki: s.natsuki, born: state.clock.min, source };
+  normFish(f);
+  dayBucket(state, f);
+  return f;
+}
+
+/** 図鑑に のせる（手に入れた とき）。はじめての しゅるいなら true */
+export function addDex(state, f) {
+  const id = f.speciesId;
+  const first = !state.dex[id];
+  state.dex[id] = { ...(state.dex[id] || {}), first: state.dex[id]?.first ?? state.daily.day, count: (state.dex[id]?.count || 0) + 1 };
+  return first;
+}
+
 export function buyFish(state, id, t = state.tanks[0]) {
   const c = canBuyFish(state, id, t);
   if (!c.ok) return c;
   const price = priceOf(state, id);
   state.coins -= price;
-  const s = B.START.fish;
-  const f = { uid: newUid(), speciesId: id, stage: 0, onaka: s.onaka, health: s.health, mood: s.mood, natsuki: s.natsuki, born: state.clock.min };
-  normFish(f);
-  dayBucket(state, f);
+  const f = createFish(state, id, { source: 'shop' });
   const friends = t.fish.filter((g) => D.compatOf(id, g.speciesId) === 2).map((g) => g.uid);
   t.fish.push(f);
-  const first = !state.dex[id];
-  state.dex[id] = { first: state.daily.day, count: (state.dex[id]?.count || 0) + 1 };
+  const first = addDex(state, f);
   inc(state, 'buyFish');
   const events = [];
   if (fixThermo(t)) events.push({ type: 'thermoReset', tankId: t.id });
