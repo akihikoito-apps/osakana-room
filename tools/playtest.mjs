@@ -580,7 +580,8 @@ async function run(browser, base, W, H) {
       await p.click('#btn-bgm'); await p.waitForTimeout(500);
       await shot('49_bgm_picker');
       const rows = await p.$$('#bgm-picker .bgm-row');
-      if (rows.length !== 5) notes.push(`【不具合】おんがくの 曲が ${rows.length}きょく（5きょく の はず）`);
+      const want = await p.evaluate(async () => { try { return (await import('./js/bgm.js')).TRACKS.length; } catch { return 0; } });   // v0.7 で 8きょく
+      if (rows.length !== want) notes.push(`【不具合】おんがくの 曲が ${rows.length}きょく（${want}きょく の はず）`);
       const cur = async () => p.evaluate(async () => { try { const m = await import('./js/bgm.js'); return m.current(); } catch (e) { return { err: e.message }; } });
       if (rows[0]) { await rows[0].click(); await p.waitForTimeout(2500); }
       const s1 = await cur();

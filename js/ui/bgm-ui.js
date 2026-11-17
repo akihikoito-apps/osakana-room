@@ -49,9 +49,21 @@ function openPicker() {
   const list = box.querySelector('.bgm-list');
   const c = cur();
   const sel = c.on ? c.id : null;
-  list.replaceChildren(...B.TRACKS.map((t) => el('button', { class: 'bgm-row' + (t.id === sel ? ' on' : ''), 'data-id': t.id, onclick: () => choose(t.id) },
+  const row = (t) => el('button', { class: 'bgm-row' + (t.id === sel ? ' on' : ''), 'data-id': t.id, onclick: () => choose(t.id) },
+    t.icon ? el('span', { class: 'bgm-ic', text: t.icon, 'aria-hidden': 'true' }) : null,
     el('span', { class: 'bgm-body' }, el('span', { class: 'bgm-title', text: title(t) }), note(t) ? el('span', { class: 'bgm-note', text: note(t) }) : null),
-    t.id === sel ? el('span', { class: 'bgm-mark', text: '✓ えらんでいる' }) : null)));
+    t.id === sel ? el('span', { class: 'bgm-mark', text: '✓', 'aria-label': 'えらんでいる' }) : null);
+  // v0.7：「たのしい」と「まったり」を 2れつに わける（色・見出しの 絵・ならびで 見わける。agy・Codex）
+  const kinds = Array.isArray(B.KINDS) ? B.KINDS.filter((k) => B.TRACKS.some((t) => t.kind === k.id)) : [];
+  if (kinds.length > 1) {
+    list.classList.add('cols');
+    list.replaceChildren(...kinds.map((k) => el('div', { class: 'bgm-col kind-' + k.id },
+      el('div', { class: 'bgm-kind' }, el('span', { class: 'bgm-kind-ic', text: k.icon, 'aria-hidden': 'true' }), el('span', { text: k.label })),
+      ...B.TRACKS.filter((t) => t.kind === k.id).map(row))));
+  } else {
+    list.classList.remove('cols');
+    list.replaceChildren(...B.TRACKS.map(row));
+  }
   box.querySelector('.bgm-state').textContent = sel ? '' : 'とまっている';
   box.hidden = false;
 }

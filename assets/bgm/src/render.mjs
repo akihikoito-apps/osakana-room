@@ -7,7 +7,7 @@
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync, copyFileSync } from 'node:fs';
 import os from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,7 +35,9 @@ const SR = 48000;
 const BITRATE = process.env.BR || '96k';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const ids = args.length ? args : ['pokapoka', 'hidamari', 'yurayura', 'suichu', 'ohirune'];
+const ids = args.length ? args : ['pokapoka', 'hidamari', 'yurayura', 'suichu', 'ohirune', 'parade', 'matsuri', 'skip'];
+// 曲ごとの 目標ラウドネス（既定 -20 LUFS。v0.7 の たのしい曲は 下の TARGETS。docs/音楽.md）
+const TARGETS = { };
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const page = await browser.newPage();
 page.on('console', (m) => console.log('  [chrome]', m.text()));
@@ -87,6 +89,14 @@ function analyze(f32, ch, sr, loopFrames, offsetSec = 1.0) {
   return res;
 }
 
+// できた ファイルの ラウドネス（全体 I・3秒の 最大 Smax・true peak）。v0.7 から
+function loudOf(file) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true:framelog=info', '-f', 'null', '-'], { encoding: 'utf8', maxBuffer: 1 << 28 });
+  const err = r.stderr || '';
+  const sum = err.split('Summary:')[1] || '';
+  const S = [...err.matchAll(/\bS:\s*(-?[\d.]+)/g)].map((m) => Number(m[1])).filter((x) => x > -70);
+  return { I: Number(/I:\s+(-?[\d.]+) LUFS/.exec(sum)?.[1]), Smax: Math.max(...S), TP: Number(/Peak:\s+(-?[\d.]+) dBFS/.exec(sum)?.[1]) };
+}
 const report = {};
 for (const id of ids) {
   const t0 = Date.now();
@@ -101,11 +111,11 @@ for (const id of ids) {
   const wavPath = join(OUT, id + '.wav');
   writeFileSync(wavPath, wav16(pcm, 2, SR));
   const m4a = join(OUT, id + '.m4a');
-  const { spawnSync } = await import('node:child_process');
+
   const mr = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', wavPath, '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
   const I = Number(/I:\s+(-?[\d.]+) LUFS/.exec(mr.split('Summary:')[1])[1]);
   const TP = Number(/Peak:\s+(-?[\d.]+) dBFS/.exec(mr.split('Summary:')[1])[1]);
-  const TARGET = Number(process.env.LUFS || -20);
+  const TARGET = Number(process.env.LUFS || TARGETS[id] || -20);
   let gdb = TARGET - I; if (TP + gdb > -3) gdb = -3 - TP;
   console.log('  LUFS', I, 'TP', TP, '→ gain', gdb.toFixed(2), 'dB');
   execFileSync('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-i', wavPath, '-af', 'volume=' + gdb.toFixed(2) + 'dB', '-c:a', 'aac', '-b:a', BITRATE, '-ar', String(SR), '-ac', '2', '-movflags', '+faststart', m4a]);
@@ -113,7 +123,8 @@ for (const id of ids) {
   const f32 = new Float32Array(dec.buffer, dec.byteOffset, dec.byteLength / 4);
   const a = analyze(f32, 2, SR, r.loopFrames, 1.0);
   const size = statSync(m4a).size;
-  report[id] = { L: r.L, loopFrames: r.loopFrames, decodedFrames: f32.length / 2, sizeKB: Math.round(size / 1024), events: r.events, badEvents: r.bad, gainDb: +r.gainDb.toFixed(1), preRmsDb: +r.rmsDb.toFixed(1), prePeakDb: +r.peakDb.toFixed(1), ...Object.fromEntries(Object.entries(a).filter(([k]) => k !== 'wins').map(([k, v]) => [k, typeof v === 'number' ? +v.toFixed(k.includes('Step') ? 5 : 1) : v])), secs: ((Date.now() - t0) / 1000).toFixed(1) };
+  const lm = loudOf(m4a);
+  report[id] = { lufs: lm.I, shortMaxLufs: lm.Smax, truePeak: lm.TP, L: r.L, loopFrames: r.loopFrames, decodedFrames: f32.length / 2, sizeKB: Math.round(size / 1024), events: r.events, badEvents: r.bad, gainDb: +r.gainDb.toFixed(1), preRmsDb: +r.rmsDb.toFixed(1), prePeakDb: +r.peakDb.toFixed(1), ...Object.fromEntries(Object.entries(a).filter(([k]) => k !== 'wins').map(([k, v]) => [k, typeof v === 'number' ? +v.toFixed(k.includes('Step') ? 5 : 1) : v])), secs: ((Date.now() - t0) / 1000).toFixed(1) };
   console.log(id, JSON.stringify(report[id]));
   console.log('  melody:', r.log.join(' / '));
   if (INSTALL) copyFileSync(m4a, join(HERE, '..', id + '.m4a'));

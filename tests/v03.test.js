@@ -451,7 +451,7 @@ test('awake.js と stay-awake.mp4 が ある・sw.js の キャッシュに 入�
 test('BGM：曲の ファイルが ぜんぶ ある・sw.js に 入っている・曲の なまえに 漢字が ない', async () => {
   if (!exists('js/bgm.js')) return;     // まだ とどいていない
   const { TRACKS } = await import('../js/bgm.js');
-  assert.equal(TRACKS.length, 5);
+  assert.ok(TRACKS.length >= 5); // v0.7 で 8曲（tests/v07_music.test.js）
   const sw = read('sw.js');
   const miss = TRACKS.filter((t) => !exists(t.file)).map((t) => t.file);
   assert.deepEqual(miss, [], 'まだ ない 曲');

@@ -2,6 +2,7 @@
 // 仕様 v0.2 1章：上に「いま えらんでいる すいそう」（◀ ▶ で きりかえ）。並べるのは その水槽と おなじ 水の もの だけ。
 // 買った 生きもの・かざりは その水槽に 入る（水が あわない ものは そもそも 並ばない）。解放前の ものは かぎつきカード。
 import { $, $$, el, toast, dialog, coinIcon, stars, bumpCoins } from './common.js';
+import { renderPremium } from './premium.js';   // v0.7 課金係：✨ とくべつ タブ
 
 let G = null;
 let tab = 'fish';
@@ -94,9 +95,14 @@ function lockBanner() {
 function render() {
   $('#scr-shop .tab-tanks').hidden = !G.sim.isUnlocked(G.state, 'tank6');
   if (tab === 'tanks' && !G.sim.isUnlocked(G.state, 'tank6')) tab = 'equip';
+  const pmTab = $('#scr-shop .tab-premium');   // v0.7 課金係：チュートリアルが おわってから
+  if (pmTab) pmTab.hidden = !G.state.tutorial.done;
+  if (tab === 'premium' && !G.state.tutorial.done) tab = 'fish';
   $$('#scr-shop .tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   renderTankBar();
   const list = $('#shop-list');
+  if (tab === 'premium') { $('#shop-tank').hidden = true; list.classList.add('pm-list'); renderPremium(G, list); G.emit('shopRendered'); return; }
+  list.classList.remove('pm-list');
   const s = G.state, sim = G.sim, t = G.tank();
   const tut = G.data.tutorialModule?.TUTORIAL;
   const isFish = tab === 'fish';

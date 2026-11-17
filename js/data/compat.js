@@ -1185,6 +1185,78 @@ export const COMPAT = {
   'ishigame|tagame': 1,
   // いけ：tagame
   'tagame|tagame': 0,  // なわばりで けんか
+
+  // v0.7 課金係：とくべつ コーナー。いろちがいは もとの しゅるいと おなじ（Codex・agy）
+  // きんいろキンギョ（キンギョと おなじ。キンギョどうしは なかよし）
+  'gold_goldfish|medaka': 1,
+  'gold_goldfish|guppy': 0,
+  'gold_goldfish|neon_tetra': 0,
+  'gold_goldfish|goldfish': 2,
+  'corydoras|gold_goldfish': 0,
+  'gold_goldfish|minami_shrimp': 0,
+  'betta|gold_goldfish': 0,
+  'angelfish|gold_goldfish': 0,
+  'gold_goldfish|red_bee_shrimp': 0,
+  'albino_corydoras|gold_goldfish': 0,
+  'gold_goldfish|ishimaki': 1,
+  'gold_goldfish|ramshorn': 1,
+  'gold_goldfish|platy': 0,
+  'cherry_barb|gold_goldfish': 0,
+  'gold_goldfish|otocinclus': 0,
+  'dwarf_gourami|gold_goldfish': 0,
+  'gold_goldfish|rummy_nose': 0,
+  'gold_goldfish|yamato_shrimp': 0,
+  'gold_goldfish|kanoko': 1,
+  'gold_goldfish|gold_goldfish': 2,
+  // あおいザリガニ（アメリカザリガニと おなじ。ザリガニどうしは なわばりで けんか）
+  'blue_zarigani|tanishi': 0,
+  'blue_zarigani|sujiebi': 0,
+  'blue_zarigani|zarigani': 0,  // なわばりで けんか
+  'blue_zarigani|otamajakushi': 0,
+  'blue_zarigani|motsugo': 1,
+  'blue_zarigani|dojou': 1,
+  'blue_zarigani|funa': 1,
+  'blue_zarigani|oikawa': 1,
+  'blue_zarigani|yago': 1,
+  'blue_zarigani|yoshinobori': 1,
+  'blue_zarigani|sawagani': 0,
+  'blue_zarigani|tanago': 1,
+  'blue_zarigani|donko': 1,
+  'blue_zarigani|mizukamakiri': 1,
+  'blue_zarigani|hotokedojou': 0,
+  'blue_zarigani|namazu': 0,
+  'blue_zarigani|gengorou': 1,
+  'blue_zarigani|tonosamagaeru': 1,
+  'amagaeru|blue_zarigani': 1,
+  'blue_zarigani|kusagame': 1,
+  'blue_zarigani|ishigame': 1,
+  'blue_zarigani|tagame': 1,
+  'blue_zarigani|blue_zarigani': 0,  // なわばりで けんか
+  // アルビノスッポン（クサガメに ちかい。ちいさな さかな・エビ・カニ・カエルは にがて）
+  'albino_suppon|tanishi': 0,
+  'albino_suppon|sujiebi': 0,
+  'albino_suppon|zarigani': 0,  // スッポンが たべる
+  'albino_suppon|otamajakushi': 0,
+  'albino_suppon|motsugo': 0,
+  'albino_suppon|dojou': 0,
+  'albino_suppon|funa': 1,
+  'albino_suppon|oikawa': 0,
+  'albino_suppon|yago': 1,
+  'albino_suppon|yoshinobori': 0,
+  'albino_suppon|sawagani': 0,  // スッポンが たべる
+  'albino_suppon|tanago': 0,
+  'albino_suppon|donko': 1,
+  'albino_suppon|mizukamakiri': 1,
+  'albino_suppon|hotokedojou': 0,
+  'albino_suppon|namazu': 1,
+  'albino_suppon|gengorou': 1,
+  'albino_suppon|tonosamagaeru': 0,  // スッポンが カエルを たべる
+  'albino_suppon|amagaeru': 0,
+  'albino_suppon|kusagame': 1,  // クサガメどうしの ◎（ひなたぼっこ）は スッポンには つけない
+  'albino_suppon|ishigame': 1,
+  'albino_suppon|tagame': 1,
+  'albino_suppon|albino_suppon': 0,  // かみつきあう
+  'albino_suppon|blue_zarigani': 0,  // スッポンが たべる
 };
 
 // 2匹の相性（0/1/2）を返す

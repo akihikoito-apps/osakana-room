@@ -243,6 +243,53 @@
     }
     return buf;
   }
+  // ---- v0.7 たのしい曲の 音色 ----
+  function genXylo(m, rnd) { // 木琴：3倍音（12度）が 鳴る。マリンバより 短く かたい
+    const f = mtof(m);
+    const T = clamp(0.55 * Math.pow(523 / f, 0.5), 0.22, 0.9);
+    const buf = partialsBuf(f, [
+      { r: 1, a: 1, d: T, atk: 0.001 },
+      { r: 1.002, a: 0.18, d: T * 0.7, atk: 0.001 },
+      { r: 3.0, a: 0.22, d: T * 0.35, atk: 0.0008 },
+      { r: 6.1, a: 0.04, d: T * 0.12, atk: 0.0006 },
+    ], T * 4, { rnd });
+    let y = 0; // かたい マレットの「こん」
+    for (let i = 0; i < 0.004 * SR; i++) { y += 0.3 * ((rnd() * 2 - 1) - y); buf[i] += y * 0.18 * (1 - i / (0.004 * SR)); }
+    return buf;
+  }
+  function genSteelpan(m, rnd) { // スチールパン：1・2・3・4倍音、2倍音が つよい。すこし うなる
+    const f = mtof(m);
+    const T = clamp(1.3 * Math.pow(523 / f, 0.4), 0.7, 2.2);
+    return partialsBuf(f, [
+      { r: 1, a: 1, d: T, atk: 0.004 },
+      { r: 1.0025, a: 0.25, d: T * 0.8, atk: 0.004 },
+      { r: 2.0, a: 0.5, d: T * 0.55, atk: 0.003 },
+      { r: 3.0, a: 0.16, d: T * 0.3, atk: 0.002 },
+      { r: 4.01, a: 0.06, d: T * 0.18, atk: 0.002 },
+    ], T * 3.2, { rnd });
+  }
+  function genToyPiano(m, rnd) { // トイピアノ：金属の 棒。ちいさく ちんちん
+    const f = mtof(m);
+    const T = clamp(1.4 * Math.pow(523 / f, 0.4), 0.6, 2.4);
+    const buf = partialsBuf(f, [
+      { r: 1, a: 1, d: T, atk: 0.0015 },
+      { r: 1.0016, a: 0.3, d: T * 0.9, atk: 0.0015 },
+      { r: 3.87, a: 0.12, d: T * 0.15, atk: 0.001 },
+      { r: 7.6, a: 0.03, d: 0.05, atk: 0.0008 },
+    ], T * 3, { rnd });
+    for (let i = 0; i < 0.002 * SR; i++) buf[i] += (rnd() * 2 - 1) * 0.04 * (1 - i / (0.002 * SR));
+    return buf;
+  }
+  function genGlock(m, rnd) { // グロッケン：すんだ 金属の ベル
+    const f = mtof(m);
+    const T = clamp(2.2 * Math.pow(1046 / f, 0.3), 1.2, 3.2);
+    return partialsBuf(f, [
+      { r: 1, a: 1, d: T, atk: 0.0012 },
+      { r: 2.76, a: 0.12, d: T * 0.25, atk: 0.001 },
+      { r: 5.40, a: 0.035, d: T * 0.08, atk: 0.0008 },
+    ], T * 3, { rnd });
+  }
+
   // Karplus-Strong（ナイロンギター・ウッドベース）
   function genKS(m, o, rnd) {
     const f = mtof(m);
@@ -440,6 +487,62 @@
       rhodes(dest, t, m, d, v, o) { const b = vb(v); playBuf(dest, getBuf('rh' + m + '_' + b, () => genRhodes(m, b, rnd)), t, d, v, { release: 0.3, curve: 1.2, bright: [1200, 3500], ...o }); },
       nylon(dest, t, m, d, v, o) { playBuf(dest, getBuf('ny' + m, () => genKS(m, { t60: clamp(4 * Math.pow(196 / mtof(m), 0.5), 1.5, 5), soft: 0.55, pick: 0.18, s1: 0.45 }, rnd)), t, d, v, { release: 0.25, bright: [1400, 3500], ...o }); },
       bass(dest, t, m, d, v, o) { playBuf(dest, getBuf('ba' + m, () => genKS(m, { t60: 2.2, soft: 0.85, pick: 0.25, s1: 0.5, sine: 0.6 }, rnd)), t, d, v, { release: 0.12, bright: [500, 900], curve: 1.2, ...o }); },
+      xylo(dest, t, m, d, v, o) { playBuf(dest, getBuf('xy' + m, () => genXylo(m, rnd)), t, null, v, { bright: [1800, 4200], ...o }); },
+      steelpan(dest, t, m, d, v, o) { playBuf(dest, getBuf('sp' + m, () => genSteelpan(m, rnd)), t, d, v, { release: 0.5, bright: [1600, 3600], ...o }); },
+      toypiano(dest, t, m, d, v, o) { playBuf(dest, getBuf('tp' + m, () => genToyPiano(m, rnd)), t, d, v, { release: 0.3, bright: [2000, 3500], ...o }); },
+      glock(dest, t, m, d, v, o) { playBuf(dest, getBuf('gk' + m, () => genGlock(m, rnd)), t, null, v, { bright: [2500, 4000], ...o }); },
+      pizz(dest, t, m, d, v, o) { playBuf(dest, getBuf('pz' + m, () => genKS(m, { t60: clamp(0.9 * Math.pow(130 / mtof(m), 0.4), 0.35, 1.2), soft: 0.7, pick: 0.13, s1: 0.5, sine: 0.35, dur: 1.4 }, rnd)), t, d, v, { release: 0.1, bright: [700, 1600], curve: 1.3, ...o }); },
+      uke(dest, t, m, d, v, o) { playBuf(dest, getBuf('uk' + m, () => genKS(m, { t60: clamp(2.2 * Math.pow(262 / mtof(m), 0.5), 0.9, 2.6), soft: 0.45, pick: 0.28, s1: 0.42 }, rnd)), t, d, v, { release: 0.12, bright: [1600, 3200], ...o }); },
+      whistle(dest, t, m, d, v, o, r) { // 口笛／オカリナ：サインに すこしの 倍音・おそめの ビブラート・息の音
+        const f = mtof(m); const end = t + Math.max(0.06, d * (o.legato ?? 0.92));
+        const lvl = Math.pow(v, 1.4) * 0.5;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + (o.atk ?? 0.025));
+        g.gain.setTargetAtTime(lvl * 0.85, t + 0.05, 0.25);
+        g.gain.setTargetAtTime(0, end, 0.035);
+        const os = ctx.createOscillator(); os.type = 'sine';
+        const os2 = ctx.createOscillator(); os2.type = 'sine'; os2.frequency.value = f * 2;
+        const g2 = ctx.createGain(); g2.gain.value = 0.06;
+        const os3 = ctx.createOscillator(); os3.type = 'sine'; os3.frequency.value = f * 3;
+        const g3 = ctx.createGain(); g3.gain.value = 0.025;
+        // 頭は すこし 下から（しゃくり）
+        os.frequency.setValueAtTime(f * 0.985, t); os.frequency.linearRampToValueAtTime(f, t + 0.03);
+        const lf = ctx.createOscillator(); lf.frequency.value = 5.2;
+        const lg = ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.006, t + Math.min(0.35, (end - t) * 0.8));
+        lf.connect(lg); lg.connect(os.frequency);
+        os.connect(g); os2.connect(g2); g2.connect(g); os3.connect(g3); g3.connect(g); g.connect(dest);
+        // 息
+        const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true;
+        const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = Math.min(f * 2, 8000); bf.Q.value = 2;
+        const bg = ctx.createGain(); bg.gain.setValueAtTime(0, t); bg.gain.linearRampToValueAtTime(lvl * 0.06, t + 0.015); bg.gain.setTargetAtTime(lvl * 0.012, t + 0.03, 0.06); bg.gain.setTargetAtTime(0, end, 0.03);
+        src.connect(bf); bf.connect(bg); bg.connect(dest);
+        const stopAt = end + 0.3;
+        [os, os2, os3, lf].forEach((x) => { x.start(t); x.stop(stopAt); });
+        src.start(t, (r ?? 0) * 1.5, stopAt - t);
+      },
+      clap(dest, t, m, d, v, o, r) { // 手拍子：ちいさな 3つの はじけ＋みじかい 余韻
+        [0, 0.009, 0.019].forEach((dt, i) => P.noiseHit(dest, t + dt, v * (i === 2 ? 1 : 0.7), { f: 1300, q: 1.1, atk: 0.0008, dec: i === 2 ? 0.07 : 0.012, gain: 1.0 }, (r + i * 0.31) % 1));
+      },
+      tamb(dest, t, m, d, v, o, r) { // タンバリン（やわらかく）
+        P.noiseHit(dest, t, v, { type: 'bandpass', f: 8200, q: 1.6, atk: 0.003, dec: 0.09, gain: 0.7 }, r);
+      },
+      conga(dest, t, m, d, v, o, r) { // コンガ／ボンゴ：音の 高さあり
+        const f = mtof(m);
+        const os = ctx.createOscillator(); os.type = 'sine';
+        os.frequency.setValueAtTime(f * 1.12, t); os.frequency.exponentialRampToValueAtTime(f, t + 0.03);
+        const g = ctx.createGain(); const lvl = Math.pow(v, 1.5);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + 0.003); g.gain.setTargetAtTime(0, t + 0.01, o.dec ?? 0.07);
+        os.connect(g); g.connect(dest); os.start(t); os.stop(t + 0.6);
+        P.noiseHit(dest, t, v, { f: 1500, q: 0.8, atk: 0.001, dec: 0.012, gain: 0.25 }, r);
+      },
+      wblock(dest, t, m, d, v, o, r) { // ウッドブロック：ころん
+        const f = mtof(m);
+        const os = ctx.createOscillator(); os.type = 'triangle'; os.frequency.value = f;
+        const g = ctx.createGain(); g.gain.setValueAtTime(Math.pow(v, 1.5) * 0.7, t); g.gain.setTargetAtTime(0, t + 0.002, 0.018);
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 6;
+        os.connect(bp); bp.connect(g); g.connect(dest); os.start(t); os.stop(t + 0.2);
+        P.noiseHit(dest, t, v, { f: f * 1.5, q: 3, atk: 0.0005, dec: 0.008, gain: 0.3 }, r);
+      },
       subbass(dest, t, m, d, v, o) {
         const os = ctx.createOscillator(); os.type = 'sine'; os.frequency.value = mtof(m);
         const os2 = ctx.createOscillator(); os2.type = 'triangle'; os2.frequency.value = mtof(m);

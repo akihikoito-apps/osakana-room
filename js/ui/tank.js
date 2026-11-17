@@ -9,6 +9,12 @@ let aq = null;                // いま 見ている 水槽の 3D
 const aqs = {};               // 水の しゅるいごとに 1つだけ 作って つかいまわす（ズームで 出入りしても 作りなおさない）
 let shownTankId = null;
 let cleaning = false;         // そうじの アニメ中
+let watering = false;         // v0.7 みずかえの アニメ中（そうじと おなじく ほかの お世話は おせない）
+let tw = null;                // v0.7 ピンセット モード中 { food, kind, session, fed:Set, busy }
+let twTimer = 0;
+const TW_IDLE_MS = 8000;      // ピンセット モードは 8びょう さわらないと おわる（ボタンが うすく なる 10びょう より まえ。agy）
+const careLocked = () => cleaning || watering;
+const feedHow = () => (G.state.ui?.feedHow === 'tweezers' ? 'tweezers' : 'scatter');
 let selected = null;          // カードを出している魚の uid
 let tagUid = null, tagTimer = 0, tagEl = null;
 let busy = {};                // ボタンの 連打よけ（実時間）
@@ -179,6 +185,9 @@ export function show(g) {
 }
 export function hide() {
   cleanDone?.();
+  aq?.finishCare?.();   // v0.7 みずかえ・ピンセットを その場で おわらせる（ピンセットは たべた ことに なる）
+  waterDone?.();
+  endTweezers();
   aq?.stop();
   if (feedTimer) { clearTimeout(feedTimer); feedTimer = 0; G.handleEvents(G.sim.feedEnd(G.state)?.events); }
 }
@@ -247,10 +256,12 @@ function renderCareState() {
   const btn = (k) => $(`#care [data-care="${k}"]`);
   const fb = btn('feed'), wb = btn('water'), cb = btn('clean');
   const food = curFood();
-  fb.classList.toggle('cool', !sim.ownsTool(s, food) || sim.feedBusy() || cleaning || (t.fish.length > 0 && !t.fish.some((f) => sim.foodPrefOf?.(f.speciesId, food) !== 'no')));
+  fb.classList.toggle('cool', !tw && (!sim.ownsTool(s, food) || sim.feedBusy() || careLocked() || (t.fish.length > 0 && !t.fish.some((f) => sim.foodPrefOf?.(f.speciesId, food) !== 'no'))));
+  fb.classList.toggle('tw-on', !!tw);
   renderFoodBtn(fb, food);
-  wb.classList.toggle('cool', !sim.ownsTool(s, 'water_change') || cleaning);
-  cb.classList.toggle('cool', cleaning);      // たべのこし 0 でも あみは つかえる（仕様 v0.2 7章）
+  wb.classList.toggle('cool', !sim.ownsTool(s, 'water_change') || careLocked());
+  wb.classList.toggle('busy', watering);
+  cb.classList.toggle('cool', careLocked());      // たべのこし 0 でも あみは つかえる（仕様 v0.2 7章）
   cb.classList.toggle('busy', cleaning);
   const show = G.tutorialShows || (() => true);
   fb.hidden = !show('feed'); wb.hidden = !show('water'); cb.hidden = !show('clean'); btn('photo').hidden = !show('photo');
@@ -263,7 +274,7 @@ function renderCareState() {
   vb.querySelector('.vit-left').textContent = doneNow && left ? '☀ あしたの あさ また' : ` のこり ${left}`;
   const done = (s.daily.vitamin?.[t.id] || 0) >= (sim.balance().VITAMIN?.perTankPerDay ?? 1);
   const allNo = t.fish.length > 0 && t.fish.every((f) => G.data.fishById[f.speciesId]?.vitamin === 'dislike');
-  vb.classList.toggle('cool', !left || done || allNo || cleaning || sim.vitaminBusy());
+  vb.classList.toggle('cool', !left || done || allNo || careLocked() || !!tw || sim.vitaminBusy());
   renderCap(); renderThermo();
 }
 
@@ -330,7 +341,10 @@ function onCare(kind, b) {
   if (busy[kind] && now < busy[kind]) return;
   const s = G.state, t = G.tank(), sim = G.sim;
   if (kind === 'photo') { G.emit('photo'); return; }
-  if (cleaning) return;                 // あみの アニメ中は えさ・みずかえ・そうじ を おせない
+  if (careLocked()) return;             // あみ・みずかえの アニメ中は えさ・みずかえ・そうじ を おせない
+  if (kind === 'feed' && tw) { endTweezers(); return; }          // v0.7 ピンセット モードの［おわる］
+  if (tw) endTweezers();
+  if (kind === 'feed' && feedHow() === 'tweezers') { startTweezers(); return; }
   if (kind === 'feed') {
     const food = curFood();
     if (!sim.ownsTool(s, food)) { toast('えさは おみせに あるよ'); return; }
@@ -368,15 +382,8 @@ function onCare(kind, b) {
   if (kind === 'water') {
     if (!sim.ownsTool(s, 'water_change')) { toast('みずかえセットは おみせに あるよ'); return; }
     busy.water = now + 1500;
-    const r = sim.waterChange(s, t);
-    flashWater();
-    toast('みずが ピカピカに なったよ');
-    reward(r.coin, b);
-    // 全員 happy、1ぴきだけ spin
-    const spinner = t.fish.length ? t.fish[Math.floor(Math.random() * t.fish.length)].uid : null;
-    t.fish.forEach((f, i) => setTimeout(() => aq?.react(f.uid, f.uid === spinner ? 'spin' : 'happy'), i * 120));
-    G.emit('action', { type: 'waterChange', result: r });
-    G.handleEvents(r.events);
+    startWaterChange(b, t);
+    return;
   } else if (kind === 'clean') {
     startClean(b, t);
     return;
@@ -413,7 +420,124 @@ function startClean(b, t) {
   Promise.resolve(anim).catch(() => {}).then(() => cleanDone?.());
 }
 // とちゅうで 裏に まわったら、そこで おわった ことに する
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') cleanDone?.(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') { cleanDone?.(); aq?.finishCare?.(); waterDone?.(); endTweezers(); } });
+
+/**
+ * v0.7 みずかえ：水が 3分の2 まで へって、バケツで あたらしい 水を そそぐ アニメ（aq.playWaterChange・約3びょう）。
+ * Codex：かずの かわる のは そそぎ おわった とき（きれいさ・コイン・よろこび を いっしょに）。
+ * とちゅうで 画面を はなれたら その場で おわらせて かぞえる（水位も もどす。agy・Codex）。おそい 端末でも 3＋2びょうで しめる。
+ */
+let waterDone = null;
+function startWaterChange(b, t) {
+  watering = true;
+  $('#food-menu')?.remove();
+  document.body.classList.add('watering');   // ヒントの ふきだしは かくす（agy）
+  toast('みずを へらしているよ');             // いま なにを しているか（Codex・agy）
+  renderCareState();
+  const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+  const e = G.data.itemById.water_change?.effect || { clean: 40 };
+  const dirtTo = Math.max(0, Math.min(1, (100 - Math.min(100, t.clean + (e.clean ?? 40))) / 100));
+  const anim = Promise.race([typeof aq?.playWaterChange === 'function' ? Promise.resolve(aq.playWaterChange({ dirtTo, onPour: () => toast('あたらしい みずを いれているよ') })).catch(() => {}) : wait(600), wait(5000)]);
+  let finished = false;
+  waterDone = () => {
+    if (finished) return;
+    finished = true; waterDone = null; watering = false;
+    document.body.classList.remove('watering');
+    const tank = G.state.tanks.find((x) => x.id === t.id) || t;
+    const r = G.sim.waterChange(G.state, tank);
+    toast('みずが ピカピカに なったよ');
+    reward(r.coin, b);
+    // 全員 happy、1ぴきだけ spin（見えている 水槽だけ）
+    if (G.screen === 'tank' && G.tank().id === tank.id) {
+      const spinner = tank.fish.length ? tank.fish[Math.floor(Math.random() * tank.fish.length)].uid : null;
+      tank.fish.forEach((f, i) => setTimeout(() => aq?.react(f.uid, f.uid === spinner ? 'spin' : 'happy'), i * 120));
+    }
+    G.emit('action', { type: 'waterChange', result: r });
+    G.handleEvents(r.events);
+    G.markDirty(); G.saveNow();
+    G.emit('changed');
+    G.refreshHud();
+  };
+  Promise.resolve(anim).catch(() => {}).then(() => waterDone?.());
+}
+
+// ---------- v0.7 ピンセット ----------
+// ［▲えらぶ］の「あげかた」で［ピンセット］に すると、［えさ］で ピンセット モード（ボタンは［おわる］）。
+// モード中に 生きものを タップ → ピンセットが その子の 口もとへ（りくちの カエル・カメにも とどく）→ たべる。
+// かぞえかたは まくと おなじ：さいしょに たべさせる ときに feedStart（えさの かいすうが 1へる・コインは 1かいぶん）、
+// 1ぴき 1かい feedEat、モードが おわったら feedEnd。だれにも あげずに おわれば なにも へらない（agy）。
+// おなか いっぱいの 子は ピンセットを ださずに にっこり。にがての えさなら ピンセットは 出るが ぷいっ（へらない。Codex・agy）。
+function startTweezers() {
+  const s = G.state, t = G.tank(), sim = G.sim;
+  const food = curFood();
+  if (!sim.ownsTool(s, food)) { toast('えさは おみせに あるよ'); return; }
+  if (!t.fish.length) { toast('まだ さかなが いないよ'); return; }
+  if (sim.feedBusy()) return;
+  const eaters = t.fish.filter((f) => sim.foodPrefOf?.(f.speciesId, food) !== 'no');
+  if (!eaters.length) { toast('この すいそうの みんなは この えさを たべないよ。'); return; }
+  if (eaters.every((f) => f.onaka >= sim.balance().HUNGER.full)) { toast(sim.text('full')); return; }
+  // まえの まく えさやりは ここで しめる（あとから feedEnd が ピンセットの ぶんを しめて しまわない ように）
+  if (feedTimer) { clearTimeout(feedTimer); feedTimer = 0; G.handleEvents(sim.feedEnd(s)?.events); }
+  $('#food-menu')?.remove();
+  tw = { food, kind: sim.foodKindOf ? sim.foodKindOf(food) : 'flake', session: false, fed: new Set(), tankId: t.id };
+  document.body.classList.add('tweezers');
+  toast('あげたい こを タッチしてね');
+  armTweezers();
+  renderCareState();
+  G.emit('action', { type: 'tweezersStart' });
+}
+function armTweezers() {
+  clearTimeout(twTimer);
+  twTimer = setTimeout(() => { if (tw && !tw.busy) endTweezers(); else if (tw) armTweezers(); }, TW_IDLE_MS);
+}
+/** ピンセット モードを おわる（たべた 子が いれば ここで えさやりを しめる） */
+function endTweezers(line) {
+  if (!tw) return;
+  const was = tw; tw = null;
+  clearTimeout(twTimer);
+  document.body.classList.remove('tweezers');
+  if (was.session) {
+    const end = G.sim.feedEnd(G.state);
+    G.handleEvents(end?.events);
+    G.markDirty(); G.saveNow();
+    G.emit('changed');
+  }
+  if (line) toast(line);
+  renderCareState();
+}
+function tweezersTap(uid) {
+  const s = G.state, t = G.tank(), sim = G.sim;
+  if (!tw || tw.busy || aq?.careBusy) return;
+  armTweezers();
+  const f = t.fish.find((x) => x.uid === uid);
+  if (!f) return;
+  const name = G.data.fishById[f.speciesId]?.name || '';
+  const pref = sim.foodPrefOf?.(f.speciesId, tw.food);
+  if (tw.fed.has(uid)) { aq?.react(uid, 'happy'); toast(`${name}は もう たべたよ`); return; }
+  if (f.onaka >= sim.balance().HUNGER.full && pref !== 'no') { aq?.react(uid, 'happy'); toast(`${name}は おなか いっぱい みたい`); return; }
+  if (pref !== 'no' && !tw.session) {
+    const r = sim.feedStart(s, t, tw.food, Date.now(), { tweezers: true });
+    if (!r.ok) { endTweezers(r.text || ''); return; }
+    tw.session = true;
+    G.handleEvents(r.prevEvents);
+    if (tw.food !== 'food_flake' && !(s.inv[tw.food] > 0)) { toast((G.data.itemById[tw.food]?.name || '') + 'は さいごの 1かい だったよ'); s.ui.food = 'food_flake'; }
+  }
+  const p = aq?.feedByTweezers?.(uid, { kind: tw.kind });
+  if (!p) return;
+  tw.busy = true;
+  const cur = tw;
+  if (pref !== 'no') cur.fed.add(uid);
+  p.then((res) => {
+    cur.busy = false;
+    if (tw !== cur) return;
+    if (res === 'pui') toast(`${name}は この えさが にがて みたい`);
+    armTweezers();
+    // まだ あげられる 子が いなければ おわる
+    const left = G.tank().fish.filter((x) => !cur.fed.has(x.uid) && x.onaka < sim.balance().HUNGER.full && sim.foodPrefOf?.(x.speciesId, cur.food) !== 'no');
+    if (!left.length && cur.session) endTweezers('みんなに あげたね');
+    else renderCareState();
+  });
+}
 
 /** ビタミン：おとす（にがての 魚は 3D が ぷいっ）。おわりに しめる */
 let vitTimer = 0;
@@ -475,13 +599,10 @@ function reward(coin, b) {
   bumpCoins();
 }
 
-function flashWater() {
-  $('#aq').animate([{ filter: 'brightness(1.35) saturate(1.2)' }, { filter: 'none' }], { duration: 900, easing: 'ease-out' });
-}
-
 // ---------- 魚を タップ ----------
 function onTapFish(uid) {
   justTapped = true;
+  if (tw) { tweezersTap(uid); return; }   // v0.7 ピンセット モード中の タップは なでる では なく えさ
   const r = G.sim.pet(G.state, uid, Date.now(), G.tank());
   if (r.ok && r.react) {
     aq.react(uid, r.react);
@@ -635,9 +756,11 @@ function renderFoodBtn(fb, food) {
     const name = FOODS[food]?.short || it?.name || 'えさ';
     let nm = lb.querySelector('.food-name');
     if (!nm) { lb.textContent = ''; nm = el('span', { class: 'food-name' }); lb.append(nm); }
-    nm.textContent = name;
+    nm.textContent = tw ? 'おわる' : name;   // モード中は［おわる］＋ちいさく「ピンセット ちゅう」（agy）
     let left = lb.querySelector('.food-left');
-    if (food !== 'food_flake') { if (!left) { left = el('small', { class: 'food-left' }); lb.append(left); } left.textContent = `のこり ${s.inv[food] || 0}`; }
+    // v0.7 ピンセットの ときは「ピンセット」と 出す
+    const sub = tw ? 'ピンセット ちゅう' : feedHow() === 'tweezers' ? 'ピンセット' : food !== 'food_flake' ? `のこり ${s.inv[food] || 0}` : '';
+    if (sub) { if (!left) { left = el('small', { class: 'food-left' }); lb.append(left); } left.textContent = sub; }
     else left?.remove();
   }
   const list = G.sim.foodsOwned ? G.sim.foodsOwned(s) : [];
@@ -647,17 +770,35 @@ function renderFoodBtn(fb, food) {
       el('span', { class: 'fp-ic', text: '▲' }), el('span', { class: 'lb', text: 'えらぶ' }));
     fb.after(pick);
   }
-  pick.hidden = fb.hidden || list.length < 2;
-  pick.classList.toggle('cool', cleaning);
+  // v0.7 あげかた（まく／ピンセット）も ここで えらぶので、えさが 1しゅるいでも 出す（チュートリアル中・ピンセット モード中は 出さない）
+  pick.hidden = fb.hidden || !!tw || (list.length < 2 && tutorialOn());
+  pick.classList.toggle('cool', careLocked());
   if (pick.hidden) $('#food-menu')?.remove();
 }
+// v0.7 あげかたの ちいさな 絵（字が よめない 子にも：Codex・agy）。まく＝つぶが ぱらぱら、ピンセット＝V の かたち
+const HOW_ICON = {
+  scatter: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 6h16" stroke="#7a5a2a" stroke-width="2.5" stroke-linecap="round"/><g fill="#d9893c"><circle cx="7" cy="12" r="2"/><circle cx="13" cy="10.5" r="2"/><circle cx="17.5" cy="14" r="2"/><circle cx="10" cy="17.5" r="2"/><circle cx="15" cy="20" r="2"/></g></svg>',
+  tweezers: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 3 L11 20 M17 3 L13 20" stroke="#5f6b73" stroke-width="2.6" stroke-linecap="round"/><path d="M6 3h12" stroke="#3fc7a0" stroke-width="3" stroke-linecap="round"/><circle cx="12" cy="21" r="2.4" fill="#d9893c"/></svg>',
+};
 function toggleFoodMenu(force) {
   const old = $('#food-menu');
   if (old || force === false) { old?.remove(); return; }
   const s = G.state, t = G.tank(), sim = G.sim;
   const cur = curFood();
   const list = sim.foodsOwned(s);
-  const menu = el('div', { id: 'food-menu', role: 'menu' }, ...list.map((id) => {
+  // v0.7 あげかた：まく／ピンセット（Codex・agy：えさの しゅるいと おなじ メニューの いちばん 上）
+  const how = feedHow();
+  const howBtn = (k, text) => el('button', {
+    class: 'fm-how-btn' + (how === k ? ' on' : ''), role: 'menuitemradio', 'aria-checked': how === k ? 'true' : 'false', 'data-how': k,
+    onclick: (e) => {
+      e.stopPropagation();
+      s.ui.feedHow = k; G.markDirty();
+      if (k === 'tweezers') toast('えさボタンを おして、あげたい こを タッチしてね');
+      toggleFoodMenu(false); renderCareState();
+    },
+  }, el('span', { class: 'fm-how-ic', html: HOW_ICON[k] }), text);
+  const howRow = el('div', { class: 'fm-how' }, el('span', { class: 'fm-how-lb', text: 'あげかた' }), howBtn('scatter', 'まく'), howBtn('tweezers', 'ピンセット'));
+  const menu = el('div', { id: 'food-menu', role: 'menu' }, howRow, el('div', { class: 'fm-foods' }, ...list.map((id) => {
     const it = G.data.itemById[id];
     const prefs = t.fish.map((f) => sim.foodPrefOf(f.speciesId, id));
     const eaters = prefs.filter((p) => p !== 'no').length;
@@ -681,7 +822,7 @@ function toggleFoodMenu(force) {
     el('span', { class: 'fm-pic' }, img, love ? el('i', { class: 'fm-love', text: '♥' }) : null, id === cur ? el('i', { class: 'fm-check', text: '✓' }) : null),
     el('span', { class: 'fm-name', text: FOODS[id]?.short || it.name }),
     el('small', { class: 'fm-left', text: left == null ? 'ずっと' : `のこり ${left}` }));
-  }));
+  })));
   $('#care').append(menu);
   const close = (e) => {
     if (!document.body.contains(menu)) { document.removeEventListener('pointerdown', close, true); return; }

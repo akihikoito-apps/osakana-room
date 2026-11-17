@@ -329,11 +329,224 @@
     return s;
   };
 
+  // =====================================================================
+  // v0.7 たのしい 3曲（相談：Codex・agy。A＝あるく／B＝よこに ゆれる／C＝はねる）
+  // =====================================================================
+
+  // 6. てくてく パレード（マーチ：木琴＋ピチカートの ブン・チャ＋グロッケンの かざり、B♭ 128BPM 4/4）
+  //    A(1-8) → A'(9-16 ふみならし が はいる) → B(17-24 ひいて ながい おと) → A''(25-30 が 山・手拍子、31-32 で うすく)
+  BGM.SONGS.parade = () => {
+    const s = new Song({
+      bpm: 128, meter: 4, bars: 32, swing: 0.54, seed: 66, humanize: 0.004,
+      masterLP: 9000,
+      reverb: { time: 1.4, damp: 0.6, pre: 0.015 },
+      channels: {
+        xy: { type: 'xylo', gain: 0.55, pan: 0.1, rev: 0.18, eq: [{ type: 'highshelf', f: 3500, g: -3 }] },
+        gk: { type: 'glock', gain: 0.16, pan: 0.3, rev: 0.3 },
+        gkm: { type: 'glock', gain: 0.30, pan: -0.05, rev: 0.32 },
+        pzl: { type: 'pizz', gain: 0.75, pan: 0, rev: 0.06, eq: [{ type: 'peaking', f: 140, q: 1, g: 3 }] },
+        pzc: { type: 'pizz', gain: 0.38, pan: -0.22, rev: 0.12 },
+        kick: { type: 'kick', gain: 0.16, pan: 0, rev: 0 },
+        tap: { type: 'brushtap', gain: 0.10, pan: 0.15, rev: 0.1, eq: [{ type: 'lowpass', f: 4000, q: 0.5 }] },
+        clap: { type: 'clap', gain: 0.11, pan: -0.1, rev: 0.12, eq: [{ type: 'lowpass', f: 3000, q: 0.5 }] },
+      },
+    });
+    const A = 'Bb | Eb F | Bb | Gm F | Eb | F | Dm Gm | Cm7 F7';
+    const A2 = 'Bb | Eb F | Bb | Gm F | Eb Cm7 | F7 | Bb | Bb7';
+    const B = 'Eb | F | Dm7 | Gm | Eb | Cm7 | F | F7';
+    const A3 = 'Bb | Eb F | Bb | Gm F | Eb | F | Bb | Cm7 F7';
+    const chs = chart([A, A2, B, A3].join(' | '), 4);
+
+    // 2小節の「タタ・タン」＋こたえ の 2小節（3小節目の 休みは 半拍＋F5 の よびこみ：まるごと 休むと 次で 9dB はねた）
+    const h4 = 'D5:.5 F5:.5 Bb5:1 A5:.5 Bb5:.5 F5:1 | G5:.5 G5:.5 Eb5:1 F5:.5 F5:.5 C5:1 | D5:.5 F5:.5 Bb5:1 D6:1 r:.5 F5:.5 | Bb5:.5 A5:.5 G5:1 A5:.5 G5:.5 F5:1 |';
+    const h6 = ' G5:1 Eb5:.5 G5:.5 Bb5:1 G5:1 | A5:1 F5:.5 A5:.5 C6:1 A5:1 |';
+    const mA = h4 + h6 + ' A5:.5 F5:.5 D5:1 G5:.5 A5:.5 Bb5:1 | C6:.5 Bb5:.5 G5:1 A5:1 r:.5 C5:.5'; // さいごの C5 は A' への よびこみ
+    const mA2 = h4 + ' G5:1 Eb5:.5 G5:.5 C6:1 G5:1 | A5:.5 C6:.5 A5:.5 F5:.5 Eb5:1 C5:1 | D5:2 F5:.5 D5:.5 Bb4:1 | r:2 D5:.5 F5:.5 Ab5:1';
+    const mA3 = h4 + h6 + ' Bb5:1 F5:.5 D5:.5 Bb4:2 | r:2.5 F5:.5 Eb5:.5 C5:.5';
+    const mB = 'G5:2 Bb5:1 G5:1 | A5:2 F5:2 | F5:1 A5:1 C6:1 A5:1 | Bb5:2 r:2 | G5:2 Eb5:1 G5:1 | C6:2 Bb5:1 G5:1 | A5:1 C6:1 A5:1 F5:1 | A5:2 r:2'; // 24小節（F7）は 3度の A5（E♭ だけ むきだしに しない。agy）
+    let b = 0;
+    b = s.melody('xy', mA, b, 0.6);
+    b = s.melody('xy', mA2, b, 0.62);
+    b = s.melody('gkm', mB, b, 0.5); // B は グロッケンが ゆっくり うたう（木琴は おやすみ）
+    s.melody('xy', 'r:2 D5:.5 F5:.5 G5:1', 19 * 4, 0.42); // B の 休みに 木琴の こたえ（小さく）
+    s.melody('xy', 'r:2 C5:.5 D5:.5 Eb5:.5 F5:.5', 23 * 4, 0.42);
+    b = s.melody('xy', mA3, b, 0.62);
+    // グロッケンの かざり：4小節に 1回、メロディの 休みに 1〜2音（Codex）。31-32 は なし（agy）
+    for (const [bar, bt, m] of [[10, 3, 'D6'], [15, 0.5, 'D6'], [26, 3, 'F6']] /* いちばん 高い F6 は 山の 27小節だけ（agy） */) s.note('gk', bar * 4 + bt, BGM.pn(m), 1, 0.5);
+
+    // ピチカート：1・3拍目に 低い音（ブン）、2・4拍目に 中くらいの 和音（チャ）。B は 2分音符で ゆったり
+    let prev = null;
+    for (let bar = 0; bar < 32; bar++) {
+      const inB = bar >= 16 && bar < 24;
+      for (const q of [0, 1, 2, 3]) {
+        const c = at(chs, bar * 4 + q);
+        if (q % 2 === 0) {
+          const r = bassNote(c.ch, 34);
+          const first = c.beat === bar * 4 + q; // コードが かわった ところは 根音、おなじなら 5度
+          s.note('pzl', bar * 4 + q, first ? r : fifthOf(r, 46), inB ? 1.8 : 0.9, q === 0 ? 0.72 : 0.62);
+        } else if (!inB && !(bar === 31 && q === 3)) { // 32小節の 4拍目は よびこみを きかせる（agy）
+          const v = voice(c.ch, prev, { lo: 55, hi: 67, n: 3 }); prev = v;
+          strum(s, 'pzc', bar * 4 + q, v, 0.4, 0.5, { spread: 0.004 });
+        }
+      }
+      if (inB) { const c = at(chs, bar * 4 + 2); const v = voice(c.ch, prev, { lo: 55, hi: 67, n: 3 }); prev = v; strum(s, 'pzc', bar * 4 + 2, v, 1, 0.42, { spread: 0.02 }); }
+      // ふみならし（キック）：A' から 1・3拍目。B は 1拍目だけ
+      if (bar >= 8 && bar < 30) { s.note('kick', bar * 4, 36, 0.5, inB ? 0.45 : bar === 8 ? 0.45 : 0.6); if (!inB) s.note('kick', bar * 4 + 2, 36, 0.5, 0.5); } // 31-32 は やすむ（Codex）
+      // 小太鼓の かわりに やわらかい タップ（2・4拍目）。A' と A''（31-32 は なし）
+      if (bar >= 8 && bar < 16) { s.note('tap', bar * 4 + 1, 60, 0.2, 0.5); s.note('tap', bar * 4 + 3, 60, 0.2, 0.55); } // A'' は 手拍子に こうたい（おなじ 拍に かさねない。Codex）
+      // 手拍子：A'' の 山（25〜30小節）だけ
+      if (bar >= 24 && bar < 30) { s.note('clap', bar * 4 + 1, 60, 0.2, 0.55); s.note('clap', bar * 4 + 3, 60, 0.2, 0.6); }
+    }
+    return s;
+  };
+
+  // 7. ちゃぷちゃぷ まつり（カリプソふう：スチールパン＋ウクレレの 3-3-2＋コンガ、G 125BPM 4/4）
+  //    B だけ うたを マリンバに こうたい（agy：金ぞくの 音で つかれない）。さいごは Am7 → D7 で あたまの G6 へ（Codex）
+  BGM.SONGS.matsuri = () => {
+    const s = new Song({
+      bpm: 125, meter: 4, bars: 32, swing: 0.5, seed: 77, humanize: 0.005,
+      masterLP: 9500,
+      reverb: { time: 1.5, damp: 0.6, pre: 0.015 },
+      channels: {
+        pan: { type: 'steelpan', gain: 0.46, pan: 0.15, rev: 0.22 },
+        mar: { type: 'marimba', gain: 0.58, pan: 0.15, rev: 0.22 },
+        uke: { type: 'uke', gain: 0.40, pan: -0.25, rev: 0.12, eq: [{ type: 'highshelf', f: 3500, g: -4 }] },
+        bass: { type: 'bass', gain: 0.62, pan: 0, rev: 0.03, eq: [{ type: 'peaking', f: 170, q: 1, g: 3 }, { type: 'lowpass', f: 2000, q: 0.5 }] },
+        conga: { type: 'conga', gain: 0.30, pan: 0.3, rev: 0.08 },
+        shk: { type: 'shaker', gain: 0.06, pan: -0.35, rev: 0.06 },
+        kick: { type: 'kick', gain: 0.14, pan: 0, rev: 0 },
+      },
+    });
+    const A = 'G6 | G6 | C | D7 | Em | C | Am7 D7 | G';
+    const A2 = 'G6 | G6 | C | D7 | Em | C | D7 | G';
+    const B = 'Am7 | D7 | Bm7 | Em | C | D7 | G Em | Am7 D7'; // ii から（ほかの 2曲の B は IV から。Codex）
+    const A3 = 'G6 | G6 | C | D7 | Em | C | Am7 | D7';
+    const chs = chart([A, A2, B, A3].join(' | '), 4);
+
+    const h6 = 'r:.5 B4:.5 D5:.5 G5:1 E5:.5 D5:1 | D5:1.5 B4:.5 G4:1 r:1 | r:.5 C5:.5 E5:.5 G5:1 A5:.5 G5:1 | F#5:1.5 E5:.5 D5:1 r:1 |'
+      + ' r:.5 E5:.5 G5:.5 B5:1 A5:.5 G5:1 | E5:1.5 G5:1.5 E5:1 |';
+    const mA = h6 + ' C5:1 E5:1 D5:1 C5:1 | B4:2 r:2';
+    const mA2 = h6.replace('E5:1.5 G5:1.5 E5:1 |', 'G5:1.5 E5:.5 C5:1 E5:1 |') + ' A5:1 F#5:1 D5:1 C5:1 | B4:1.5 G4:.5 r:2'; // 14小節だけ かえる（3回 おなじに しない。agy）
+    const mA3 = h6 + ' C5:1.5 E5:1.5 A5:1 | F#5:2 r:2';
+    const mB = 'E5:.5 G5:.5 C6:1 B5:.5 A5:.5 G5:1 | F#5:.5 A5:.5 D5:1 E5:.5 F#5:.5 A5:1 | B5:1.5 A5:.5 F#5:1 D5:1 | E5:3 r:1 |'
+      + ' C5:.5 E5:.5 A5:1 G5:.5 E5:.5 C5:1 | D5:.5 F#5:.5 A5:1 C6:1 A5:1 | B5:1 G5:1 E5:1 G5:1 | A5:2 F#5:1 r:1';
+    let b = 0;
+    b = s.melody('pan', mA, b, 0.6);
+    b = s.melody('pan', mA2, b, 0.62);
+    b = s.melody('mar', mB, b, 0.6);
+    b = s.melody('pan', mA3, b, 0.62);
+
+    // ウクレレ：8分を ずっと、アクセントは 3-3-2（0・1.5・3拍目）。うらは 上から（アップ）で そっと
+    let prev = null;
+    const acc = [0, 1.5, 3];
+    for (let bar = 0; bar < 32; bar++) {
+      for (let e = 0; e < 8; e++) {
+        const bt = bar * 4 + e * 0.5;
+        const c = at(chs, bt);
+        const v = voice(c.ch, prev, { lo: 55, hi: 69, n: 4 }); prev = v;
+        const isAcc = acc.includes(e * 0.5);
+        if (bar >= 16 && bar < 24 && !isAcc) continue; // B は 3打だけ（いきぬき。Codex）
+        if (bar === 31 && (e === 5 || e === 7)) continue; // 32小節は 3拍目の「ジャン」だけ のこして 区切る（agy。ぜんぶ 休むと -40dB の 穴に なった）
+        const up = e % 2 === 1;
+        const notes = up ? v.slice().reverse().slice(0, 3) : v;
+        strum(s, 'uke', bt, notes, isAcc ? 0.7 : 0.35, isAcc ? 0.55 : (up ? 0.26 : 0.3), { spread: 0.007 });
+      }
+    }
+    // ベース：1拍目 根音（ながめ）→ 1.5 オクターブ上 → 2.5・3拍目 5度（ひだまりの ボサノバとは ちがう 形）
+    for (let bar = 0; bar < 32; bar++) {
+      const c1 = at(chs, bar * 4), c2 = at(chs, bar * 4 + 2);
+      const r1 = bassNote(c1.ch, 38), r2 = bassNote(c2.ch, 38);
+      s.note('bass', bar * 4, r1, 1.3, 0.72);
+      s.note('bass', bar * 4 + 1.5, r1 + 12 <= 55 ? r1 + 12 : r1, 0.4, 0.42);
+      const f2 = c1 === c2 ? fifthOf(r1, 50) : r2;
+      if (bar === 31) { s.note('bass', bar * 4 + 3, f2, 0.9, 0.55); continue; } // 32小節は 2.5拍目を ぬいて 区切る（agy）
+      s.note('bass', bar * 4 + 2.5, f2, 0.45, 0.5);
+      s.note('bass', bar * 4 + 3, f2, 0.9, 0.6);
+    }
+    // コンガ：1小節 2〜3打（1.5 高い・2.5／3 ひくい）。A は ひかえめ、A' から ふえる
+    for (let bar = 0; bar < 32; bar++) {
+      const B0 = bar * 4;
+      const full = bar >= 8 && !(bar >= 30);
+      s.note('conga', B0 + 1.5, 62, 0.2, 0.55);
+      if (full) s.note('conga', B0 + 2.5, 57, 0.2, 0.5);
+      s.note('conga', B0 + 3, 55, 0.2, 0.6);
+      if (bar % 4 === 3 && full) s.note('conga', B0 + 3.5, 62, 0.2, 0.4); // 4小節ごとに 小さな おかず
+      s.note('kick', B0, 36, 0.5, 0.55); if (bar >= 8) s.note('kick', B0 + 2, 36, 0.5, 0.42);
+      // シェイカー：A' と A''（B と さいごの 2小節は なし）
+      if ((bar >= 8 && bar < 16) || (bar >= 24 && bar < 30)) for (let e = 0; e < 8; e++) s.note('shk', B0 + e * 0.5, 60, 0.2, e % 2 ? 0.5 : 0.3);
+    }
+    return s;
+  };
+
+  // 8. ぷくぷく スキップ（6/8：オカリナふうの くちぶえ＋ピチカート＋ギターの「チャッ」＋ウッドブロック、A 8分＝200 40小節）
+  //    メロディは「ターン・タ ターン・タ」の スキップ。A → A' → B → A → うすい A（さいごは D6 → E7sus4 で あたまへ）
+  BGM.SONGS.skip = () => {
+    const s = new Song({
+      bpm: 200, meter: 6, bars: 40, swing: 0.5, seed: 88, humanize: 0.004,
+      masterLP: 9000,
+      reverb: { time: 1.7, damp: 0.6, pre: 0.02 },
+      channels: {
+        lead: { type: 'whistle', gain: 0.50, pan: 0.08, rev: 0.25, opt: { legato: 0.9 }, eq: [{ type: 'highshelf', f: 3000, g: -4 }] },
+        toy: { type: 'toypiano', gain: 0.26, pan: 0.3, rev: 0.3, eq: [{ type: 'highshelf', f: 3500, g: -3 }] },
+        gtr: { type: 'nylon', gain: 0.40, pan: -0.25, rev: 0.15, eq: [{ type: 'highshelf', f: 4000, g: -4 }] },
+        pz: { type: 'pizz', gain: 0.78, pan: 0, rev: 0.06, eq: [{ type: 'peaking', f: 150, q: 1, g: 3 }] },
+        wb: { type: 'wblock', gain: 0.18, pan: 0.35, rev: 0.12 },
+        kick: { type: 'kick', gain: 0.12, pan: 0, rev: 0 },
+      },
+    });
+    const A = 'A6 | D | A | E7 | A | D | Bm7 E7 | A';
+    const A2 = 'A6 | D | A | E7 | F#m | D | Bm7 E7 | A';
+    const B = 'Bm7 | E | A | F#m | Bm7 | E | A F#m | Bm7 E7'; // ii から（3曲の B を おなじに しない。agy）
+    const A5 = 'A6 | D | A | F#m | D | E | D6 | E7sus4';
+    const chs = chart([A, A2, B, A, A5].join(' | '), 6);
+
+    const h4 = 'E5:2 A5:1 C#6:2 A5:1 | A5:2 B5:1 F#5:2 A5:1 | C#6:2 B5:1 A5:2 E5:1 | G#5:3 r:3 |';
+    const mA = h4 + ' E5:2 A5:1 C#6:2 A5:1 | D6:3 B5:2 A5:1 | B5:2 A5:1 G#5:2 B5:1 | A5:3 r:3'; // 6小節は 3+2+1（リズムを すこし くずす。agy）
+    const mA2 = h4 + ' C#6:2 A5:1 F#5:2 A5:1 | F#5:3 A5:2 B5:1 | D6:2 C#6:1 B5:2 G#5:1 | A5:3 r:3';
+    const mB = 'F#5:3 A5:3 | G#5:3 B5:3 | E5:2 A5:1 C#6:3 | A5:5 r:1 | D6:2 C#6:1 B5:2 A5:1 | G#5:2 B5:1 E5:2 G#5:1 | A5:3 C#6:3 | B5:3 G#5:2 r:1';
+    const mA5 = 'E4:2 A4:1 C#5:2 A4:1 | A4:2 B4:1 F#4:2 A4:1 | C#5:2 B4:1 A4:2 E4:1 | F#4:3 r:3 | r:6 | r:6 | B4:2 A4:1 F#4:3 | A4:2 B4:1 D5:2 r:1'; // うすい A は 1オクターブ 下（Codex）。40小節は 休まない（休むと -34dB → 10dB はねた）
+    let b = 0;
+    b = s.melody('lead', mA, b, 0.6);
+    b = s.melody('lead', mA2, b, 0.62);
+    b = s.melody('lead', mB, b, 0.58);
+    b = s.melody('lead', mA, b, 0.6);
+    b = s.melody('lead', mA5, b, 0.55);
+    // トイピアノの こたえ：うたの 休みだけ（高い音は 同時に ひとつ）
+    const toyAns = { 3: 'r:3 B5:1 G#5:1 E5:1', 7: 'r:3 C#6:1 A5:1 E5:1', 11: 'r:3 B5:1 D6:1 B5:1', 15: 'r:3 E6:1 C#6:1 A5:1', 27: 'r:3 B5:1 G#5:1 E5:1', 31: 'r:3 C#6:1 A5:1 E5:1', 35: 'r:3 A4:1 C#5:1 A4:1',
+      36: 'F#4:1 A4:1 D5:1 A4:1 F#4:1 A4:1', 37: 'G#4:1 B4:1 E5:1 B4:1 G#4:1 B4:1' }; // 37-38 も 1オクターブ 下
+    for (const [bar, str] of Object.entries(toyAns)) s.melody('toy', str, bar * 6, bar >= 36 ? 0.4 : 0.48);
+
+    // ピチカート：ながい ところ（1・4つめ）に 根音と 5度。ギター：みじかい ところ（3・6つめ）に「チャッ」
+    let prev = null;
+    for (let bar = 0; bar < 40; bar++) {
+      // うすい ところ（37〜40小節）は ウッドブロックと キックだけ やすむ（ピチカートと ギターは のこす。測ったら すきまが -37dB だった）
+      for (const q of [0, 3]) {
+        const c = at(chs, bar * 6 + q);
+        const r = bassNote(c.ch, 33);
+        const first = c.beat === bar * 6 + q;
+        s.note('pz', bar * 6 + q, first ? r : fifthOf(r, 45), 1.8, q === 0 ? 0.72 : 0.6);
+      }
+      for (const q of [2, 5]) {
+        const c = at(chs, bar * 6 + q);
+        const v = voice(c.ch, prev, { lo: 57, hi: 69, n: 3 }); prev = v;
+        strum(s, 'gtr', bar * 6 + q, v, 0.6, q === 5 ? 0.5 : 0.44, { spread: 0.006 });
+      }
+      // ウッドブロック：2小節に 2打（ころ・ころん）。A' から、うすい ところは なし
+      if (bar >= 8 && bar < 36 && bar % 2 === 1) { s.note('wb', bar * 6 + 3, 81, 0.2, 0.5); s.note('wb', bar * 6 + 5, 76, 0.2, 0.55); }
+      // ちいさな キック（付点4分の 2つ）。A' から B まで と、4つめの A
+      if ((bar >= 8 && bar < 36)) { s.note('kick', bar * 6, 36, 0.5, 0.55); s.note('kick', bar * 6 + 3, 36, 0.5, 0.4); }
+    }
+    return s;
+  };
+
   BGM.META = {
     pokapoka: { name: 'ぽかぽか おへや', mood: 'ほのぼの（マリンバ・ピアノ）' },
     hidamari: { name: 'ひだまり カフェ', mood: 'カフェ ボサノバ（ギター・ビブラフォン）' },
     yurayura: { name: 'ゆらゆら ティータイム', mood: 'ローファイ ジャズ（エレピ・やわらかいドラム）' },
     suichu: { name: 'すいちゅう さんぽ', mood: 'すいちゅう（パッド・ガラスのベル・あわ）' },
     ohirune: { name: 'おひるね オルゴール', mood: 'オルゴール（3びょうし）' },
+    parade: { name: 'てくてく パレード', mood: 'こうしん（もっきん・ピチカート・グロッケン）' },
+    matsuri: { name: 'ちゃぷちゃぷ まつり', mood: 'みなみの しま（スチールパン・ウクレレ・コンガ）' },
+    skip: { name: 'ぷくぷく スキップ', mood: 'スキップ（くちぶえ・ピチカート・ウッドブロック）' },
   };
 })();

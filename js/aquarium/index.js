@@ -13,6 +13,8 @@ import { FishAgent } from './swim.js';
 import { Tank, TANK_H, TANK_D, WATER_TOP } from './tank.js';
 import { FxLayer } from './fx.js';
 import { Cleaner } from './clean.js';
+import { WaterChanger } from './waterchange.js';
+import { Tweezers } from './tweezers.js';
 import { mergeSpec } from './speciesDefaults.js';
 
 // canvas ごとに renderer を使い回す（水槽を何度作り直しても WebGL コンテキストを増やさない）
@@ -49,6 +51,8 @@ export function createAquarium(canvas, opts = {}) {
   const tank = new Tank(scene, opts.water || 'fresh');
   const fx = new FxLayer(scene);
   const cleaner = new Cleaner(scene, tank, fx);
+  const waterer = new WaterChanger(scene, tank, fx);   // v0.7 みずかえの えんしゅつ
+  const tweezers = new Tweezers(scene, tank, fx);      // v0.7 ピンセット
   const lib = new SpeciesLibrary(rootUrl);
 
   /** @type {Map<string, {agent: FishAgent, mesh: THREE.Mesh, mat: THREE.Material}>} */
@@ -140,6 +144,7 @@ export function createAquarium(canvas, opts = {}) {
   function removeFish(uid) {
     const f = fishes.get(uid);
     if (!f) return;
+    f.agent.gone = true;   // v0.7 ピンセットが ねらって いたら やめる
     scene.remove(f.mesh);
     f.mat.dispose();
     fishes.delete(uid);
@@ -277,9 +282,11 @@ export function createAquarium(canvas, opts = {}) {
     updateSchools(dt);
     tank.update(dt);
     cleaner.update(dt, ctx);
+    waterer.update(dt, ctx);
+    tweezers.update(dt);
     for (const f of fishes.values()) {
       const a = f.agent;
-      a.update(dt, ctx);
+      if (!a.held) a.update(dt, ctx);   // v0.7 ピンセットを まっている 子は その場で とまる（うごきは tweezers.js）
       const u = f.mat.userData.u;
       // 貝は体の下（あし）が地面・ガラスにつくように持ち上げる
       const lift = a.isSnail ? a.len * a.heightRatio * 0.42 : 0;
@@ -384,6 +391,24 @@ export function createAquarium(canvas, opts = {}) {
     /** そうじのアニメ（約2秒）。終わると解決する Promise を返す。 */
     playClean() { return cleaner.play(); },
     /**
+     * v0.7 みずかえの アニメ（約3秒）：水が 3分の2 まで へって、バケツで あたらしい 水を そそぐ。終わると解決する Promise。
+     * o.dirtTo（0-1）を わたすと、そそぐ あいだに にごりを そこまで うすく する（あとで setWater で おなじ 値を わたす）。o.onPour()＝そそぎ はじめ。
+     */
+    playWaterChange(o = {}) { return waterer.play(o); },
+    /**
+     * v0.7 ピンセットで uid の 子に えさを 1つぶ（約1.4秒）。たべた ときは ふだんの えさと おなじ 'eat' が 出る（ハート・だいすきも おなじ）。
+     * きらいな えさ（setFoodPrefs の 'dislike'）なら ぷいっ。Promise は 'ate' | 'pui' | 'gone'。ほかの ピンセットが うごいて いる・いない 子なら null。
+     */
+    feedByTweezers(uid, o = {}) {
+      const f = fishes.get(uid);
+      if (!f || tweezers.busy) return null;
+      return tweezers.play(f.agent, { kind: o.kind || 'flake', pref: (a, k) => foodPref(a, k), onEat: (a, k) => ctx.onEat(a, k), onPui: (a, k) => ctx.onPui(a, k) });
+    },
+    /** v0.7 そうじ・みずかえ・ピンセットが うごいて いるか */
+    get careBusy() { return !!(cleaner.active || waterer.busy || tweezers.busy); },
+    /** v0.7 うごいて いる えんしゅつを すぐ おわらせる（画面を はなれる とき）。水位は もとに もどり、ピンセットは その場で たべる。 */
+    finishCare() { waterer.finish(); tweezers.finish(); },
+    /**
      * 後片付け。canvas をまた使うなら dispose() のまま（renderer を使い回す）。
      * canvas ごと捨てるときは dispose({ releaseContext: true }) で WebGL コンテキストも手放す。
      * 戻り値：片付けたあとに残った GPU の geometry / texture の数（0 なら漏れなし）。
@@ -399,7 +424,7 @@ export function createAquarium(canvas, opts = {}) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       for (const uid of [...fishes.keys()]) removeFish(uid);
-      cleaner.dispose(); fx.dispose(); tank.dispose(); lib.dispose();
+      cleaner.dispose(); waterer.dispose(); tweezers.dispose(); fx.dispose(); tank.dispose(); lib.dispose();
       scene.clear();
       renderer.renderLists.dispose();
       const left = { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length ?? 0 };

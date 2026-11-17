@@ -57,6 +57,29 @@
 #food-menu .fm-love { position: absolute; right: -6px; top: -4px; font-style: normal; font-size: 15px; color: #ff4f8b; text-shadow: 0 0 2px #fff, 0 0 2px #fff; }
 #food-menu .fm-name { font-size: 12px; line-height: 1.15; white-space: nowrap; }
 #food-menu .fm-left { font-size: 11px; line-height: 1; color: var(--ink-soft); }
+/* v0.7 あげかた（まく／ピンセット）：メニューの いちばん 上の 行 */
+#food-menu { flex-direction: column; }
+#food-menu .fm-foods { display: flex; gap: 6px; }
+#food-menu .fm-how { display: flex; align-items: center; gap: 6px; }
+#food-menu .fm-how-lb { font-size: 12px; font-weight: 800; color: var(--ink-soft); padding: 0 2px; white-space: nowrap; }
+#food-menu .fm-how-btn { flex: 1; min-height: 40px; padding: 4px 10px; border-radius: 12px; border: 2px solid transparent; background: #f3f7f5; color: var(--ink); font-size: 14px; font-weight: 800; white-space: nowrap; }
+#food-menu .fm-how-btn.on { border-color: var(--good-deep, #3a9b6b); background: #e6f6ec; }
+#food-menu .fm-how-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+#food-menu .fm-how-ic { display: inline-flex; }
+#food-menu .fm-how-btn.on::before { content: '✓'; color: var(--good-deep, #3a9b6b); }
+/* v0.7 みずかえ中は ヒントの ふきだしを かくす（なにを しているかは トーストで） */
+body.watering #hint, body.watering #hint-mini { display: none !important; }
+/* v0.7 ▲えらぶ を いつも 出すので：スマホでも 44px 以上・iPad で ビタミンも ある ときは ボタンを すこし せまく（おんがく ボタンと かさならない） */
+.care-btn.food-pick { min-width: 44px; }
+@media (min-height: 600px) and (min-width: 900px) {
+  #care:has(#food-pick:not([hidden])):has(.vit:not([hidden])) .care-btn:not(.food-pick):not([data-care="photo"]) { min-width: 126px; }
+}
+@media (max-height: 500px) {
+  #care:has(#food-pick:not([hidden])):has(.vit:not([hidden])) .care-btn:not(.food-pick):not([data-care="photo"]) { min-width: 84px; padding: 0 8px 0 5px; }
+}
+/* ピンセット モード中：えさボタンは［おわる］。ふちが ひかる */
+.care-btn.tw-on { background: #dff7ef; box-shadow: 0 0 0 3px #4fbf9f, 0 3px 0 rgba(32, 62, 74, 0.2); }
+.care-btn.tw-on .food-left { color: #1f7a62; font-weight: 800; }
 @media (min-height: 600px) and (min-width: 900px) {
   #food-menu .fm-item { width: 92px; }
   #food-menu .fm-pic { width: 56px; height: 56px; }
@@ -64,11 +87,13 @@
   .care-btn.food-pick .lb { font-size: 15px; }
 }
 @media (max-height: 500px) {
-  .care-btn.food-pick { min-width: 0; padding: 0 6px; }
+  .care-btn.food-pick { min-width: 44px; padding: 0 6px; }
   .care-btn.food-pick .lb { font-size: 11px; }
   #food-menu { padding: 6px; gap: 4px; }
   #food-menu .fm-item { width: 66px; }
   #food-menu .fm-pic { width: 36px; height: 36px; }
+  #food-menu .fm-foods { gap: 4px; }
+  #food-menu .fm-how-btn { min-height: 34px; font-size: 13px; padding: 2px 8px; }
 }
 
 /* ---------- ずかん ---------- */

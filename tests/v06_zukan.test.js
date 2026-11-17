@@ -15,13 +15,14 @@ const KINDS = ['fish', 'shrimp', 'snail'];
 test('v0.6 図鑑：obtain は shop（なし）・fishing・gasagasa だけ。fishing は うみ、gasagasa は いけ、どちらも おみせに 出ない', () => {
   for (const f of FISH) {
     if (f.obtain === undefined) { assert.notEqual(f.water, 'pond', `${f.id}：いけの 子が おみせに いる`); continue; }
-    assert.ok(['fishing', 'gasagasa'].includes(f.obtain), `${f.id} obtain=${f.obtain}`);
+    assert.ok(['fishing', 'gasagasa', 'premium'].includes(f.obtain), `${f.id} obtain=${f.obtain}`);   // v0.7 premium（課金係・tests/v07_iap.test.js）
     assert.equal(f.price, null, `${f.id} は price: null`);
     assert.equal(f.unlock, undefined, `${f.id} に unlock は いらない`);
   }
   for (const f of FISHING) assert.equal(f.water, 'salt', f.id);
   for (const f of GASA) assert.equal(f.water, 'pond', f.id);
-  assert.deepEqual(POND.map((f) => f.id), GASA.map((f) => f.id), 'いけの 子は ぜんぶ ガサガサ');
+  // v0.7：いけの 子は ガサガサ か とくべつ コーナー（premium）
+  assert.deepEqual(POND.filter((f) => f.obtain !== 'premium').map((f) => f.id), GASA.map((f) => f.id), 'いけの 子は ぜんぶ ガサガサ');
 });
 
 test('v0.6 図鑑：かず（つり 15〜18・いけ 18〜24）と レア度 1〜5 が ぜんぶ ある', () => {

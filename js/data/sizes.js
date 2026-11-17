@@ -80,6 +80,7 @@ export function defaultFoodPref(foodId, sp) {
 
 export const FOOD_PREF_OVERRIDE = {
   goldfish: { food_bloodworm: 'love', food_veggie: 'love', food_krill: 'ok' },
+  gold_goldfish: { food_bloodworm: 'love', food_veggie: 'love', food_krill: 'ok' },   // v0.7 課金係：キンギョと おなじ
   otocinclus: { food_veggie: 'love', food_bloodworm: 'ok', food_brine: 'no' },
   corydoras: { food_bloodworm: 'love', food_veggie: 'ok' },
   albino_corydoras: { food_bloodworm: 'love', food_veggie: 'ok' },

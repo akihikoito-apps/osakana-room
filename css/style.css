@@ -533,6 +533,39 @@ body.photo #btn-bgm, body.idle #btn-bgm { display: none !important; }
 .bgm-title { font-size: 16px; }
 .bgm-note { font-size: 13px; color: var(--ink-soft); }
 .bgm-mark { font-size: 14px; color: #1f7f92; white-space: nowrap; }
+/* v0.7：「たのしい」（あたたかい色）と「まったり」（つめたい色）を 2れつに。8曲でも 740×390 に おさまる */
+#bgm-picker .bgm-list.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+.bgm-col { display: flex; flex-direction: column; gap: 5px; padding: 6px; border-radius: 18px; min-width: 0; }
+.bgm-col.kind-tanoshii { background: #ffefd2; }
+.bgm-col.kind-mattari { background: #e3f1f8; }
+.bgm-kind { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 6px; font-size: 15px; font-weight: 700; }
+.bgm-kind-ic { font-size: 18px; line-height: 1; }
+.kind-tanoshii .bgm-kind { color: #a4501a; }
+.kind-mattari .bgm-kind { color: #2b6984; }
+.bgm-col .bgm-row { min-height: 46px; padding: 3px 10px; gap: 8px; background: #fff; }
+.kind-tanoshii .bgm-row { min-height: 56px; }
+.kind-tanoshii .bgm-row.on { background: #fff; border-color: #ee8a32; }
+.kind-tanoshii .bgm-mark { color: #b85a18; }
+.bgm-col .bgm-row.on { background: #fff; }
+.bgm-ic { flex: none; width: 30px; font-size: 24px; line-height: 1; text-align: center; }
+.bgm-col .bgm-body { min-width: 0; }
+.bgm-col .bgm-title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bgm-col .bgm-note { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bgm-col .bgm-mark { font-size: 18px; font-weight: 900; }
+/* えらんでいる 曲の 絵：たのしいは ぴょんぴょん、まったりは ゆらゆら（agy） */
+.kind-tanoshii .bgm-row.on .bgm-ic { animation: bgm-hop 0.7s ease-in-out infinite; }
+.kind-mattari .bgm-row.on .bgm-ic { animation: bgm-sway 2.4s ease-in-out infinite; }
+@keyframes bgm-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes bgm-sway { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .bgm-row.on .bgm-ic { animation: none !important; } }
+@media (max-height: 420px) {
+  #bgm-picker .bgm-panel { padding: 10px 14px; }
+  #bgm-picker .bgm-head { margin-bottom: 6px; }
+  .bgm-col { gap: 3px; padding: 5px; }
+  .bgm-kind { height: 20px; font-size: 14px; }
+  .bgm-col .bgm-row { min-height: 41px; padding: 2px 10px; }
+  .kind-tanoshii .bgm-row { min-height: 54px; }
+}
 
 /* ---------- v0.3：ビタミン・定員・おんど ダイヤル ---------- */
 .care-btn .vit-left { display: block; font-size: 12px; line-height: 1; color: #634d16; }

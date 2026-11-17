@@ -13,6 +13,7 @@
 //   vitamin  : （v0.3）ビタミン剤（food_vitamin）の すききらい。'love'＝だいすき／'ok'＝たべる／'dislike'＝たべない（ぷいっ）
 //   water    : 'fresh' | 'salt' | 'pond'（v0.6：いけ）
 //   obtain   : （v0.6）手に入れかた。無い＝おみせ。'fishing'＝ぼうけんの うみで つり、'gasagasa'＝いけで ガサガサ。どちらも price: null
+//              （v0.7）'premium'＝とくべつ コーナー（アプリ内購入・js/iap.js）。price: null
 //   かい（kind 'snail'）は v0.3 から space 0。かずは balance.js TANK.snailMax（2ひき）で べつに かぞえる
 export const FISH = [
   {
@@ -730,5 +731,36 @@ export const FISH = [
     texture: 'assets/fish/tagame.png',
     intro: 'にほんで いちばん おおきな みずの なかの むし。いけの おうさま。',
     hint: 'いまは かずが へっている たいせつな むし。しぜんで みつけたら そっと みまもろう。',
+  },
+
+  // ======== v0.7 課金係：とくべつ コーナー（obtain 'premium'・price null＝コインでは かえない・つり／ガサガサにも 出ない）========
+  // 1しゅるい 1かい だけ（js/iap.js の PRODUCTS。ねだんも そこ）。レア度は 3（めずらしい）で そろえ、でんせつ（5）には しない（Codex・agy）。
+  // からだの データは もとの しゅるい（キンギョ・アメリカザリガニ・クサガメ）と おなじ くらい。課金で つよく しない。
+  {
+    id: 'gold_goldfish', name: 'きんいろキンギョ', kind: 'fish', water: 'fresh', rarity: 3, price: null, obtain: 'premium',
+    temp: { min: 10, max: 28, best: 23 }, food: ['food_flake'],
+    growDays: [3, 7], sizeCm: [3, 8, 12], appetite: 1.1, space: 2, likes: ['stone', 'plant'], cleanMin: 40, vitamin: 'love',
+    look: { lengthToHeight: 2.6, thickness: 0.30, finStyle: 'long' }, swim: { layer: 'any', speed: 0.7, school: false },
+    texture: 'assets/fish/gold_goldfish.png',
+    intro: 'うろこが きんいろに かがやく、とくべつな キンギョ。ながい しっぽで ゆったり およぐよ。',
+    hint: 'よく たべて みずが よごれやすいよ。みずかえを わすれずに。',
+  },
+  {
+    id: 'albino_suppon', name: 'アルビノスッポン', kind: 'fish', water: 'pond', rarity: 3, price: null, obtain: 'premium',
+    temp: { min: 10, max: 32, best: 25 }, food: ['food_flake', 'food_sinking'],
+    growDays: [4, 8], sizeCm: [3, 12, 28], appetite: 1.1, space: 2, likes: ['driftwood', 'plant'], cleanMin: 40, vitamin: 'love',
+    look: { lengthToHeight: 2.6, thickness: 0.32, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.45, school: false },   // スッポンは 水の 中が おおい（habit なし：Codex・agy）
+    texture: 'assets/fish/albino_suppon.png',
+    intro: 'からだの いろが うすい、めずらしい アルビノの スッポン。やわらかい こうらと ストローみたいな はなが じまん。',
+    hint: 'みずの そこで じっと するのが すき。ちいさな さかなや エビとは べつの すいそうが あんしん。',
+  },
+  {
+    id: 'blue_zarigani', name: 'あおいザリガニ', kind: 'shrimp', water: 'pond', rarity: 3, price: null, obtain: 'premium',
+    temp: { min: 5, max: 30, best: 22 }, food: ['food_flake', 'food_sinking'],
+    growDays: [3, 6], sizeCm: [2, 8, 12], appetite: 1, space: 1, likes: ['stone', 'driftwood'], cleanMin: 30, vitamin: 'love',
+    look: { lengthToHeight: 2.8, thickness: 0.35, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' },
+    texture: 'assets/fish/blue_zarigani.png',
+    intro: 'そらいろの からだの アメリカザリガニ。めったに みつからない、とくべつな いろ。',
+    hint: 'かった ザリガニは そとに にがさないでね。ちいさな いきものとは べつの すいそうが あんしん。',
   },
 ];

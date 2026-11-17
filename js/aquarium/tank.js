@@ -457,6 +457,7 @@ export class Tank {
     surf.position.set(wC, this.waterTop, 0);
     surf.renderOrder = 1;
     this.group.add(surf);
+    this.surf = surf;
 
     // 水面より上（ふたの裏）
     const lid = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshBasicMaterial({ color: 0x3d4c55, fog: false }));
@@ -464,6 +465,7 @@ export class Tank {
     const air = new THREE.Mesh(new THREE.PlaneGeometry(W, H - this.waterTop), new THREE.MeshBasicMaterial({ color: 0xcfe9ee, fog: false }));
     air.position.set(0, (H + this.waterTop) / 2, -D / 2 + 0.01);
     this.group.add(lid, air);
+    this.air = air;
 
     // 光の筋
     this.rays = [];
@@ -499,6 +501,7 @@ export class Tank {
     const menMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, fog: false, depthWrite: false });
     const men = new THREE.Mesh(new THREE.PlaneGeometry(wW, 0.06), menMat); men.position.set(wC, this.waterTop, fz - 0.005); men.renderOrder = 11;
     this.group.add(men);
+    this.men = men; this.waterSpan = { wW, wC };
     // ガラスの映りこみ（うすい斜めの光）
     const glare = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({
       map: gradientTexture(256, 4, [[0, 'rgba(255,255,255,0)'], [0.62, 'rgba(255,255,255,0)'], [0.7, 'rgba(255,255,255,0.07)'], [0.76, 'rgba(255,255,255,0.02)'], [0.8, 'rgba(255,255,255,0.06)'], [0.86, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,0)']], false),
@@ -518,6 +521,50 @@ export class Tank {
     this.setDecor(this.decorIds, true);
     this.buildDirt();
     this.applyWater();
+    if (this.level !== undefined && this.level < this.waterTop) this.setLevel(this.level);   // v0.7 みずかえの とちゅうで 作りなおしても 水位を たもつ
+  }
+
+  /**
+   * v0.7 みずかえ：見た目の 水位を y に する（this.waterTop が いつもの 高さ。そこより 上には しない）。
+   * 水面・水ぎわの 線・にごり・光の筋・およげる 高さ（bounds.top）・いけの 水ぎわ（bounds.land）を いっしょに うごかす。
+   */
+  setLevel(y) {
+    const top = this.waterTop;
+    y = clamp(+y || top, 0.8, top);
+    this.level = y;
+    const k = y / top;
+    if (this.surf) this.surf.position.y = y;
+    if (this.air) { const h = TANK_H - y; this.air.scale.y = h / (TANK_H - top); this.air.position.y = (TANK_H + y) / 2; }
+    if (this.murk) { this.murk.scale.y = k; this.murk.position.y = y / 2; }
+    if (this.rays) for (const r of this.rays) { r.scale.y = Math.max(0.05, (y - 0.6) / (top - 0.6)); r.position.y = (y + 0.6) / 2; }
+    this.bounds.top = y;
+    if (this.land) {
+      // いけ：水が へると 水ぎわが 左へ さがる（さかの とちゅうが 見える）
+      let shore = this.land.x0;
+      for (let x = this.land.x0 - 3; x <= this.land.x1; x += 0.05) if (this.sandHeight(x, 0) >= y) { shore = x; break; }
+      if (y >= top - 1e-6) shore = this.land.shore;
+      if (this.bounds.land) { this.bounds.land.waterTop = y; this.bounds.land.shore = shore; }
+      this.uniforms.uWaterTop.value = y;
+      // まえの ガラスの 水の 線は 水が ある はばだけ
+      let front = shore;
+      for (let x = this.land.x0 - 3; x <= this.land.x1 + 1; x += 0.05) if (this.sandHeight(x, TANK_D / 2) >= y) { front = x; break; }
+      if (this.waterSpan) {
+        const w = Math.max(0.5, front + 0.4 - (-this.W / 2)), sx = y >= top - 1e-6 ? 1 : Math.min(1, w / this.waterSpan.wW);
+        for (const m of [this.men, this.murk]) if (m) { m.scale.x = sx; m.position.x = -this.W / 2 + this.waterSpan.wW * sx / 2; }
+      }
+    }
+    if (this.men) this.men.position.y = y;
+    if (y >= top - 1e-6) this.level = undefined;
+  }
+
+  /** いまの 見た目の 水位（みずかえ中は さがる） */
+  get levelNow() { return this.level ?? this.waterTop; }
+
+  /** v0.7 あわを 1つ（みずかえの 着水点など）。あいて いなければ なにも しない */
+  spawnBubble(x, y, z, s = 0.08) {
+    const bb = this.bubbles.find((q) => !q.alive);
+    if (!bb) return;
+    Object.assign(bb, { alive: true, x, y, z, s, vy: 1.6 + s * 6 + Math.random() * 0.8, ph: Math.random() * 6, kind: 'splash', vx: 0, maxY: this.waterTop - 0.05, cx: x, inTube: false, tubeR: 0.25, tubeTop: Infinity });
   }
 
   /** 底のごみを置きなおす（まんなかの帯 z=-0.5〜0.5 にならべる。手前すぎるとボタンにかくれる）。 */
@@ -1680,7 +1727,7 @@ export class Tank {
       r = { m }; this.ripples.push(r);
     }
     r.alive = true; r.t = 0;
-    r.m.position.set(x, this.waterTop - 0.02, z);
+    r.m.position.set(x, this.levelNow - 0.02, z);
     r.m.visible = true;
   }
 
@@ -1699,6 +1746,7 @@ export class Tank {
           f.pos.x += Math.sin(f.age * 2.2 + f.sway) * 0.12 * dt;
           f.pos.z += Math.cos(f.age * 1.7 + f.sway) * 0.08 * dt;
         }
+        if (f.pos.y > this.levelNow - 0.05) f.pos.y = this.levelNow - 0.05;   // v0.7 みずかえ中は 下がった 水面に うく
         if (f.pos.y <= sand) { f.pos.y = sand; f.landed = true; f.landT = 0; }
       } else {
         f.landT += dt;
@@ -1769,6 +1817,15 @@ export class Tank {
       mp.setX(i, mp.getX(i) + Math.cos(this.time * 0.2 + ph[3]) * 0.002);
     }
     mp.needsUpdate = true;
+    // v0.7 みずかえ中：下がった 水面より 上の つぶは 見せない（空気の ところに うかない）
+    if (this.level !== undefined || this.moteClip) {
+      const ma = this.motes.geometry.attributes.aAlpha;
+      if (!this.moteA) this.moteA = Float32Array.from(ma.array);
+      const lv = this.levelNow;
+      this.moteClip = this.level !== undefined;
+      for (let i = 0; i < this.moteCount; i++) ma.setX(i, mp.getY(i) > lv - 0.1 ? 0 : this.moteA[i]);
+      ma.needsUpdate = true;
+    }
     // 泡
     const on = this.bubblesOn;
     for (const e of this.emitters) {
@@ -1795,7 +1852,7 @@ export class Tank {
         bb.x += (Math.sin(bb.ph) * 0.25 + (bb.vx || 0)) * dt;
         if (bb.kind === 'filter') { bb.vx *= 1 - dt * 0.8; bb.vy += dt * 0.6; }
         if (bb.inTube && bb.y < bb.tubeTop) bb.x = bb.cx + clamp(bb.x - bb.cx, -bb.tubeR, bb.tubeR);
-        if (bb.y > bb.maxY || bb.x < this.bounds.minX) bb.alive = false;
+        if (bb.y > Math.min(bb.maxY, this.levelNow - 0.05) || bb.x < this.bounds.minX) bb.alive = false;   // v0.7 みずかえ中は 下がった 水面で きえる
       }
       bp.position.setXYZ(i, bb.x, bb.y, bb.z);
       bp.aSize.setX(i, bb.alive ? bb.s : 0);

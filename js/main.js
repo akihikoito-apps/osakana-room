@@ -5,6 +5,7 @@ import { ITEMS } from './data/items.js';
 import { compatOf } from './data/compat.js';
 import * as S from './state.js';
 import * as sim from './sim.js';
+import * as IAP from './iap.js';   // v0.7 課金係
 import { $, $$, toast, bumpCoins, dialog, el } from './ui/common.js';
 import * as room from './ui/room.js';
 import * as tankUi from './ui/tank.js';
@@ -29,6 +30,9 @@ async function boot() {
     optional('./data/balance.js'), optional('./data/missions.js'), optional('./data/hints.js'), optional('./data/tutorial.js'),
   ]);
   const data = sim.setup({ FISH, ITEMS, compatOf, balance, missions: missionData, hints: hintData, tutorial: tutorialData });
+  // v0.7 課金係：とくべつ コーナー。公開版は 'none'（買えない）。?iaptest の ときだけ にせの 購入で、セーブも べつ
+  IAP.initIap({ search: location.search, host: location.hostname });   // テストは localhost だけ
+  if (IAP.isTest()) S.useSaveKey(S.SAVE_KEY + '-iaptest', { copyFrom: S.SAVE_KEY });
 
   if (params.has('reset')) {
     S.resetSave();
@@ -38,6 +42,8 @@ async function boot() {
   }
   const state = S.load(sim.initialValues());
   sim.normalize(state);
+  IAP.norm(state);
+  const healed = IAP.heal(state);   // 買ったのに いない 子（セーブの まえに とじた など）を おやすみすいそうへ
 
   /** みんなで使う入れもの */
   const G = {
@@ -59,6 +65,7 @@ async function boot() {
     handleEvents(events) { for (const ev of events || []) this.emit('sim', ev); },
   };
   window.G = G;   // 確認用
+  G.iap = IAP; G.iapHealed = healed;   // v0.7 課金係（画面は js/ui/premium.js）
 
   // ---------- 画面の切り替え ----------
   const SHEETS = ['shop', 'dex', 'missions'];
@@ -187,7 +194,7 @@ async function boot() {
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
   // v0.5：ヘルプ・こうしん りれき（案内係）／ミニゲーム・かりすいそう・プレイヤー（ゲーム係）。無くても うごく
-  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js'].map(optional))) m.init?.(G);
+  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js', './ui/premium.js'].map(optional))) m.init?.(G);   // v0.7 premium：課金係
 
   // ずっと押していると出るメニューや、ダブルタップの拡大を止める
   document.addEventListener('contextmenu', (e) => e.preventDefault());

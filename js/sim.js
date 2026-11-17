@@ -559,7 +559,8 @@ const done = (state) => { const events = []; checkMissions(state, events); retur
 export const FEED_WINDOW_MS = 40000;   // 水槽の餌は 底に ついてから 30びょう のこる
 let session = null;
 /** えさを 落とせるか しらべて はじめる。{ ok, reason: 'noTool'|'noFish'|'full'|'busy', leftover, lockMs } */
-export function feedStart(state, t = state.tanks[0], foodId = 'food_flake', now = Date.now()) {
+// v0.7 opts.tweezers：ピンセット（1ぴきずつ 口もとへ）。かぞえかたは まくと おなじ。粒が のこらないので たべのこしは ふえない
+export function feedStart(state, t = state.tanks[0], foodId = 'food_flake', now = Date.now(), opts = {}) {
   if (!ownsTool(state, foodId)) return { ok: false, reason: 'noTool' };
   if (!t.fish.length) return { ok: false, reason: 'noFish' };
   if (session && now < session.until) return { ok: false, reason: 'busy' };
@@ -572,7 +573,7 @@ export function feedStart(state, t = state.tanks[0], foodId = 'food_flake', now 
   const it = D.itemById[foodId];
   if (it?.uses && !it.grants && foodId !== 'food_vitamin') state.inv[foodId] = Math.max(0, (state.inv[foodId] || 0) - 1);   // かいすうの ある えさは へる
   let leftover = 0;
-  if (full > 0 && full * 2 >= t.fish.length) {     // たべない魚が 半分以上
+  if (!opts.tweezers && full > 0 && full * 2 >= t.fish.length) {     // たべない魚が 半分以上
     leftover = B.HUNGER.leftoverIfHalfFull;
     t.leftover = clamp(t.leftover + leftover, 0, B.CLEAN.leftoverMax);
   }

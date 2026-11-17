@@ -17,13 +17,22 @@
 //   ・iPhone/iPad の マナーモード（消音スイッチ）では 鳴らない ことが 多い（効果音と おなじ あつかい）。わざと そのまま。
 //   ・選んだ曲・オン/オフ・音量は localStorage 'osakana-room-bgm' に。
 
+// kind：'tanoshii'（げんきな 曲）か 'mattari'（ゆったり）。画面は この 2つに わけて 2れつで ならべる（v0.7）。
+// icon：字が よめない 子も 絵で おぼえられる ように（agy）。note：画面の 説明の 行（みじかく）。mood：くわしい 説明。loop：ループの 秒数
 export const TRACKS = [
-  { id: 'pokapoka', name: 'ぽかぽか おへや', file: 'assets/bgm/pokapoka.m4a', mood: 'ほのぼの（マリンバ・ピアノ）', loop: 76.8 },
-  { id: 'hidamari', name: 'ひだまり カフェ', file: 'assets/bgm/hidamari.m4a', mood: 'カフェ ボサノバ（ギター・ビブラフォン）', loop: 64 },
-  { id: 'yurayura', name: 'ゆらゆら ティータイム', file: 'assets/bgm/yurayura.m4a', mood: 'ローファイ ジャズ（エレピ・やわらかいドラム）', loop: 72 },
-  { id: 'suichu', name: 'すいちゅう さんぽ', file: 'assets/bgm/suichu.m4a', mood: 'すいちゅう（パッド・ガラスのベル・あわ）', loop: 80 },
-  { id: 'ohirune', name: 'おひるね オルゴール', file: 'assets/bgm/ohirune.m4a', mood: 'オルゴール（3びょうし）', loop: 96 },
-].map((t) => ({ ...t, note: t.mood })); // note は 画面（js/ui/bgm-ui.js）の 説明の 行に 出る。loop はループの 秒数
+  { id: 'pokapoka', kind: 'mattari', icon: '🌼', name: 'ぽかぽか おへや', file: 'assets/bgm/pokapoka.m4a', mood: 'ほのぼの（マリンバ・ピアノ）', note: 'マリンバと ピアノ', loop: 76.8 },
+  { id: 'hidamari', kind: 'mattari', icon: '☕', name: 'ひだまり カフェ', file: 'assets/bgm/hidamari.m4a', mood: 'カフェ ボサノバ（ギター・ビブラフォン）', note: 'ギターの ボサノバ', loop: 64 },
+  { id: 'yurayura', kind: 'mattari', icon: '🍵', name: 'ゆらゆら ティータイム', file: 'assets/bgm/yurayura.m4a', mood: 'ローファイ ジャズ（エレピ・やわらかいドラム）', note: 'エレピの ジャズ', loop: 72 },
+  { id: 'suichu', kind: 'mattari', icon: '🐠', name: 'すいちゅう さんぽ', file: 'assets/bgm/suichu.m4a', mood: 'すいちゅう（パッド・ガラスのベル・あわ）', note: 'あわと ガラスの ベル', loop: 80 },
+  { id: 'ohirune', kind: 'mattari', icon: '🌙', name: 'おひるね オルゴール', file: 'assets/bgm/ohirune.m4a', mood: 'オルゴール（3びょうし）', note: 'オルゴールの こもりうた', loop: 96 },
+  { id: 'parade', kind: 'tanoshii', icon: '🎈', name: 'てくてく パレード', file: 'assets/bgm/parade.m4a', mood: 'こうしん（もっきん・ピチカート・グロッケン）', note: 'もっきんで こうしん', loop: 60 },
+  { id: 'matsuri', kind: 'tanoshii', icon: '🏝️', name: 'ちゃぷちゃぷ まつり', file: 'assets/bgm/matsuri.m4a', mood: 'みなみの しま（スチールパン・ウクレレ・コンガ）', note: 'スチールパンで おどろう', loop: 61.44 },
+  { id: 'skip', kind: 'tanoshii', icon: '🐇', name: 'ぷくぷく スキップ', file: 'assets/bgm/skip.m4a', mood: 'スキップ（くちぶえ・ピチカート・ウッドブロック）', note: 'くちぶえで スキップ', loop: 72 },
+];
+export const KINDS = [
+  { id: 'tanoshii', label: 'たのしい', icon: '🎉' },
+  { id: 'mattari', label: 'まったり', icon: '☁️' },
+];
 
 const KEY = 'osakana-room-bgm';
 const LOOP_START = 1.0;   // ファイルの この秒から L 秒を ループ

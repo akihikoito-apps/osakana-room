@@ -79,6 +79,10 @@ export const SPECIES_DEFAULTS = {
   kusagame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
   ishigame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
   tagame:        { kind: 'shrimp', water: 'pond', look: { lengthToHeight: 2.8, thickness: 0.25, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.3, school: false } },
+  // v0.7 課金係：とくべつ コーナー（スッポンは 水の 中が おおいので habit なし）
+  gold_goldfish: { kind: 'fish', water: 'fresh', look: { lengthToHeight: 2.6, thickness: 0.3, finStyle: 'long' }, swim: { layer: 'any', speed: 0.7, school: false } },
+  albino_suppon: { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.6, thickness: 0.32, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.45, school: false } },
+  blue_zarigani: { kind: 'shrimp', water: 'pond', look: { lengthToHeight: 2.8, thickness: 0.35, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
 };
 
 /** データ（fish.js）と予備をまぜる。データの値が優先。 */

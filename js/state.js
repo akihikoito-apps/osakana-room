@@ -9,6 +9,15 @@ export const REAL_SEC_PER_GAME_DAY = 600;
 export const MIN_PER_DAY = 1440;
 export const START_MINUTE = 6 * 60;          // 1にちめ の あさ 6:00 から（balance.js TIME.dayStartHour が あれば そちら）
 
+// v0.7 課金係：?iaptest（にせの 購入）の ときは べつの セーブを つかう。にせの 購入で 手に 入れた 子を ふだんの セーブに まぜない
+// （だれでも URL に つけられるので、タダで 手に 入る 道に しない：Codex）。はじめは ふだんの セーブの コピーから。
+let saveKey = SAVE_KEY;
+export const currentSaveKey = () => saveKey;
+export function useSaveKey(key, { copyFrom } = {}) {
+  saveKey = key;
+  try { if (copyFrom && !localStorage.getItem(key)) { const v = localStorage.getItem(copyFrom); if (v) localStorage.setItem(key, v); } } catch { /* なし */ }
+}
+
 let uidSeq = 0;
 export function newUid(prefix = 'f') {
   uidSeq = (uidSeq + 1) % 1000;
@@ -30,6 +39,7 @@ export function newState(init = {}) {
     }],
     box: [],                 // v0.5 おやすみすいそう（あずけた 生きもの。水槽の 魚と おなじ 形・時間は すすまない）
     storage: [],             // v0.6 そうこ（しまった すいそう。中身ごと・時間は すすまない）
+    iap: { owned: {}, log: [] },   // v0.7 とくべつ コーナーで 買った きろく（js/iap.js。けさない）
     quiz: null,              // v0.5 ミニゲームの とちゅう（とじても つづきから）
     hearts: 0,               // なでて もらった ハート（いまの かず。あとで つかう よてい）
     heartsTotal: 0,          // つうさんの ハート（つかっても へらない）
@@ -81,6 +91,8 @@ export function migrate(raw, init) {
   out.quiz = isObj(s.quiz) && Array.isArray(s.quiz.qs) ? s.quiz : null;
   out.unlocks = isObj(s.unlocks) ? s.unlocks : {};
   out.notices = isObj(s.notices) ? s.notices : {};
+  // v0.7 課金係：買った きろくは なくさない（こまかい 形の 直しは js/iap.js の norm）
+  out.iap = isObj(s.iap) ? { ...s.iap, owned: isObj(s.iap.owned) ? s.iap.owned : {}, log: Array.isArray(s.iap.log) ? s.iap.log : [] } : { owned: {}, log: [] };
   // 水槽の わく（0〜5）が かさならない ように
   const used = new Set();
   for (const t of out.tanks) {
@@ -123,22 +135,22 @@ const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
 
 export function load(init) {
   try {
-    const txt = localStorage.getItem(SAVE_KEY);
+    const txt = localStorage.getItem(saveKey);
     if (!txt) return newState(init);
     const s = migrate(JSON.parse(txt), init);
     if (s) return s;
   } catch (e) {
     console.warn('セーブを よめなかった', e);
-    try { localStorage.setItem(SAVE_KEY + '-broken', localStorage.getItem(SAVE_KEY) || ''); } catch { /* いっぱい */ }
+    try { localStorage.setItem(saveKey + '-broken', localStorage.getItem(saveKey) || ''); } catch { /* いっぱい */ }
   }
   return newState(init);
 }
 
 export function save(state) {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); return true; } catch (e) { console.warn('セーブ できなかった', e); return false; }
+  try { localStorage.setItem(saveKey, JSON.stringify(state)); return true; } catch (e) { console.warn('セーブ できなかった', e); return false; }
 }
 
-export function resetSave() { try { localStorage.removeItem(SAVE_KEY); } catch { /* なし */ } }
+export function resetSave() { try { localStorage.removeItem(saveKey); } catch { /* なし */ } }
 
 // ---------------- 時計 ----------------
 export const dayOf = (min) => Math.floor(min / MIN_PER_DAY) + 1;

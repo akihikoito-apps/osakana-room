@@ -23,7 +23,7 @@
 </style>
 </head>
 <body>
-  <h1>BGM の かくにん（5きょく）</h1>
+  <h1>BGM の かくにん（<span id="count"></span>きょく）</h1>
   <p class="note">きょくを タップすると ながれます（iPhone・iPad は マナーモードだと なりません）。ループの つなぎめも きいて みてね。</p>
   <div class="grid" id="list"></div>
   <div class="bar">
@@ -37,10 +37,11 @@
   const vol = document.getElementById('vol');
   const st = document.getElementById('state');
   const fmt = (s) => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  document.getElementById('count').textContent = TRACKS.length;
   for (const t of TRACKS) {
     const b = document.createElement('button');
     b.className = 'track'; b.dataset.id = t.id;
-    b.innerHTML = `${t.name}<small>${t.mood}・${fmt(t.loop)} で ループ</small>`;
+    b.innerHTML = `${t.icon || ''} ${t.name}<small>${t.kind === 'tanoshii' ? 'たのしい・' : ''}${t.mood}・${fmt(t.loop)} で ループ</small>`;
     b.addEventListener('click', () => play(t.id));
     list.appendChild(b);
   }
