@@ -4,6 +4,7 @@
 // - assets/room/room_v2.jpg が 読めないときは v0.1 の 部屋（台 1つ）で 1つめの 水槽だけ 出す。
 import { $, $$, el, toast } from './common.js';
 import { lightOf } from '../state.js';
+import { makeClock, clockWords } from './clock.js';   // v0.8 ゆめ係：かべの とけい
 
 const IMG_W = 1920, IMG_H = 1080;
 // 絵ごとの わく（絵に対する割合）。x0〜x1 が 天板の 左右、bottom が 水槽の 底の 高さ。
@@ -11,13 +12,15 @@ const IMG_W = 1920, IMG_H = 1080;
 const ROOMS = {
   v2: {
     src: 'assets/room/room_v2.jpg', night: 'assets/room/room_v2_night.jpg', floorY: 0.80,
+    // v0.8 ゆめ係：かべの とけい（まんなか x・y と 直径 d は 絵の 高さに たいする 割合）
+    clock: { x: 0.517, y: 0.165, d: 0.115 },
     // docs/アート.md 5章：x 左・右、bottom ＝ 奥 y と 手前 y の あいだ、top ＝ 上の限り
     slots: [
       { x0: 0.302, x1: 0.435, bottom: 0.5395, top: 0.314 }, { x0: 0.450, x1: 0.586, bottom: 0.5395, top: 0.314 }, { x0: 0.601, x1: 0.734, bottom: 0.5395, top: 0.314 },
       { x0: 0.302, x1: 0.435, bottom: 0.7535, top: 0.565 }, { x0: 0.450, x1: 0.586, bottom: 0.7535, top: 0.565 }, { x0: 0.601, x1: 0.734, bottom: 0.7535, top: 0.565 },
     ],
   },
-  v1: { src: 'assets/room/room_base.jpg', floorY: 0.775, slots: [{ x0: 0.382, x1: 0.708, bottom: 0.571 }] },
+  v1: { src: 'assets/room/room_base.jpg', floorY: 0.775, slots: [{ x0: 0.382, x1: 0.708, bottom: 0.571 }], clock: { x: 0.545, y: 0.16, d: 0.12 } },
 };
 let ROOM = ROOMS.v1;
 
@@ -29,14 +32,32 @@ export function init(g) {
   G = g;
   $$('#room-nav [data-go], #room-corner [data-go]').forEach((b) => b.addEventListener('click', () => G.go(b.dataset.go)));
   window.addEventListener('resize', () => { layout(); render(true); });
-  G.on('tick', () => { if (G.screen === 'room') { renderNight(); render(); } });
+  G.on('tick', () => { if (G.screen === 'room') { renderNight(); render(); renderClock(); } });
   G.on('changed', () => { if (G.screen === 'room') render(true); });
   // 新しい 部屋の 絵が あれば つかう（無ければ v0.1 の 部屋）
   const probe = new Image();
-  probe.onload = () => { ROOM = ROOMS.v2; $('#room-bg').src = ROOM.src; buildSlots(); layout(); renderNight(); render(true); G.emit('roomReady'); };
+  probe.onload = () => { ROOM = ROOMS.v2; $('#room-bg').src = ROOM.src; buildSlots(); layout(); renderNight(); render(true); renderClock(); G.emit('roomReady'); };
   probe.src = ROOMS.v2.src;
   buildSlots();
   layout();
+  renderClock();
+}
+
+// ---------- v0.8 かべの とけい（ゆめ係）----------
+// はりは ゲームの 時間で うごく（5ふん きざみ）。タップすると「いま あさの 6じ30ぷん だよ」。
+let wallClock = null;
+function renderClock() {
+  const c = ROOM.clock;
+  const st = $('#room-stage');
+  if (!c || !st) return;
+  if (!wallClock) {
+    const face = makeClock({ className: 'wall-ck', ticks: 12 });   // すうじは はりと かさなって よめないので めもり だけ（agy）
+    wallClock = el('button', { class: 'room-clock', 'aria-label': 'とけい', onclick: () => toast(`いま ${clockWords(G.state.clock.min)} だよ`) }, face);
+    wallClock.face = face;
+    st.append(wallClock);
+  }
+  Object.assign(wallClock.style, { left: c.x * 100 + '%', top: c.y * 100 + '%', height: c.d * 100 + '%' });
+  wallClock.face.update(G.state.clock.min);
 }
 
 export function show(g, opts = {}) {
@@ -44,6 +65,7 @@ export function show(g, opts = {}) {
   layout();
   renderNight();
   render(true);
+  renderClock();
   // すいそうから もどってきた：ズームアウト
   if (zoomed != null && opts.from === 'tank') zoomOut(zoomed);
   zoomed = null;
@@ -169,8 +191,9 @@ function miniTank(t, b) {
     const sp = G.data.fishById[f.speciesId];
     if (!sp) return;
     const bottomish = sp.swim?.layer === 'bottom' || sp.kind === 'snail';
-    const wPct = (sp.kind === 'fish' ? 13 : 10) * [0.75, 1, 1.25][f.stage];
-    const img = el('img', { src: sp.texture, alt: '', onerror: (e) => { e.target.replaceWith(el('i', { class: 'rf-dot' })); } });
+    // v0.8 ゆめの いきもの：かいた 絵（f.dream.art）。おおきさは えらんだ s・m・l
+    const wPct = f.dream ? ({ s: 9, m: 13, l: 17 }[f.dream.size] || 13) : (sp.kind === 'fish' ? 13 : 10) * [0.75, 1, 1.25][f.stage];
+    const img = el('img', { src: f.dream?.art || sp.texture, alt: '', onerror: (e) => { e.target.replaceWith(el('i', { class: 'rf-dot' })); } });
     const d = el('div', { class: 'rf' }, img);
     const x0 = 6 + ((i * 53) % 50);
     d.style.width = wPct + '%';

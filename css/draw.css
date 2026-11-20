@@ -1,0 +1,163 @@
+/* v0.8 おえかき係：ゆめのすいそうの おえかき がめん（js/ui/draw.js）。がめん いっぱい。 */
+#scr-draw {
+  --dr-b: 46px;          /* ボタンの 大きさ */
+  --dr-c: 40px;          /* いろの まる */
+  --dr-gap: 6px;
+  --dr-ink: #3b3a66;
+  --dr-sel: #ffcf3f;
+  --dr-panel: rgba(255, 255, 255, 0.82);
+  z-index: 35;           /* 上の 帯（30）より 上・おしらせ（45）や ダイアログ（50）より 下 */
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.7) 0 6%, transparent 7%),
+    radial-gradient(circle at 88% 82%, rgba(255, 255, 255, 0.5) 0 9%, transparent 10%),
+    linear-gradient(160deg, #e9defb 0%, #d7ecfb 55%, #cdf1ec 100%);
+  color: var(--dr-ink);
+  touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  overflow: hidden;
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  #scr-draw { --dr-b: 58px; --dr-c: 54px; --dr-gap: 8px; }
+}
+body.on-draw #btn-bgm, body.on-draw #hud { visibility: hidden; }
+
+#scr-draw .dr-page { position: absolute; inset: 0; padding: calc(var(--safe-t) + 8px) calc(var(--safe-r) + 10px) calc(var(--safe-b) + 8px) calc(var(--safe-l) + 10px); display: flex; flex-direction: column; gap: 8px; }
+#scr-draw .dr-head { display: flex; align-items: center; gap: 10px; flex: none; position: relative; z-index: 2; }
+#scr-draw .dr-title { margin: 0; font-size: var(--fs-h); font-weight: 800; letter-spacing: 0.04em; text-shadow: 0 2px 0 #fff; flex: 1; }
+
+#scr-draw button { touch-action: none; }
+#scr-draw .dr-back {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 96px; height: var(--dr-b); padding: 0 14px;
+  border-radius: 999px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.18); font-weight: 700; font-size: var(--fs-s); flex: none;
+}
+#scr-draw .dr-back-ic { font-size: 0.8em; color: #8b7fd6; }
+#scr-draw button:active:not(:disabled) { transform: translateY(2px); }
+
+/* ---- ① えらぶ？ ---- */
+#scr-draw .dr-pick .dr-big-row { flex: 1; display: flex; gap: 4%; align-items: center; justify-content: center; padding: 0 4% 2%; position: relative; z-index: 1; }
+#scr-draw .dr-big {
+  flex: 1; max-width: 380px; height: min(100%, 300px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px;
+  border-radius: 28px; background: #fff; box-shadow: 0 5px 0 rgba(59, 58, 102, 0.16), 0 10px 22px rgba(59, 58, 102, 0.12); border: 4px solid transparent;
+}
+#scr-draw .dr-big-nurie { border-color: #c9b8f5; }
+#scr-draw .dr-big-free { border-color: #9fdccf; }
+#scr-draw .dr-big:disabled { opacity: 0.55; }
+#scr-draw .dr-big-pic { width: 82%; flex: 1; min-height: 0; display: grid; place-items: center; border-radius: 20px; background: repeating-linear-gradient(45deg, #f5f1ff 0 12px, #efe9ff 12px 24px); }
+#scr-draw .dr-big-free .dr-big-pic { background: repeating-linear-gradient(45deg, #effbf7 0 12px, #e4f6f0 12px 24px); }
+#scr-draw .dr-big-pic img { max-width: 86%; max-height: 80%; object-fit: contain; }
+#scr-draw .dr-silhouette { filter: brightness(0) invert(1) drop-shadow(1px 0 0 #9aaebd) drop-shadow(-1px 0 0 #9aaebd) drop-shadow(0 1px 0 #9aaebd) drop-shadow(0 -1px 0 #9aaebd); }
+#scr-draw .dr-big-emoji { font-size: clamp(64px, 20vh, 150px); line-height: 1; }
+#scr-draw .dr-big { position: relative; }
+#scr-draw .dr-big-tag { position: absolute; top: 10px; left: 10px; padding: 2px 12px; border-radius: 999px; background: #c9b8f5; color: #fff; font-weight: 800; font-size: var(--fs-s); }
+#scr-draw .dr-big-free .dr-big-tag { background: #6cc6b4; }
+#scr-draw .dr-big-lb { font-size: calc(var(--fs-h) * 1.05); font-weight: 800; }
+#scr-draw .dr-big-sub { font-size: var(--fs-s); color: #6b6a8f; text-align: center; line-height: 1.3; }
+
+#scr-draw .dr-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#scr-draw .dr-bubbles i { position: absolute; bottom: -40px; width: var(--sz); height: var(--sz); border-radius: 50%; background: radial-gradient(circle at 30% 30%, #fff 0 25%, rgba(255, 255, 255, 0.35) 30%, rgba(255, 255, 255, 0.15) 70%); border: 1px solid rgba(255, 255, 255, 0.8); animation: drRise 9s linear infinite; }
+@keyframes drRise { to { transform: translateY(calc(-100vh - 60px)) translateX(14px); } }
+@media (prefers-reduced-motion: reduce) { #scr-draw .dr-bubbles i { animation: none; display: none; } }
+
+/* ---- ② いきものを えらぶ ---- */
+#scr-draw .dr-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; padding: 4px 2px 28px; touch-action: pan-y; -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
+#scr-draw .dr-grid .dr-card { touch-action: pan-y; }
+#scr-draw .dr-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 8px; border-radius: 20px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.14); }
+#scr-draw .dr-card-pic { width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; border-radius: 14px; background: #f3f0ff; }
+#scr-draw .dr-card-pic img { position: absolute; inset: 6%; width: 88%; height: 88%; object-fit: contain; }
+#scr-draw .dr-card-lb { font-size: var(--fs-s); font-weight: 700; line-height: 1.2; text-align: center; }
+
+/* ---- ③ かく ---- */
+#scr-draw .dr-paint { flex-direction: row; gap: 8px; }
+#scr-draw .dr-side { flex: none; display: flex; flex-direction: column; gap: var(--dr-gap); padding: 6px; border-radius: 22px; background: var(--dr-panel); box-shadow: 0 3px 10px rgba(59, 58, 102, 0.1); }
+#scr-draw .dr-left { width: calc(var(--dr-b) * 3 + var(--dr-gap) * 2 + 12px); }
+#scr-draw .dr-left .dr-back { width: 100%; min-width: 0; }
+#scr-draw .dr-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--dr-gap); }
+#scr-draw .dr-tool {
+  position: relative; min-height: calc(var(--dr-b) + 10px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px 1px;
+  border-radius: 16px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.16); border: 3px solid transparent;
+}
+#scr-draw .dr-tool.on { border-color: var(--dr-sel); background: #fff8dc; box-shadow: 0 3px 0 rgba(200, 150, 20, 0.35); }
+#scr-draw .dr-tool:disabled { opacity: 0.4; }
+#scr-draw .dr-ic { font-size: calc(var(--dr-b) * 0.5); line-height: 1; height: calc(var(--dr-b) * 0.55); display: grid; place-items: center; }
+#scr-draw .dr-lb { font-size: 11px; font-weight: 700; line-height: 1.1; text-align: center; white-space: nowrap; }
+@media (min-height: 600px) and (min-width: 900px) { #scr-draw .dr-lb { font-size: 14px; } }
+/* けしゴム：ピンクの けしゴムを CSS で */
+#scr-draw .ic-eraser::before { content: ''; width: calc(var(--dr-b) * 0.5); height: calc(var(--dr-b) * 0.3); border-radius: 5px; background: linear-gradient(90deg, #6fb7e8 0 34%, #ffb3c4 34%); transform: rotate(-24deg); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.08); }
+#scr-draw .dr-tools2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dr-gap); }
+#scr-draw .dr-sub { font-size: 12px; font-weight: 800; color: #8b7fd6; margin: 2px 0 -4px 6px; }
+#scr-draw .dr-sizes { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--dr-gap); }
+#scr-draw .dr-size { height: max(40px, calc(var(--dr-b) - 6px)); border-radius: 14px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.16); border: 3px solid transparent; display: grid; place-items: center; }
+#scr-draw .dr-size.on { border-color: var(--dr-sel); background: #fff8dc; }
+#scr-draw .dr-size .dot { width: var(--d); height: var(--d); border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1.5px rgba(59, 58, 102, 0.35); }
+#scr-draw .dr-clear .dr-ic, #scr-draw .dr-undo .dr-ic { font-size: calc(var(--dr-b) * 0.44); }
+#scr-draw .dr-spacer { flex: 1; }
+
+#scr-draw .dr-right { width: calc(var(--dr-c) * 2 + var(--dr-gap) + 12px); justify-content: center; }
+#scr-draw .dr-colors { display: grid; grid-template-columns: repeat(2, var(--dr-c)); gap: var(--dr-gap); }
+#scr-draw .dr-color { width: var(--dr-c); height: var(--dr-c); border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 2px rgba(59, 58, 102, 0.22), 0 2px 0 rgba(59, 58, 102, 0.15); position: relative; }
+#scr-draw .dr-color.on { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--dr-sel), inset 0 0 0 2px rgba(59, 58, 102, 0.22); z-index: 1; }
+#scr-draw .dr-color.on::after { content: ''; position: absolute; left: 50%; top: 50%; width: 22%; height: 22%; border-radius: 50%; translate: -50% -50%; background: #fff; box-shadow: 0 0 0 2px rgba(59, 58, 102, 0.5); }
+
+#scr-draw .dr-canvas-wrap { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; }
+#scr-draw .dr-topbar { flex: none; display: flex; align-items: center; gap: 8px; min-height: var(--dr-b); }
+#scr-draw .dr-area { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; }
+#scr-draw .dr-stage { position: relative; overflow: hidden; border-radius: 18px; touch-action: none; box-shadow: 0 0 0 3px #fff, 0 6px 18px rgba(59, 58, 102, 0.18); }
+#scr-draw .dr-stage.is-free { background-color: #fff; background-image: linear-gradient(45deg, #f3f7fc 25%, transparent 25%, transparent 75%, #f3f7fc 75%), linear-gradient(45deg, #f3f7fc 25%, transparent 25%, transparent 75%, #f3f7fc 75%); background-size: 24px 24px; background-position: 0 0, 12px 12px; }
+#scr-draw .dr-stage.is-nurie { background: linear-gradient(180deg, #bfe3f6, #9fd3ee); }
+#scr-draw .dr-stage[data-tool="fill"] { cursor: cell; }
+#scr-draw .dr-stage[data-tool="pen"], #scr-draw .dr-stage[data-tool="eraser"] { cursor: crosshair; }
+#scr-draw .dr-zoom { position: absolute; inset: 0; transform-origin: 0 0; }
+#scr-draw .dr-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+#scr-draw .dr-zoom-reset { position: absolute; right: 8px; bottom: 8px; z-index: 3; height: 44px; padding: 0 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.95); box-shadow: 0 3px 0 rgba(59, 58, 102, 0.18); font-size: var(--fs-s); font-weight: 700; }
+#scr-draw .dr-head-sign { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 14px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 rgba(59, 58, 102, 0.14); font-weight: 700; font-size: var(--fs-s); pointer-events: none; }
+#scr-draw .dr-head-sign b { color: #ff8a5c; font-size: 1.3em; animation: drNudge 1.2s ease-in-out infinite; }
+@keyframes drNudge { 50% { transform: translateX(5px); } }
+#scr-draw .dr-name-tag { display: inline-flex; align-items: center; padding: 4px 14px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 rgba(59, 58, 102, 0.14); font-weight: 700; font-size: var(--fs-s); }
+#scr-draw .dr-topbar .dr-grow { flex: 1; }
+#scr-draw .dr-done {
+  height: var(--dr-b); padding: 0 20px; border-radius: 999px; font-weight: 800; font-size: var(--fs); flex: none;
+  background: linear-gradient(#ffe27a, #ffc93c); box-shadow: 0 4px 0 #d79a1a; color: #5a3b00;
+}
+#scr-draw .dr-done:disabled { opacity: 0.45; filter: grayscale(0.4); }
+
+/* ---- ④ しゅるい など ---- */
+#scr-draw .dr-info-body { flex: 1; min-height: 0; display: flex; gap: 12px; }
+#scr-draw .dr-preview { flex: 0 0 30%; display: grid; place-items: center; border-radius: 22px; background: linear-gradient(180deg, #bfe3f6, #9fd3ee); box-shadow: 0 0 0 3px #fff, 0 6px 18px rgba(59, 58, 102, 0.15); padding: 10px; }
+#scr-draw .dr-preview-art { position: relative; display: grid; max-width: 100%; max-height: 100%; }
+#scr-draw .dr-preview img { grid-area: 1 / 1; max-width: 100%; max-height: 100%; object-fit: contain; }
+#scr-draw .dr-preview-art { filter: drop-shadow(0 4px 6px rgba(30, 60, 90, 0.25)); }
+#scr-draw .dr-form { flex: 1; gap: 6px; padding: 0 2px 8px; }
+#scr-draw .dr-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 18px; background: var(--dr-panel); }
+#scr-draw .dr-row-lb { flex: 0 0 4.2em; font-weight: 800; font-size: var(--fs-s); }
+#scr-draw .dr-opts { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#scr-draw .dr-opt { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; border-radius: 999px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.15); border: 3px solid transparent; font-weight: 700; font-size: var(--fs-s); }
+#scr-draw .dr-opt.on { border-color: var(--dr-sel); background: #fff8dc; }
+#scr-draw .dr-opt-ic { font-size: 1.25em; }
+#scr-draw .dr-size-dot { display: inline-block; width: var(--d); height: var(--d); border-radius: 50%; background: #8b7fd6; }
+#scr-draw .dr-fixed { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border-radius: 999px; background: #f1edff; font-weight: 700; font-size: var(--fs-s); }
+#scr-draw .dr-name { width: 9em; height: 44px; padding: 0 12px; border-radius: 14px; border: 3px solid #d9d2f7; font: inherit; font-size: var(--fs); background: #fff; color: var(--dr-ink); touch-action: manipulation; user-select: text; -webkit-user-select: text; }
+#scr-draw .dr-name:focus { outline: none; border-color: var(--dr-sel); }
+#scr-draw .dr-name-note { font-size: 13px; color: #d0603d; font-weight: 700; }
+#scr-draw .dr-info .dr-head .dr-done { margin-left: auto; }
+@media (max-height: 420px) {
+  #scr-draw .dr-row { padding: 3px 8px; }
+  #scr-draw .dr-form { gap: 4px; }
+  #scr-draw .dr-title { font-size: 20px; }
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  #scr-draw .dr-form { gap: 12px; justify-content: center; }
+  #scr-draw .dr-row { padding: 10px 14px; }
+  #scr-draw .dr-row-lb { font-size: var(--fs); }
+  #scr-draw .dr-opt, #scr-draw .dr-fixed { min-height: 60px; padding: 0 18px; font-size: var(--fs); }
+  #scr-draw .dr-name { height: 60px; font-size: var(--fs-h); }
+  #scr-draw .dr-card-lb { font-size: var(--fs); }
+}
+
+/* v0.8 もじペン（本人の ようぼう）：「あ」の アイコン・えらんだ ときの ふきだし・キャンバスの わくの いろ */
+#scr-draw .ic-moji { font-weight: 900; font-size: calc(var(--dr-b) * 0.46); color: #fff; background: #ff8a5c; border-radius: 10px; width: calc(var(--dr-b) * 0.56); height: calc(var(--dr-b) * 0.52); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12); }
+#scr-draw .dr-stage[data-tool="moji"] { box-shadow: 0 0 0 4px #ff8a5c, 0 6px 18px rgba(59, 58, 102, 0.18); }
+#scr-draw .dr-hint { position: absolute; left: 50%; top: 6px; translate: -50% 0; z-index: 4; display: flex; align-items: center; gap: 8px; max-width: 94%; padding: 6px 16px 6px 8px; border-radius: 999px; background: #fff; box-shadow: 0 3px 0 rgba(59, 58, 102, 0.18), 0 6px 14px rgba(59, 58, 102, 0.15); font-weight: 800; font-size: var(--fs-s); pointer-events: none; animation: drPop 220ms ease-out; white-space: nowrap; }
+#scr-draw .dr-hint b { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #ff8a5c; color: #fff; }
+@keyframes drPop { from { transform: scale(0.85); opacity: 0; } }
+@media (min-height: 600px) and (min-width: 900px) { #scr-draw .dr-tool { min-height: calc(var(--dr-b) + 26px); } #scr-draw .dr-size { height: var(--dr-b); } }
+@media (max-height: 420px) { #scr-draw .dr-hint { font-size: 13px; } }

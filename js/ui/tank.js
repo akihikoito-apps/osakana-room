@@ -1,6 +1,6 @@
 // すいそう画面：3D水槽・ゲージ・お世話ボタン・魚のカード・ヒント。
 import { createAquarium } from '../aquarium/index.js';
-import { $, $$, el, toast, popAt, bumpCoins } from './common.js';
+import { $, $$, el, toast, popAt, bumpCoins, dialog } from './common.js';
 import { lightOf } from '../state.js';
 import { sizeWord, forecastWord, eiyoLevel, FOODS, EIYO } from '../size.js';   // v0.6 個体差（個体差係）
 
@@ -196,7 +196,7 @@ export function hide() {
 function syncFish() {
   const fish = G.tank().fish;
   // v0.6 sizeMul＝個体の おおきさ（3D の 倍率）、shiny＝キラキラ
-  aq?.setFish(fish.map((f) => ({ uid: f.uid, speciesId: f.speciesId, stage: f.stage, health: f.health, happy: f.mood, sizeMul: G.sim.lookScaleOf ? G.sim.lookScaleOf(f) : 1, shiny: !!f.shiny })));
+  aq?.setFish(fish.map((f) => ({ uid: f.uid, speciesId: f.speciesId, stage: f.stage, health: f.health, happy: f.mood, sizeMul: G.sim.lookScaleOf ? G.sim.lookScaleOf(f) : 1, shiny: !!f.shiny, dream: f.dream || null })));   // v0.8 3D係：dream＝かいた 絵の いきもの
   // えさの すききらい（3D の ぷいっ・だいすき の よろこび）。ビタミン＋v0.6 の えさ
   aq?.setFoodPrefs?.(Object.fromEntries(fish.map((f) => [f.uid, foodPrefs3d(f)])));
 }
@@ -214,7 +214,7 @@ function syncWater() {
   // よるは すこし くらく（まっくらには しない）
   const day = lightOf(G.state.clock.min);
   const light = base * (0.55 + 0.45 * (day - 0.45) / 0.55);
-  aq.setWater({ dirt: (100 - t.clean) / 100, waste: (t.waste || 0) / (G.sim.balance().CLEAN?.wasteMax ?? 9), light: Math.max(0.3, Math.min(1, light)), bubbles: t.decor.includes('air_pump') });
+  aq.setWater({ dirt: (100 - t.clean) / 100, waste: (t.waste || 0) / (G.sim.balance().CLEAN?.wasteMax ?? 9), light: Math.max(0.3, Math.min(1, light)), bubbles: t.decor.includes('air_pump'), layout: t.layout || 'water' });   // v0.8 3D係：layout は ゆめのすいそう だけ 見る
 }
 
 // ---------- ゲージ ----------
@@ -264,7 +264,9 @@ function renderCareState() {
   cb.classList.toggle('cool', careLocked());      // たべのこし 0 でも あみは つかえる（仕様 v0.2 7章）
   cb.classList.toggle('busy', cleaning);
   const show = G.tutorialShows || (() => true);
-  fb.hidden = !show('feed'); wb.hidden = !show('water'); cb.hidden = !show('clean'); btn('photo').hidden = !show('photo');
+  const dreamT = t.water === 'dream';   // v0.8 ゆめのすいそう：いつも ちょうど よいので みずかえ・そうじ は ない
+  fb.hidden = !show('feed'); wb.hidden = !show('water') || dreamT; cb.hidden = !show('clean') || dreamT; btn('photo').hidden = !show('photo');
+  renderDream();
   // ビタミン：いちど かったら 出す。のこり かいすう・きょう もう あげた・みんな にがて は うすく
   const vb = btn('vitamin');
   const left = s.inv.food_vitamin || 0;
@@ -288,6 +290,12 @@ function renderCap() {
   const box = $('#tank-cap');
   const t = G.tank();
   if (!t.fish.length || G.tutorialBusy?.()) { box.hidden = true; return; }
+  if (t.water === 'dream') {   // v0.8 ゆめのすいそう：かい の わくは ない。いきものの かず／6
+    const max = G.sim.balance().DREAM?.maxPerTank ?? 6;
+    box.replaceChildren(el('span', { class: t.fish.length >= max ? 'full' : '', text: t.fish.length >= max ? '✨ いきもの いっぱい' : `✨ いきもの ${t.fish.length}／${max}` }));
+    box.hidden = false;
+    return;
+  }
   const k = capText(t);
   box.replaceChildren(el('span', { class: k.fishFull ? 'full' : '', text: '🐟 ' + k.fish }), el('span', { class: k.snailFull ? 'full' : '', text: '🐚 ' + k.snail }));
   box.hidden = false;
@@ -511,7 +519,7 @@ function tweezersTap(uid) {
   armTweezers();
   const f = t.fish.find((x) => x.uid === uid);
   if (!f) return;
-  const name = G.data.fishById[f.speciesId]?.name || '';
+  const name = nm(f);
   const pref = sim.foodPrefOf?.(f.speciesId, tw.food);
   if (tw.fed.has(uid)) { aq?.react(uid, 'happy'); toast(`${name}は もう たべたよ`); return; }
   if (f.onaka >= sim.balance().HUNGER.full && pref !== 'no') { aq?.react(uid, 'happy'); toast(`${name}は おなか いっぱい みたい`); return; }
@@ -647,7 +655,7 @@ function showTag(uid) {
   const f = G.tank().fish.find((x) => x.uid === uid);
   if (!f) return;
   tagEl?.remove();
-  tagEl = el('div', { class: 'name-tag', text: G.data.fishById[f.speciesId]?.name || '' });
+  tagEl = el('div', { class: 'name-tag', text: nm(f) });
   tagEl.hidden = true;
   $('#tank-pops').append(tagEl);
   tagUid = uid; tagTimer = performance.now() + 2500;
@@ -675,21 +683,25 @@ function renderCard() {
   const gr = sim.growRatio(f);
   card.replaceChildren(...[
     el('div', { class: 'c-head' },
-      el('div', { class: 'c-name', text: sp.name || '' }, f.shiny ? el('span', { class: 'c-shiny', title: 'キラキラ', text: '✨' }) : null),
-      el('span', { class: 'c-stage', text: B.LABELS.stage[f.stage] }),
+      el('div', { class: 'c-name', text: nm(f) }, f.shiny ? el('span', { class: 'c-shiny', title: 'キラキラ', text: '✨' }) : null),
+      el('span', { class: 'c-stage' + (f.dream ? ' dream' : ''), text: f.dream ? 'ゆめ' : B.LABELS.stage[f.stage] }),
       close),
     ...sizeRows(f, sp),
     faceRow('けんこう', 'health', f.health),
     faceRow('ごきげん', 'mood', f.mood),
     el('div', { class: 'c-row' }, el('span', { class: 'c-lb', text: 'なつき' }), heartEl),
-    faceRow('なかよし', 'nakayoshi', nk),
-    f.stage < 2
+    f.dream ? null : faceRow('なかよし', 'nakayoshi', nk),   // v0.8 ゆめ：あいしょう なし
+    f.stage < 2 && !f.dream
       ? el('div', { class: 'c-row' }, el('span', { class: 'c-lb', text: 'そだち' }), el('div', { class: 'c-grow' }, el('i', { style: { width: Math.max(4, gr * 100) + '%' } })))
       : null,
     el('div', { class: 'c-msg', text: cardMessage(f, sp) }),
     // v0.5 おやすみすいそうへ（チュートリアルの あと）
     G.toBoxAsk && G.state.tutorial.done && !tutorialOn()
       ? el('button', { class: 'btn soft c-tobox', text: '💤 おやすみすいそうへ', onclick: async () => { clearTimeout(cardTimer); if (await G.toBoxAsk(f.uid)) { selected = null; renderCard(); } else armCardClose(); } })
+      : null,
+    // v0.8 ゆめ：かいた 絵を けして かきなおせる（かくにん 1かい）
+    f.dream && !tutorialOn()
+      ? el('button', { class: 'btn soft c-toart', text: '🎨 えに もどす', onclick: async () => { clearTimeout(cardTimer); if (await toArtAsk(f)) { selected = null; renderCard(); } else armCardClose(); } })
       : null,
   ].filter(Boolean));   // v0.6：null が「null」の 文字に ならない ように（replaceChildren は null を 文字に する）
   card.classList.toggle('shiny', !!f.shiny);
@@ -701,6 +713,14 @@ function renderCard() {
 function sizeRows(f, sp) {
   const sim = G.sim;
   if (!sim.sizeOf) return [];
+  if (f.dream) {   // v0.8 ゆめ：えらんだ おおきさ・はやさ（そだたない）
+    const z = sim.sizeOf(f);
+    return [el('div', { class: 'c-row c-size' },
+      el('span', { class: 'c-lb', text: 'おおきさ' }),
+      el('b', { class: 'c-cm', text: z.cm + 'cm' }),
+      el('span', { class: 'c-word', text: DREAM_SIZE_WORD[f.dream.size] || 'ふつう' })),
+    el('div', { class: 'c-row' }, el('span', { class: 'c-lb', text: 'はやさ' }), el('span', { class: 'c-word', text: DREAM_SPEED_WORD[f.dream.speed] || 'ふつう' }))];
+  }
   const z = sim.sizeOf(f);
   const rows = [];
   if (z.fixed) {
@@ -814,7 +834,7 @@ function toggleFoodMenu(force) {
         if (empty) { toast('もう ないよ。おみせで かえるよ'); return; }
         if (!eaters && t.fish.length) toast('この すいそうには この えさを たべる こが いないよ');
         s.ui.food = id; G.markDirty();
-        const lovers = [...new Set(t.fish.filter((f) => sim.foodPrefOf(f.speciesId, id) === 'love').map((f) => G.data.fishById[f.speciesId]?.name).filter(Boolean))];
+        const lovers = [...new Set(t.fish.filter((f) => sim.foodPrefOf(f.speciesId, id) === 'love').map((f) => nm(f)).filter(Boolean))];
         if (lovers.length && eaters) toast(`♥ ${lovers.slice(0, 3).join('・')}の だいすきな ごはん`);
         toggleFoodMenu(false); renderCareState();
       },
@@ -834,7 +854,8 @@ function toggleFoodMenu(force) {
 
 function cardMessage(f, sp) {
   const B = G.sim.balance();
-  if (f.health < B.HEALTH.weak) return G.sim.text('weakPrefix', sp.name || '');
+  if (f.health < B.HEALTH.weak) return G.sim.text('weakPrefix', nm(f));
+  if (f.dream) return f.onaka < 30 ? 'おなかが すいているよ' : 'ゆめの すいそうで たのしく くらしているよ';   // v0.8 ゆめ：そだたない
   if (f.onaka < 30) return 'おなかが すいているよ';
   if (f.stage === 0) return 'おとなに なるのが たのしみだね';
   if (f.stage === 1) return 'ビッグに なるのが たのしみだね';
@@ -866,7 +887,7 @@ function renderHint(force) {
     happyLineAt = now;
     const f = t.fish[Math.floor(Math.random() * t.fish.length)];
     const line = G.data.HAPPY_LINES[Math.floor(Math.random() * G.data.HAPPY_LINES.length)];
-    box.replaceChildren(el('span', { class: 'hint-ic', text: '🌟' }), el('span', { class: 'hint-t', text: line.replaceAll('{name}', G.data.fishById[f.speciesId]?.name || '') }), el('button', { class: 'hint-x', 'aria-label': 'とじる', text: '✕' }));
+    box.replaceChildren(el('span', { class: 'hint-ic', text: '🌟' }), el('span', { class: 'hint-t', text: line.replaceAll('{name}', nm(f)) }), el('button', { class: 'hint-x', 'aria-label': 'とじる', text: '✕' }));
     box.hidden = false;
     happyUntil = now + 8000;
   } else if (!happyUntil) box.hidden = true;
@@ -876,6 +897,11 @@ function renderEmpty() {
   const t = G.tank();
   const m = $('#tank-empty');
   if (t.fish.length || G.screen !== 'tank' || G.tutorialBusy?.() || G.sim.currentHint(G.state, t)) { m.hidden = true; return; }
+  if (t.water === 'dream') {   // v0.8 ゆめのすいそう：おみせ では なく おえかきへ
+    m.replaceChildren(el('div', { text: 'まだ だれも いないよ。いきものを かいて みよう！' }), el('button', { class: 'btn primary dream-add-big', text: '✏️ いきものを ついか', style: { marginTop: '8px' }, onclick: () => openDraw() }));
+    m.hidden = false;
+    return;
+  }
   m.replaceChildren(el('div', { text: 'まだ さかなが いないよ' }), el('button', { class: 'btn primary', text: '🛒 おみせへ', style: { marginTop: '8px' }, onclick: () => G.go('shop', { tab: 'fish' }) }));
   m.hidden = false;
 }
@@ -885,7 +911,7 @@ function onSimEvent(ev) {
   const t = G.tank();
   // ほかの 水槽の 魚の できごとも ある（なまえは ぜんぶの 水槽から さがす）
   const f = ev.uid && G.state.tanks.flatMap((x) => x.fish).find((x) => x.uid === ev.uid);
-  const name = (f && G.data.fishById[f.speciesId]?.name) || '';
+  const name = f ? nm(f) : '';
   const visible = G.screen === 'tank' && aq && !!t.fish.find((x) => x.uid === ev.uid);
   if (ev.type === 'thanks') {
     if (visible) {
@@ -918,7 +944,81 @@ function onSimEvent(ev) {
   } else if (ev.type === 'autoFeed') {
     // じどう えさやり：見ている 水槽なら 3D の きかいから 粒を おとす（見た目だけ。数値は sim で もう 足した）
     if (G.screen === 'tank' && aq && ev.tankId === t.id) aq.autoFeed?.({ kind: 'flake' });
+  } else if (ev.type === 'dreamGift') {
+    renderTitle();
   } else if (ev.type === 'newDay') {
     toast(`${ev.day}にちめの あさ だよ`);
   }
+}
+
+// ---------- v0.8 ゆめのすいそう（ゆめ係）----------
+const DREAM_SIZE_WORD = { s: 'ちいさい', m: 'ふつう', l: 'おおきい' };
+const DREAM_SPEED_WORD = { slow: 'ゆっくり', normal: 'ふつう', fast: 'すばやい' };
+/** なまえ（ゆめの いきものは かいた なまえ） */
+function nm(f) { return (G.sim.nameOf ? G.sim.nameOf(f) : G.data.fishById[f?.speciesId]?.name) || ''; }
+
+/** 「いきものを ついか」→ おえかき がめん（おえかき係の 'draw'）。まだ なければ おしらせ だけ */
+function openDraw() {
+  const t = G.tank();
+  const c = G.sim.dream?.canAdd(G.state, t) || { ok: false, reason: 'notDream' };
+  if (!c.ok) {
+    toast(c.reason === 'full' ? 'この すいそうは いっぱい だよ。おやすみすいそうに うつすと また かけるよ'
+      : c.reason === 'max' ? 'ゆめの いきものが いっぱい だよ。えに もどすと また かけるよ' : 'ここでは かけないよ');
+    return;
+  }
+  if (!G.hasScreen?.('draw')) { toast('おえかきは もうすこし まってね'); return; }
+  G.emit('action', { type: 'dreamDraw', tankId: t.id });
+  G.go('draw', { tankId: t.id });
+}
+
+/** ゆめのすいそうの ボタン：おせわ ならびの「いきものを ついか」と みぎの「みずだけ／はんぶん りく」 */
+function renderDream() {
+  const t = G.tank();
+  const on = t.water === 'dream' && G.screen === 'tank' && !tutorialOn();
+  let add = $('#dream-add');
+  if (!add) {
+    add = el('button', { class: 'care-btn dream-add', id: 'dream-add', onclick: () => openDraw() },
+      el('span', { class: 'care-emoji', text: '✏️' }), el('span', { class: 'lb', html: 'いきものを<br>ついか' }));
+    $('#care [data-care="photo"]').before(add);
+  }
+  add.hidden = !on;
+  if (on) add.classList.toggle('cool', !G.sim.dream.canAdd(G.state, t).ok);
+  let lay = $('#dream-layout');
+  if (!lay) {
+    const b = (k, ic, text) => el('button', { class: 'dl-btn', 'data-layout': k, 'aria-pressed': 'false', onclick: () => pickLayout(k) }, el('span', { class: 'dl-ic', text: ic }), el('span', { class: 'dl-lb', text }));
+    lay = el('div', { id: 'dream-layout', role: 'group', 'aria-label': 'すいそうの かたち' }, b('water', '🌊', 'みずだけ'), b('land', '🏝️', 'はんぶん りく'));
+    $('#tank-cap').after(lay);
+  }
+  lay.hidden = !on;
+  if (on) for (const x of lay.querySelectorAll('.dl-btn')) { const sel = x.dataset.layout === (t.layout || 'water'); x.classList.toggle('on', sel); x.setAttribute('aria-pressed', String(sel)); }
+}
+function pickLayout(k) {
+  const t = G.tank();
+  if ((t.layout || 'water') === k) return;
+  const r = G.sim.dream.setLayout(G.state, t, k);
+  if (!r.ok) return;
+  toast(k === 'land' ? 'はんぶん りくに したよ' : 'みずだけに したよ');
+  G.markDirty(); G.saveNow();
+  syncWater();
+  renderDream();
+  G.emit('changed');
+}
+
+/** カードの「えに もどす」：かくにん 1かい → すいそうから 絵に もどる（しぬ を 思わせない ことば：Codex・agy） */
+async function toArtAsk(f) {
+  const t = G.tank();
+  const name = nm(f);
+  const yes = await dialog([
+    f.dream?.art ? el('img', { src: f.dream.art, alt: '', class: 'toart-pic' }) : null,
+    el('div', { class: 'big', text: `${name}を えに もどす？` }),
+    el('div', { class: 'small', text: 'えに もどすと この すいそうから いなく なるよ。いまの えは もとに もどせないよ。また あたらしく かけるよ。' }),
+  ].filter(Boolean), [{ label: 'やめる', value: false, kind: 'soft' }, { label: '🎨 えに もどす', value: true, kind: 'primary' }], { cancelValue: false });
+  if (!yes) return false;
+  const r = G.sim.dream.release(G.state, t, f.uid);
+  if (!r.ok) return false;
+  toast(`${name}は えに もどったよ`);
+  G.markDirty(); G.saveNow();
+  G.emit('changed');
+  G.emit('action', { type: 'dreamRelease', uid: f.uid });
+  return true;
 }

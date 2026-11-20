@@ -8,8 +8,9 @@
 // - 指でドラッグすると左右に少し見回せる（opts.look:false で無効）。4秒さわらないと正面に戻る。
 import * as THREE from '../../vendor/three.module.min.js';
 import { FISH } from '../data/fish.js';
-import { SpeciesLibrary, makeFishMaterial } from './fishModel.js';
+import { SpeciesLibrary, makeFishMaterial, loadDreamLook } from './fishModel.js';
 import { FishAgent } from './swim.js';
+import { dreamSpec, dreamKey, dreamLookMul } from './dreamSpec.js';
 import { Tank, TANK_H, TANK_D, WATER_TOP } from './tank.js';
 import { FxLayer } from './fx.js';
 import { Cleaner } from './clean.js';
@@ -48,7 +49,7 @@ export function createAquarium(canvas, opts = {}) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 80);
-  const tank = new Tank(scene, opts.water || 'fresh');
+  const tank = new Tank(scene, opts.water || 'fresh', opts.layout);   // v0.8 layout＝ゆめのすいそうの かたち（'water'|'land'）
   const fx = new FxLayer(scene);
   const cleaner = new Cleaner(scene, tank, fx);
   const waterer = new WaterChanger(scene, tank, fx);   // v0.7 みずかえの えんしゅつ
@@ -123,7 +124,42 @@ export function createAquarium(canvas, opts = {}) {
     }
   }
 
+  // v0.8 ゆめの いきもの（info.dream）：絵は uid ごとに つくり、いなく なったら すてる。できるまでは 見せない
+  const flatPH = new THREE.PlaneGeometry(1, 0.5);   // ひらたい いたの 絵が できるまでの かり（見せない）
+  function addDreamFish(info) {
+    const d = info.dream;
+    const base = d.base ? specOf(d.base) : null;
+    const spec = dreamSpec(d, base, info.uid);
+    const flat = spec.dream.flat;
+    const agent = new FishAgent(info, spec, tank.bounds);
+    agent.heightRatio = flat ? 0.6 : 0.3;
+    agent.clampToTank(tank.bounds, agent.onFloor);
+    if (agent.onFloor && agent.surf !== 'glass') agent.pos.y = tank.groundHeight(agent.pos.x, agent.pos.z);
+    const ph = flat ? null : lib.get(base);   // ぬりえ：もとの しゅるいの 形を かりに（見せない）
+    const mat = makeFishMaterial(ph ? ph.texture : null, { flat, twoSided: typeof d.overlay === 'string' && d.overlay.length > 0 });   // v0.8 もじペンの 字
+    if (agent.isShrimp) mat.userData.u.uK.value = 3;
+    if (agent.isSnail) { mat.userData.u.uAmp.value = 0; mat.userData.u.uRim.value = 0.5; }
+    const mesh = new THREE.Mesh(ph ? ph.geometry : flatPH, mat);
+    mesh.rotation.order = 'YZX';
+    mesh.userData.uid = info.uid;
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    scene.add(mesh);
+    const f = { agent, mesh, mat, key: dreamKey(d), flat, flip: Math.cos(agent.yaw) >= 0 ? 1 : -1, own: null, cancel: null, sway: Math.random() * 6 };
+    f.cancel = loadDreamLook(spec, d.art, (look) => {
+      if (fishes.get(info.uid) !== f) { look.geometry.dispose(); look.texture.dispose(); look.textureBack?.dispose(); return; }
+      f.own = look;
+      mesh.geometry = look.geometry;
+      mat.map = look.texture; mat.needsUpdate = true;
+      if (mat.userData.u.uMapB) mat.userData.u.uMapB.value = look.textureBack || look.texture;   // 裏（字だけ 左右もどし）。無ければ 表と おなじ
+      agent.heightRatio = look.heightRatio;
+      mesh.visible = true;
+    }, d.overlay);
+    fishes.set(info.uid, f);
+  }
+
   function addFish(info) {
+    if (info.dream) { addDreamFish(info); return; }
     const spec = specOf(info.speciesId);
     const entry = lib.get(spec, upgradeHandler);
     const agent = new FishAgent(info, spec, tank.bounds);
@@ -148,6 +184,9 @@ export function createAquarium(canvas, opts = {}) {
     scene.remove(f.mesh);
     f.mat.dispose();
     fishes.delete(uid);
+    // v0.8 ゆめの いきもの：その子 だけの 形と 絵を すてる（まだ できて いなければ とりやめ）
+    if (f.cancel) f.cancel();
+    if (f.own) { f.own.geometry.dispose(); f.own.texture.dispose(); f.own.textureBack?.dispose(); f.own = null; }
   }
 
   /** 頭の上（ハートを出す位置）。 */
@@ -171,7 +210,7 @@ export function createAquarium(canvas, opts = {}) {
     const r = canvas.getBoundingClientRect();
     ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const meshes = [...fishes.values()].map((f) => f.mesh);
+    const meshes = [...fishes.values()].filter((f) => f.mesh.visible).map((f) => f.mesh);
     const hit = ray.intersectObjects(meshes, false)[0];
     if (hit) return hit.object.userData.uid;
     // 小さい魚でも押しやすいように、近くの魚を探す（体の中心から画面上 48px 以内）
@@ -288,12 +327,14 @@ export function createAquarium(canvas, opts = {}) {
       const a = f.agent;
       if (!a.held) a.update(dt, ctx);   // v0.7 ピンセットを まっている 子は その場で とまる（うごきは tweezers.js）
       const u = f.mat.userData.u;
+      if (f.flat) { drawFlat(f, dt); continue; }
       // 貝は体の下（あし）が地面・ガラスにつくように持ち上げる
       const lift = a.isSnail ? a.len * a.heightRatio * 0.42 : 0;
       if (a.isSnail && a.surf === 'glass') f.mesh.position.set(a.pos.x - Math.sin(a.pitch) * lift * Math.cos(a.yaw), a.pos.y + a.oy + Math.cos(a.pitch) * lift, a.pos.z + a.oz);
       else f.mesh.position.set(a.pos.x, a.pos.y + a.oy + lift, a.pos.z + a.oz);
       f.mesh.rotation.y = a.renderYaw();
-      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
+      f.mesh.position.y += a.hy;   // v0.8 カエルの ぴょん
+      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
       f.mesh.rotation.x = 0;
       f.mesh.scale.set(a.len * a.sx, a.len * (2 - a.sx) * 0.5 + a.len * 0.5, a.len);
       u.uWave.value = a.wave;
@@ -314,6 +355,39 @@ export function createAquarium(canvas, opts = {}) {
     look.pitch += (look.tPitch - look.pitch) * Math.min(1, dt * 6);
     placeCamera();
     renderer.render(scene, camera);
+  }
+
+  /**
+   * v0.8 ひらたい いた（オリジナルの ゆめの いきもの）の 描きかた。
+   * - 板は いつも ほぼ カメラに 正面：横向きからの ずれ d を FLAT.tilt 倍だけ 回す（上限 ±FLAT.maxTilt）。
+   * - 左右の むきは scale.x の ±1。むきが かわる ときは FLAT.flipT びょうで +1→0→−1（紙を めくる ように。cos で なめらかに）。
+   *   はんてんは a.sx（たての のびちぢみにも つかう）とは べつに もつ（Codex）。0 の ちかくは うすく なりすぎない よう ±0.03。
+   * - からだ ぜんたいが ゆっくり ±3° ゆれる（0.33Hz）。くねりは マテリアル（尾がわ ほど 上下）。
+   */
+  function drawFlat(f, dt) {
+    const a = f.agent, u = f.mat.userData.u;
+    const face = Math.cos(a.yaw) >= 0 ? 1 : -1;
+    if (f.flipTo !== face) { f.flipFrom = f.flip; f.flipTo = face; f.flipK = f.flip === face ? 1 : 0; }
+    f.flipK = Math.min(1, f.flipK + dt / FLAT.flipT);
+    f.flip = f.flipFrom + (f.flipTo - f.flipFrom) * (0.5 - 0.5 * Math.cos(Math.PI * f.flipK));
+    const sgn = f.flip >= 0 ? 1 : -1;
+    const fl = Math.abs(f.flip) < 0.03 ? 0.03 * sgn : f.flip;
+    const d = wrapA(a.yaw - (face > 0 ? 0 : Math.PI));
+    f.sway += dt * TAU * 0.33;
+    const flipping = 1 - Math.abs(f.flip);   // めくって いる とちゅう（0〜1）は すこし うく（agy）
+    f.mesh.position.set(a.pos.x, a.pos.y + a.oy + a.hy + flipping * 0.04, a.pos.z + a.oz);
+    f.mesh.rotation.y = THREE.MathUtils.clamp(d * FLAT.tilt, -FLAT.maxTilt, FLAT.maxTilt) + a.oyaw;
+    f.mesh.rotation.z = (THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch, -0.75, 0.75) + Math.sin(f.sway) * FLAT.sway) * sgn;
+    f.mesh.rotation.x = 0;
+    f.mesh.scale.set(a.len * a.sx * fl, a.len * (2 - a.sx) * 0.5 + a.len * 0.5, a.len);
+    if (u.uFlipX) u.uFlipX.value = fl < 0 ? 1 : 0;   // もじペンの 字：左むきは 裏の 絵（字が 左右反対に ならない）
+    u.uWave.value = a.wave;
+    u.uAmp.value = a.amp;
+    u.uBend.value = 0;
+    u.uDull.value = a.dull;
+    u.uFlash.value = a.flash;
+    u.uShiny.value = a.shiny ? 1 : 0;
+    u.uTime.value = simTime;
   }
 
   function centerPos(f, out) {
@@ -339,18 +413,36 @@ export function createAquarium(canvas, opts = {}) {
   const api = {
     setFish(list = []) {
       const seen = new Set();
-      for (const info of list) {
+      for (let info of list) {
         if (info == null || info.uid == null) continue;
+        if (info.dream) info = { ...info, sizeMul: dreamLookMul(info.dream), stage: 2 };   // v0.8 ゆめの いきもの：大きさは えらんだ まま（そだたない・個体差なし。いた・立体の 見えかたの そろえ だけ）
         seen.add(info.uid);
         const f = fishes.get(info.uid);
         if (!f) addFish(info);
-        else if (f.agent.spec.id !== info.speciesId) { removeFish(info.uid); addFish(info); }
+        else if (info.dream ? f.key !== dreamKey(info.dream) : (f.key || f.agent.spec.id !== info.speciesId)) { removeFish(info.uid); addFish(info); }   // v0.8 絵・しゅるい・はやさ・おおきさが かわったら つくりなおす
         else f.agent.setInfo(info);
       }
       for (const uid of [...fishes.keys()]) if (!seen.has(uid)) removeFish(uid);
     },
     setDecor(ids) { tank.setDecor(ids || []); },
-    setWater(w) { tank.setWater(w || {}); tank.setFogRange(camDist + TANK_D / 2); },
+    setWater(w) { if (w && w.layout !== undefined) api.setLayout(w.layout); tank.setWater(w || {}); tank.setFogRange(camDist + TANK_D / 2); },
+    /**
+     * v0.8 ゆめのすいそうの かたち：'water'（みずだけ）| 'land'（みぎ やく 4わりが りく）。かわった ときだけ 作りなおす。
+     * setWater({ layout }) でも よい。ゆめのすいそう（water:'dream'）いがいでは なにも しない。かわったら true。
+     */
+    setLayout(layout) {
+      if (!tank.setLayout(layout)) return false;
+      tank.setFogRange(camDist + TANK_D / 2);
+      for (const f of fishes.values()) {
+        const a = f.agent;
+        a.setHasLand(tank.bounds);
+        a.clampToTank(tank.bounds, a.onFloor);
+        if (a.onFloor) a.pos.y = tank.groundHeight(a.pos.x, a.pos.z) + a.footLift;
+      }
+      return true;
+    },
+    /** v0.8 いまの かたち（ゆめのすいそう いがいは 'water'） */
+    get layout() { return tank.waterType === 'dream' ? tank.layout : 'water'; },
     feed(xNorm = 0.5, yNorm = 0.3, o = {}) {
       ndc.set(xNorm * 2 - 1, -(yNorm * 2 - 1));
       ray.setFromCamera(ndc, camera);
@@ -424,7 +516,7 @@ export function createAquarium(canvas, opts = {}) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       for (const uid of [...fishes.keys()]) removeFish(uid);
-      cleaner.dispose(); waterer.dispose(); tweezers.dispose(); fx.dispose(); tank.dispose(); lib.dispose();
+      cleaner.dispose(); waterer.dispose(); tweezers.dispose(); fx.dispose(); tank.dispose(); lib.dispose(); flatPH.dispose();
       scene.clear();
       renderer.renderLists.dispose();
       const left = { geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, programs: renderer.info.programs?.length ?? 0 };
@@ -451,3 +543,7 @@ export function createAquarium(canvas, opts = {}) {
 }
 
 const _v = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const TAU = Math.PI * 2;
+const wrapA = (x) => { x = (x + Math.PI) % TAU; if (x < 0) x += TAU; return x - Math.PI; };
+// v0.8 ひらたい いた（Codex：0.5倍・上限0.37／agy：0.35倍・上限0.35 → まんなか）。めくり 0.25びょう、ゆれ ±3°
+export const FLAT = { tilt: 0.42, maxTilt: 0.36, flipT: 0.25, sway: 0.05 };

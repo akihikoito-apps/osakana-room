@@ -8,7 +8,7 @@ let filter = 'all';          // all か 水の しゅるい（fresh・salt・pon
 
 // 水の なまえは balance の WATERS（かわ・うみ・いけ … これから ふえる）
 const wname = (w) => G.sim.balance().WATERS?.[w]?.name || { fresh: 'かわ', salt: 'うみ' }[w] || 'みず';
-const WATER_IC = { fresh: '🌿', salt: '🌊', pond: '🪷' };
+const WATER_IC = { fresh: '🌿', salt: '🌊', pond: '🪷', dream: '🌙' };
 const KIND_IC = { fish: '🐟', shrimp: '🦐', snail: '🐚' };
 
 export function init(g) {
@@ -25,6 +25,9 @@ export function init(g) {
 function show() { $('#toasts').replaceChildren(); render(); }   // まえの 画面の おしらせは けす
 
 const spOf = (f) => G.data.fishById[f.speciesId] || {};
+// v0.8 ゆめ係：ゆめの いきものは かいた 絵と なまえ（ゆめのすいそう にだけ もどせる。sim の canFromBox が 水で はじく）
+const picOf = (f) => f.dream?.art || spOf(f).texture;
+const nameOf = (f) => (G.sim.nameOf ? G.sim.nameOf(f) : spOf(f).name) || '';
 
 /** もどせない わけ（やさしい ことば） */
 function reasonText(r, f) {
@@ -64,8 +67,8 @@ function render() {
     const sp = spOf(f);
     const canAny = G.sim.boxTargets(s, f.uid).some((x) => x.ok);
     return el('button', { class: 'box-item' + (canAny ? '' : ' no-room'), 'data-uid': f.uid, onclick: () => pick(f) },
-      el('div', { class: 'pic' }, el('img', { src: sp.texture, alt: '', onerror: (e) => { e.target.replaceWith(el('span', { class: 'pic-alt', text: KIND_IC[sp.kind] || '🐟' })); } })),
-      el('div', { class: 'nm', text: sp.name || '' }),
+      el('div', { class: 'pic' + (f.dream ? ' dream' : '') }, el('img', { src: picOf(f), alt: '', onerror: (e) => { e.target.replaceWith(el('span', { class: 'pic-alt', text: KIND_IC[sp.kind] || '🐟' })); } })),
+      el('div', { class: 'nm', text: nameOf(f) }),
       el('div', { class: 'bx-tags' },
         el('span', { class: 'bx-stage s' + f.stage, text: STAGE_LABEL[f.stage] }),
         el('span', { class: 'water-tag ' + sp.water, text: wname(sp.water) })));
@@ -85,8 +88,8 @@ async function pick(f) {
   const ok = targets.filter((x) => x.ok);
   const ng = targets.filter((x) => !x.ok);
   const body = [
-    el('img', { src: sp.texture, alt: '' }),
-    el('div', { class: 'big', text: sp.name || '' }),
+    el('img', { src: picOf(f), alt: '' }),
+    el('div', { class: 'big', text: nameOf(f) }),
     el('div', { class: 'bx-line' }, el('span', { class: 'bx-stage s' + f.stage, text: STAGE_LABEL[f.stage] }), ' ', el('span', { class: 'water-tag ' + sp.water, text: wname(sp.water) }), ' ', heartsOf(f)),
   ];
   if (ok.length) body.push(el('div', { class: 'small', text: 'どの すいそうに もどす？' }));
@@ -100,7 +103,7 @@ async function pick(f) {
   const t = s.tanks.find((x) => x.id === v);
   const r = sim.fromBox(s, f.uid, t);
   if (!r.ok) { toast(reasonText(r, f)); return; }
-  toast(`${sp.name}が ${sim.tankName(s, t)}に もどったよ！`, 'gold');
+  toast(`${nameOf(f)}が ${sim.tankName(s, t)}に もどったよ！`, 'gold');
   G.queueReact?.(f.uid, 'happy', 300);
   G.markDirty(); G.saveNow();
   G.emit('changed');
@@ -113,18 +116,17 @@ async function toBoxAsk(uid) {
   const s = G.state, sim = G.sim, t = G.tank();
   const f = t.fish.find((x) => x.uid === uid);
   if (!f) return false;
-  const sp = spOf(f);
   const c = sim.canToBox(s, t, uid);
   if (!c.ok) { toast(c.reason === 'boxFull' ? 'おやすみすいそうが いっぱい だよ' : 'いまは うつせないよ'); return false; }
   const yes = await dialog([
-    el('img', { src: sp.texture, alt: '' }),
-    el('div', { class: 'big', text: `${sp.name}を おやすみすいそうへ うつす？` }),
+    el('img', { src: picOf(f), alt: '' }),
+    el('div', { class: 'big', text: `${nameOf(f)}を おやすみすいそうへ うつす？` }),
     el('div', { class: 'small', text: 'そのままの すがたで まっていて くれるよ。いつでも すいそうに もどせるよ。' }),
   ], [{ label: 'やめる', value: false, kind: 'soft' }, { label: '💤 うつす', value: true, kind: 'primary' }], { cancelValue: false });
   if (!yes) return false;
   const r = sim.toBox(s, t, uid);
   if (!r.ok) return false;
-  toast(`${sp.name}を おやすみすいそうに あずけたよ`, 'gold');
+  toast(`${nameOf(f)}を おやすみすいそうに あずけたよ`, 'gold');
   G.markDirty(); G.saveNow();
   G.emit('changed');
   G.emit('action', { type: 'toBox', uid });

@@ -13,6 +13,8 @@ const backOut = (t) => { const s = 1.70158; t -= 1; return t * t * ((s + 1) * t 
 const LAYERS = { top: [0.66, 1.0], middle: [0.3, 0.72], bottom: [0.0, 0.16], any: [0.05, 0.95] };
 const LATERAL = 0.75;
 const SALT_SCALE = 1.2;
+// v0.8 カエルの ぴょん（Codex・agy の 案の まんなか）：1かい 0.56びょう（空中 64%）・高さ 体長×0.38（上限 0.9）・距離 体長×0.8・着地後 0.4〜1.0びょう やすむ
+export const HOP = { dur: 0.56, air: 0.64, h: 0.38, hMax: 0.9, dist: 0.8, rest: [0.4, 1.0], tilt: 0.22 };
 const SNAIL_GLASS_MAX = 1.6;   // 貝がガラスを上る高さの上限（底の近くだけ。高いと浮いて見える）     // 横向きからこれ以上ずれない（ラジアン）
 
 /** 種と育ち具合から水槽内の全長（ワールド単位）を決める。 */
@@ -32,7 +34,11 @@ export class FishAgent {
     this.isSnail = spec.kind === 'snail';
     this.onFloor = this.isShrimp || this.isSnail;   // 底を歩く・這う
     this.habit = spec.swim?.habit || (this.isSnail ? 'crawl' : null);
-    if (this.habit === 'land') this.onFloor = true;   // v0.6 ぼうけん係：カメ・カエル（いけの りくちで やすむ・ときどき みずに 入る）
+    if (this.habit === 'land') this.onFloor = !!bounds.land || this.isShrimp;   // v0.6 ぼうけん係：カメ・カエル（いけの りくちで やすむ・ときどき みずに 入る）。v0.8 りくの ない ゆめのすいそう では およぐ
+    // v0.8 ゆめの いきもの：flat＝ひらたい いた（オリジナル）。hy・hpitch＝カエルの ぴょん（描画だけの 上乗せ）
+    this.flat = !!spec.dream?.flat;
+    this.hopper = !!spec.swim?.hop;
+    this.hy = 0; this.hpitch = 0; this.hopPh = 0; this.hopRest = 0;
     this.landMode = 'land';
     this.surf = 'ground';   // 貝：'ground'（砂・石の上）か 'glass'（奥のガラス）
     this.cling = null; this.clingCool = rand(3, 8);
@@ -92,8 +98,19 @@ export class FishAgent {
     this.wasWeak = weak;
   }
 
+  /** v0.8 ゆめのすいそうの かたちを かえた とき（りくが できた・なくなった）。めあて・ぴょん・せっちを いったん とく */
+  setHasLand(b) {
+    if (this.habit === 'land') this.onFloor = !!b.land || this.isShrimp;
+    this.hopPh = 0; this.hy = 0; this.hpitch = 0; this.hop = null;
+    this.retarget = 0; this.pauseT = 0; this.food = null; this.restAtBottom = false;
+    this.target.copy(this.pos);
+    if (this.habit === 'land' && b.land) this.pickLandTarget(b);
+  }
+
   get weak() { return this.health < 35; }
   get bodyH() { return this.len * this.heightRatio; }
+  /** v0.8 ひらたい いたは 中心が 原点なので、そこを あるく ときは 体の 半分 もちあげる（立体は 体が 砂に すこし しずんで 見えて よい） */
+  get footLift() { return this.flat ? this.bodyH * 0.45 : 0; }
 
   yRange(b, x = this.pos?.x ?? 0, z = this.pos?.z ?? 0) {
     const lo = b.sandY(x, z) + Math.max(0.35, this.bodyH * 0.7);
@@ -137,8 +154,11 @@ export class FishAgent {
       return;
     }
     let [ylo, yhi] = this.yRange(b, x, z);
+    this.restAtBottom = false;
     // コリドラスはときどき水面まで息つぎに行く
     if (this.layer === 'bottom' && !this.weak && !first && Math.random() < 0.06) { ylo = b.top - 1.2; yhi = b.top - 0.6; }
+    // v0.8 りくの ない ゆめのすいそうの カエル・カメトカゲ：ときどき 底に おりて 2〜5びょう やすむ（Codex）
+    else if (this.habit === 'land' && !b.land && !first && Math.random() < 0.35) { const lo = b.sandY(x, z) + Math.max(0.35, this.bodyH * 0.6); ylo = lo; yhi = lo + 0.15; this.restAtBottom = true; }
     this.target.set(x, rand(ylo, yhi), z);
     this.retarget = rand(5, 11);
     if (Math.random() < 0.4) this.offset.set(rand(-1.4, 1.4), rand(-0.6, 0.6), rand(-1.0, 1.0));
@@ -200,7 +220,8 @@ export class FishAgent {
       if (this.pauseT > 0) this.pauseT -= dt;
       else if (dist < 0.7 || this.retarget <= 0) {
         const pauseP = this.weak ? 0.65 : this.habit === 'hover' ? 0.7 : this.layer === 'bottom' ? 0.45 : 0.28;
-        if (Math.random() < pauseP) this.pauseT = this.weak ? rand(4, 9) : this.habit === 'hover' ? rand(1.5, 4) : rand(1.2, 3.8);
+        if (this.restAtBottom && dist < 0.7) this.pauseT = rand(2, 5);   // v0.8 底で ひとやすみ
+        else if (Math.random() < pauseP) this.pauseT = this.weak ? rand(4, 9) : this.habit === 'hover' ? rand(1.5, 4) : rand(1.2, 3.8);
         if (!this.school) this.pickTarget(b); else { this.retarget = rand(3, 6); this.offset.set(rand(-1.4, 1.4), rand(-0.6, 0.6), rand(-1.0, 1.0)); }
       }
     }
@@ -345,15 +366,18 @@ export class FishAgent {
     }
     // はやさ：りくちは あるく（おそい）、みずの 中は およぐ
     const swimming = this.pos.x < L.shore - 0.05;
-    let cruise = (swimming ? 0.75 : 0.42) * Math.max(0.5, this.speedMul) * sp * (this.food ? 1.6 : 1);
+    const dm = this.spec.dream?.mul ?? 1;   // v0.8 ゆめの いきもの：はやさの 倍率は 下限にも かける
+    let cruise = (swimming ? 0.75 : 0.42) * Math.max(0.5 * dm, this.speedMul) * sp * (this.food ? 1.6 : 1);
     if ((this.pauseT > 0 && !this.food) || holdStill) cruise = 0;
     else if (dist < 0.8) cruise *= 0.4 + 0.6 * (dist / 0.8);
-    this.speed += (cruise - this.speed) * Math.min(1, dt * 3);
+    if (this.hopper && (!swimming || this.hopPh > 0)) this.speed = this.hopStep(dt, cruise, dist, dm, holdStill);   // v0.8 カエル：りくでは ぴょん
+    else { this.speed += (cruise - this.speed) * Math.min(1, dt * 3); this.hy = 0; this.hpitch = 0; }
     if (dist > 1e-3) { this.pos.x += (dx / dist) * this.speed * dt; this.pos.z += (dz / dist) * this.speed * dt; }
     // たかさ：りくち・さかは 地面の うえ。みずの 中は めあての たかさへ（底より した には いかない）
     const ground = groundAt(this.pos.x, this.pos.z);
     if (this.pos.x >= L.shore - 0.05 || ground > L.waterTop - this.bodyH) {
-      this.pos.y += (ground + this.bodyH * 0.35 - this.pos.y) * Math.min(1, dt * 8);   // 地面に めりこまない
+      const foot = this.flat ? this.bodyH * 0.5 + 0.03 : this.bodyH * 0.35;   // v0.8 ひらたい いたは 下の はしを 地面に（Codex）
+      this.pos.y += (ground + foot - this.pos.y) * Math.min(1, dt * 8);   // 地面に めりこまない
       this.pitch += (0 - this.pitch) * Math.min(1, dt * 3);
     } else {
       const toLand = this.landMode === 'land' && !this.food;
@@ -370,6 +394,32 @@ export class FishAgent {
     this.checkEat(ctx, dt);
   }
 
+  /**
+   * v0.8 カエル（swim.hop）：りくでは あるかずに「ぴょん」と はねて すすむ。1かい HOP.dur びょう（空中 HOP.air のわり）、
+   * 空中だけ すすみ、着地したら すこし やすむ。はやさの 倍率は とぶ 距離と やすみ に かける（うごきの 時間は おなじ）。
+   * もどりは この フレームの 横の はやさ。hy（上への 上乗せ）・hpitch（あたまの 上げ下げ）は 描画だけ。
+   */
+  hopStep(dt, cruise, dist, dm, hold) {
+    if (this.hopPh <= 0) {
+      this.hy = 0; this.hpitch += (0 - this.hpitch) * Math.min(1, dt * 8);
+      if (this.hopRest > 0) { this.hopRest -= dt; return 0; }
+      if (cruise <= 0.01 || hold || dist < 0.12) return 0;
+      this.hopPh = 1e-4;
+      this.hopLen = Math.min(dist, this.len * HOP.dist * (0.75 + 0.25 * dm));
+    }
+    const T = HOP.dur, airT = T * HOP.air, t = this.hopPh * T;
+    this.hopPh += dt / T;
+    let v = 0;
+    if (t < airT) {
+      const q = t / airT;
+      this.hy = Math.sin(Math.PI * q) * Math.min(HOP.hMax, this.len * HOP.h);
+      this.hpitch = HOP.tilt * Math.sin(TAU * q);   // とびだしは 上むき → おりる ときは 下むき
+      v = this.hopLen / airT;
+    } else { this.hy = 0; this.hpitch *= 0.8; }
+    if (this.hopPh >= 1) { this.hopPh = 0; this.hy = 0; this.hopRest = rand(HOP.rest[0], HOP.rest[1]) / Math.max(0.5, dm); }
+    return v;
+  }
+
   updateShrimp(dt, ctx, sp, holdStill) {
     const b = ctx.bounds;
     this.retarget -= dt;
@@ -381,7 +431,7 @@ export class FishAgent {
       const k = Math.min(1, h.t / h.dur);
       this.pos.x = h.x0 + (h.x1 - h.x0) * ease(k);
       this.pos.z = h.z0 + (h.z1 - h.z0) * ease(k);
-      this.pos.y = b.sandY(this.pos.x, this.pos.z) + Math.sin(Math.PI * k) * h.h;
+      this.pos.y = b.sandY(this.pos.x, this.pos.z) + Math.sin(Math.PI * k) * h.h + this.footLift;
       this.pitch = Math.cos(Math.PI * k) * 0.35;
       this.amp = 0.03;
       this.wave += dt * 14;
@@ -426,7 +476,7 @@ export class FishAgent {
       this.pos.z += -Math.sin(this.yaw) * this.speed * dt;
       this.pitch *= 0.9;
     }
-    this.pos.y = b.sandY(this.pos.x, this.pos.z) + this.len * 0.02;
+    this.pos.y = b.sandY(this.pos.x, this.pos.z) + this.len * 0.02 + this.footLift;
     this.amp = 0.012;
     this.wave += dt * (2 + this.speed * 8);
     this.clampToTank(b, true);

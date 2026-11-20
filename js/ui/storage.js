@@ -9,7 +9,7 @@ export function init(g) {
   G.addScreen('storage', { show, hide() {} });
   const nav = () => {
     const b = $('#room-nav [data-go="storage"]');
-    if (b) b.hidden = !G.state.tutorial.done || !(G.sim.isUnlocked(G.state, 'tank6') || (G.state.storage || []).length);
+    if (b) b.hidden = !G.state.tutorial.done || !(G.sim.isUnlocked(G.state, 'tank6') || (G.state.storage || []).length || G.state.tanks.some((t) => t.water === 'dream'));   // v0.8：ゆめのすいそうは 6ぴき まえでも しまえる
   };
   nav();
   G.on('screen', nav);
@@ -26,7 +26,9 @@ const ROOM = () => G.sim.balance().TANKS?.max ?? 6;
 function tankCard(t, where, btn) {
   const n = t.fish.length;
   return el('div', { class: 'stg-card ' + where + ' w-' + t.water, 'data-id': t.id },
-    el('div', { class: 'stg-pic' }, el('img', { src: `assets/items/tank_${t.water}.png`, alt: '', onerror: (e) => { e.target.replaceWith(el('span', { class: 'stg-alt', text: '🫙' })); } }),
+    el('div', { class: 'stg-pic' }, t.water === 'dream'
+      ? el('span', { class: 'stg-alt', text: '🌙' })   // v0.8 ゆめのすいそう：絵（tank_dream.png）は まだ ない → つき（404 の コンソールエラーを 出さない）
+      : el('img', { src: `assets/items/tank_${t.water}.png`, alt: '', onerror: (e) => { e.target.replaceWith(el('span', { class: 'stg-alt', text: '🫙' })); } }),
       n ? el('span', { class: 'stg-n', text: `🐟${n}` }) : null),
     el('div', { class: 'stg-name', text: G.sim.tankName(G.state, t) }),
     el('span', { class: 'water-tag ' + t.water, text: waterName(t.water) }),

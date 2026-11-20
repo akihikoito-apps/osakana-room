@@ -117,6 +117,8 @@ function fixTank(t, b, i) {
     id: typeof t.id === 'string' ? t.id : 't' + (i + 1),
     // v0.6 ぼうけん係：'pond' など あたらしい 水も のこす（しらない 水の チェックは sim の WATERS。ここは 形だけ）
     water: typeof t.water === 'string' && /^[a-z]{2,12}$/.test(t.water) ? t.water : 'fresh',
+    // v0.8 ゆめ係：ゆめのすいそうの かたち（'water'＝みずだけ・'land'＝はんぶん りく）。ほかの すいそうには つけない
+    ...(t.water === 'dream' ? { layout: t.layout === 'land' ? 'land' : 'water' } : {}),
     name: typeof t.name === 'string' ? t.name.slice(0, 16) : '',
     slot: Number.isInteger(t.slot) ? t.slot : i,
     temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99), waste: n(t.waste, 0, 0, 99),

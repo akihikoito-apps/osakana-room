@@ -763,4 +763,45 @@ export const FISH = [
     intro: 'そらいろの からだの アメリカザリガニ。めったに みつからない、とくべつな いろ。',
     hint: 'かった ザリガニは そとに にがさないでね。ちいさな いきものとは べつの すいそうが あんしん。',
   },
+
+  // ======== v0.8 ゆめ係：ゆめの いきもの（こどもが かいた 絵。しくみは js/dream.js）========
+  // hidden・obtain 'dream'・price null：おみせ・ずかん・ずかんの かず・ミッション・クイズ・つり/ガサガサ・あいしょう から はずす。
+  // しゅるいは ゲームの しくみ用（f.dream.kind ごとに 1つ）。見た目・なまえ・おおきさ・はやさ は f.dream（3D係・ゆめ係）。
+  // texture は 形だけ（その ファイルは ない。絵は f.dream.art）。ゆめの すいそうは いつも 25ど・きれい・くうき たっぷり。
+  {
+    id: 'dream_fish', name: 'ゆめの さかな', kind: 'fish', water: 'dream', rarity: 1, price: null, obtain: 'dream', hidden: true,
+    temp: { min: 0, max: 40, best: 25 }, food: ['food_flake', 'food_sinking'],
+    growDays: [1, 1], sizeCm: [3, 6, 10], appetite: 1, space: 1, likes: ['plant'], cleanMin: 0, vitamin: 'ok',
+    look: { lengthToHeight: 2.6, thickness: 0.2, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1, school: false },
+    texture: 'assets/fish/dream_fish.png',
+    intro: 'ゆめの すいそうで うまれた、せかいに 1ぴきだけの さかな。',
+    hint: 'えさを あげたり なでたり して かわいがってね。',
+  },
+  {
+    id: 'dream_crab', name: 'ゆめの エビ・カニ', kind: 'shrimp', water: 'dream', rarity: 1, price: null, obtain: 'dream', hidden: true,
+    temp: { min: 0, max: 40, best: 25 }, food: ['food_flake', 'food_sinking'],
+    growDays: [1, 1], sizeCm: [3, 6, 10], appetite: 1, space: 1, likes: ['plant'], cleanMin: 0, vitamin: 'ok',
+    look: { lengthToHeight: 2.6, thickness: 0.25, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 1, school: false },
+    texture: 'assets/fish/dream_crab.png',
+    intro: 'ゆめの すいそうで うまれた、せかいに 1ぴきだけの エビ・カニ。',
+    hint: 'えさを あげたり なでたり して かわいがってね。',
+  },
+  {
+    id: 'dream_frog', name: 'ゆめの カエル', kind: 'fish', water: 'dream', rarity: 1, price: null, obtain: 'dream', hidden: true,
+    temp: { min: 0, max: 40, best: 25 }, food: ['food_flake', 'food_sinking'],
+    growDays: [1, 1], sizeCm: [3, 6, 10], appetite: 1, space: 1, likes: ['plant'], cleanMin: 0, vitamin: 'ok',
+    look: { lengthToHeight: 2.2, thickness: 0.3, finStyle: 'normal' }, swim: { layer: 'any', speed: 1, school: false },
+    texture: 'assets/fish/dream_frog.png',
+    intro: 'ゆめの すいそうで うまれた、せかいに 1ぴきだけの カエル。',
+    hint: 'えさを あげたり なでたり して かわいがってね。',
+  },
+  {
+    id: 'dream_reptile', name: 'ゆめの カメ・トカゲ', kind: 'fish', water: 'dream', rarity: 1, price: null, obtain: 'dream', hidden: true,
+    temp: { min: 0, max: 40, best: 25 }, food: ['food_flake', 'food_sinking'],
+    growDays: [1, 1], sizeCm: [3, 6, 10], appetite: 1, space: 1, likes: ['plant'], cleanMin: 0, vitamin: 'ok',
+    look: { lengthToHeight: 2.2, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.6, school: false },
+    texture: 'assets/fish/dream_reptile.png',
+    intro: 'ゆめの すいそうで うまれた、せかいに 1ぴきだけの カメ・トカゲ。',
+    hint: 'えさを あげたり なでたり して かわいがってね。',
+  },
 ];

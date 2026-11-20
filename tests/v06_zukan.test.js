@@ -15,7 +15,7 @@ const KINDS = ['fish', 'shrimp', 'snail'];
 test('v0.6 図鑑：obtain は shop（なし）・fishing・gasagasa だけ。fishing は うみ、gasagasa は いけ、どちらも おみせに 出ない', () => {
   for (const f of FISH) {
     if (f.obtain === undefined) { assert.notEqual(f.water, 'pond', `${f.id}：いけの 子が おみせに いる`); continue; }
-    assert.ok(['fishing', 'gasagasa', 'premium'].includes(f.obtain), `${f.id} obtain=${f.obtain}`);   // v0.7 premium（課金係・tests/v07_iap.test.js）
+    assert.ok(['fishing', 'gasagasa', 'premium', 'dream'].includes(f.obtain), `${f.id} obtain=${f.obtain}`);   // v0.7 premium（課金係・tests/v07_iap.test.js）・v0.8 dream（ゆめ係・tests/v08_dream.test.js）
     assert.equal(f.price, null, `${f.id} は price: null`);
     assert.equal(f.unlock, undefined, `${f.id} に unlock は いらない`);
   }

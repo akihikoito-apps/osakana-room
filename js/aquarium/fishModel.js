@@ -166,6 +166,75 @@ export class SpeciesLibrary {
   }
 }
 
+/**
+ * v0.8 ゆめの いきもの：かいた 絵（f.dream.art の dataURL）から 見た目を つくる。
+ * flat＝ひらたい いた（オリジナル）。そうでなければ もとの しゅるいと おなじ「輪郭→ふくらませる」立体（ぬりえ）。
+ * overlay（もじペンの 層。art と おなじ 大きさ・位置。無くて よい）が あれば、表（art＋字）と 裏（art＋字を 字の はんいの 中で 左右もどし）の
+ * 2まいを 作る。鏡うつしに 見える がわ（立体の −z 面・板の 左むき）は 裏を つかうので、どちらから 見ても 字が 読める。
+ * できたら done({ geometry, texture, textureBack|null, heightRatio }) を よぶ。もどりの 関数を よぶと とりやめ（あとから できても すぐ dispose）。
+ */
+export function loadDreamLook(spec, art, done, overlay = null) {
+  let cancelled = false;
+  if (typeof art !== 'string' || !art.startsWith('data:image/')) return () => {};
+  const okOv = typeof overlay === 'string' && overlay.startsWith('data:image/');
+  const load = (src) => new Promise((ok) => { const i = new Image(); i.decoding = 'async'; i.onload = () => ok(i.width && i.height ? i : null); i.onerror = () => ok(null); i.src = src; });
+  Promise.all([load(art), okOv ? load(overlay) : null]).then(([img, ov]) => {
+    if (cancelled || !img) return;
+    try {
+      let geometry;
+      if (spec.dream?.flat) geometry = buildFlatGeometry(img.height / img.width);
+      else geometry = buildGeometry(readProfile(img), spec.look?.thickness ?? 0.18, spec.kind === 'snail');   // 形は art だけで きめる
+      const sides = ov ? composeOverlay(img, ov, !spec.dream?.flat) : null;   // ぬりえは 字を 体の 中だけに（agy・Codex）
+      const texture = makeTexture(sides ? sides.front : img);
+      const textureBack = sides ? makeTexture(sides.back) : null;
+      done({ geometry, texture, textureBack, heightRatio: geometry.userData.heightRatio || 0.3 });
+    } catch (err) { /* 読めない 絵は 出さない */ }
+  });
+  return () => { cancelled = true; };
+}
+
+/** 字の 層の すけない 画素の 外接四角（無ければ null） */
+export function alphaBox(data, w, h, th = 8) {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > th) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
+}
+
+/** 表＝art＋字、裏＝art＋字（字の 外接四角の 中で 左右もどし）。字は art の 大きさに あわせて かさねる */
+function composeOverlay(img, ov, maskToArt = false) {
+  const w = img.width, h = img.height;
+  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const o = mk(), og = o.getContext('2d', { willReadFrequently: true });
+  og.drawImage(ov, 0, 0, w, h);
+  // 立体（ぬりえ）は 輪郭の 外に 体が ないので、字も art の 中だけに する（外接四角が ずれない・すきまに 字が うかない）
+  if (maskToArt) { og.globalCompositeOperation = 'destination-in'; og.drawImage(img, 0, 0); og.globalCompositeOperation = 'source-over'; }
+  const box = alphaBox(og.getImageData(0, 0, w, h).data, w, h);
+  const front = mk(), fg = front.getContext('2d');
+  fg.drawImage(img, 0, 0); fg.drawImage(o, 0, 0);
+  const back = mk(), bg = back.getContext('2d');
+  bg.drawImage(img, 0, 0);
+  if (box) {
+    const bw = box.x1 - box.x0 + 1, bh = box.y1 - box.y0 + 1;
+    bg.save(); bg.translate(box.x0 * 2 + bw, 0); bg.scale(-1, 1);
+    bg.drawImage(o, box.x0, box.y0, bw, bh, box.x0, box.y0, bw, bh);
+    bg.restore();
+  }
+  return { front, back };
+}
+
+/**
+ * ひらたい いた（頭が +x、中心が 原点）。長い ほうの 辺を 1 に する（たて長の 絵が 大きく なりすぎない）。
+ * userData.heightRatio＝全長に たいする 高さ（せいかくには 板の 横はばを 全長 1 と みなした 高さ）。
+ */
+export function buildFlatGeometry(aspect) {
+  const a = Math.max(0.05, Math.min(4, +aspect || 0.5));
+  const w = a > 1 ? 1 / a : 1, h = w * a;
+  const geo = new THREE.PlaneGeometry(w, h, 16, 4);
+  geo.userData.heightRatio = h;
+  geo.userData.flatW = w;
+  return geo;
+}
+
 const VERT_COMMON = /* glsl */`
 uniform float uWave;
 uniform float uAmp;
@@ -180,8 +249,15 @@ float fishDz(float x) {
 }
 `;
 
-/** 1匹ぶんのマテリアル（くねり・くすみ・光る を個別に持つ）。 */
-export function makeFishMaterial(texture) {
+/**
+ * 1匹ぶんのマテリアル（くねり・くすみ・光る を個別に持つ）。
+ * o.flat（v0.8 ゆめの ひらたい いた）：尾がわ ほど 上下にも やわらかく くねる＋絵の 色が くらく ならない よう 少し 自分で 光る。
+ */
+export function makeFishMaterial(texture, o = {}) {
+  const flat = !!o.flat;
+  // v0.8 もじペン（o.twoSided）：鏡うつしに 見える がわは uMapB（裏の 絵＝字だけ 左右もどし）。
+  //   ぬりえ＝変形前の position.z が マイナスの 面。板＝scale.x が マイナス（uFlipX）と 裏面から 見ている（!gl_FrontFacing）の どちらか 一方
+  const two = !!o.twoSided;
   const u = {
     uWave: { value: Math.random() * 6 },
     uAmp: { value: 0.06 },
@@ -193,12 +269,13 @@ export function makeFishMaterial(texture) {
     uShiny: { value: 0 },     // v0.6 キラキラ（0/1）
     uTime: { value: 0 },
   };
+  if (two) { u.uMapB = { value: texture }; u.uFlipX = { value: 0 }; }
   const mat = new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5, side: THREE.DoubleSide });
   mat.userData.u = u;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, u);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\n' + VERT_COMMON)
+      .replace('#include <common>', '#include <common>\n' + VERT_COMMON + (two ? '\nvarying float vFishSide;' : ''))
       .replace('#include <beginnormal_vertex>', `
         vec3 objectNormal = vec3( normal );
         float fishSl = (fishDz(position.x + 0.01) - fishDz(position.x - 0.01)) / 0.02;
@@ -207,15 +284,21 @@ export function makeFishMaterial(texture) {
           vec3 objectTangent = vec3( tangent.xyz );
         #endif`)
       .replace('#include <begin_vertex>', `
-        vec3 transformed = vec3( position );
-        transformed.z += fishDz(position.x);`);
+        vec3 transformed = vec3( position );${two ? '\n        vFishSide = position.z;' : ''}
+        transformed.z += fishDz(position.x)${flat ? ' * 0.6' : ''};${flat ? `
+        float flatTl = clamp((0.25 - position.x) / 0.75, 0.0, 1.0);
+        transformed.y += sin(position.x * uK * 0.8 + uWave + 0.8) * uAmp * (0.15 + flatTl * flatTl) * ${FLAT_WOBBLE.toFixed(2)};` : ''}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uDull;\nuniform float uFlash;\nuniform float uRim;\nuniform float uShiny;\nuniform float uTime;')
-      .replace('#include <map_fragment>', `#include <map_fragment>
+      .replace('#include <common>', '#include <common>\nuniform float uDull;\nuniform float uFlash;\nuniform float uRim;\nuniform float uShiny;\nuniform float uTime;' + (two ? '\nuniform sampler2D uMapB;\nuniform float uFlipX;\nvarying float vFishSide;' : ''))
+      .replace('#include <map_fragment>', `${two ? `#ifdef USE_MAP
+        bool fishBack = ${flat ? '(uFlipX > 0.5) != !gl_FrontFacing' : 'vFishSide < 0.0'};
+        vec4 sampledDiffuseColor = fishBack ? texture2D( uMapB, vMapUv ) : texture2D( map, vMapUv );
+        diffuseColor *= sampledDiffuseColor;
+        #endif` : '#include <map_fragment>'}
         float fishLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(fishLum) * vec3(0.78, 0.84, 0.92) * 0.9, uDull);`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += diffuseColor.rgb * uFlash;`)
+        totalEmissiveRadiance += diffuseColor.rgb * (uFlash${flat ? ` + ${FLAT_SELF_LIGHT.toFixed(2)}` : ''});`)
       .replace('#include <opaque_fragment>', `
         float fishRim = 1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0);
         outgoingLight += vec3(0.75, 0.95, 1.0) * pow(fishRim, 3.0) * uRim * (1.0 - uDull * 0.6);
@@ -228,6 +311,9 @@ export function makeFishMaterial(texture) {
         }
         #include <opaque_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'osakana-fish-v2';
+  mat.customProgramCacheKey = () => (flat ? 'osakana-fish-flat-v1' : 'osakana-fish-v2') + (two ? '-2side' : '');
   return mat;
 }
+// v0.8 ひらたい いたの くねり（uAmp に かける。尾の はしで 体長の やく 3〜5%）と 自分で 光る 量（絵の 色を くすませない）
+const FLAT_WOBBLE = 0.9;
+const FLAT_SELF_LIGHT = 0.22;

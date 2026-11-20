@@ -7,6 +7,9 @@
 // 画面（DOM）には触らない。
 import { newUid } from './state.js';
 import * as SZ from './size.js';   // v0.6 個体差（おおきさ・キラキラ・えいよう・えさの すききらい）
+import * as DR from './dream.js';  // v0.8 ゆめ係：ゆめのすいそう（sim.dream として 再輸出）
+export * as dream from './dream.js';
+const isDreamF = (f) => !!f && typeof f.speciesId === 'string' && f.speciesId.startsWith('dream_') && D?.fishById[f.speciesId]?.obtain === 'dream';
 
 let D = null;          // setup() で入る
 let B = null;          // balance
@@ -46,8 +49,9 @@ const FALLBACK = {
   // v0.6 そうこ（ゲーム係）：へや（TANKS.max）＋そうこ の すいそうの かずの 上限。Codex・agy とも 18
   STORAGE: { total: 18 },
   // v0.6 水の しゅるい（ぼうけん係が balance.js に WATERS を 足す。ここは 無い ときの かわり）
-  WATERS: { fresh: { name: 'かわ', items: ['fresh', 'both'] }, salt: { name: 'うみ', items: ['salt', 'both'] }, pond: { name: 'いけ', items: ['fresh', 'both'] } },
-  WATER_LABELS: { fresh: 'みずの すいそう', salt: 'うみの すいそう', pond: 'いけの すいそう' },
+  WATERS: { fresh: { name: 'かわ', items: ['fresh', 'both'] }, salt: { name: 'うみ', items: ['salt', 'both'] }, pond: { name: 'いけ', items: ['fresh', 'both'] }, dream: { name: 'ゆめ', items: ['fresh', 'both'] } },
+  WATER_LABELS: { fresh: 'みずの すいそう', salt: 'うみの すいそう', pond: 'いけの すいそう', dream: 'ゆめの すいそう' },
+  DREAM: {},   // v0.8 ゆめ係：数は balance.js DREAM（無い ときは js/dream.js の DEF）
   ADVENTURE: {},   // v0.6 ぼうけん係：数は balance.js ADVENTURE（無い ときは js/adventure.js の DEF）
   SHOP_TABS: [{ kind: 'fish', label: 'さかな' }, { kind: 'shrimp', label: 'エビ' }, { kind: 'snail', label: 'かい' }],
   REACTION: { petCooldownRealSec: 3, idleEveryHours: 4, sadEveryHours: 3, sleepyEveryHours: 5, nightSleepy: { from: 22, to: 6, chancePerHour: 0.2 } },
@@ -85,7 +89,7 @@ export function setup({ FISH, ITEMS, compatOf, balance = {}, missions = {}, hint
     FISH, ITEMS, B,
     fishById: Object.fromEntries(FISH.map((f) => [f.id, f])),
     itemById: Object.fromEntries(ITEMS.map((i) => [i.id, i])),
-    compatOf: compatOf || (() => 1),
+    compatOf: dreamCompat(compatOf || (() => 1)),   // v0.8：ゆめの いきものは あいしょう なし（いつも ふつう）
     MISSIONS: (missions.MISSIONS || []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     MISSION_VISIBLE: missions.MISSION_VISIBLE || 3,
     HINTS: (hints.HINTS || []).slice().sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)),
@@ -110,6 +114,13 @@ export function setup({ FISH, ITEMS, compatOf, balance = {}, missions = {}, hint
 }
 export const data = () => D;
 export const balance = () => B;
+/** v0.8：ゆめの しゅるい（dream_*）が まざる くみあわせは 1（ふつう）。なかよし・にがて を つけない */
+function dreamCompat(fn) {
+  const dr = (id) => typeof id === 'string' && id.startsWith('dream_');
+  return (a, b) => (dr(a) || dr(b) ? 1 : fn(a, b));
+}
+/** v0.8：生きものの なまえ（ゆめの いきものは かいた なまえ） */
+export const nameOf = (f) => DR.nameOf(f);
 
 export function initialValues() {
   const S0 = B.START;
@@ -167,8 +178,10 @@ export function normalize(state) {
   state.box = (Array.isArray(state.box) ? state.box : []).filter((f) => f && D.fishById[f.speciesId]);
   for (const f of state.box) normFish(f);
   if (state.quiz && !(Array.isArray(state.quiz.qs) && state.quiz.qs.length)) state.quiz = null;
+  DR.normalizeState(state);    // v0.8 ゆめ係：ゆめのすいそうの 形・f.dream
   normSizeState(state);        // v0.6 個体差：ずかんの きろく・古い ビッグの 魚の おおきさ
   checkUnlock(state);         // 読み込んだ 直後にも しらべる（v0.1 で もう 6ぴき なら ここで ひらく）
+  DR.checkGift(state);        // v0.8：もう 5にちめを すぎて いる 人は ひらいた とき もらえる（おしらせは state.notices.dream）
   return state;
 }
 
@@ -277,6 +290,7 @@ export function tempRange(t) {
 }
 /** つぎの段階までの そだち（0-1）。ビッグなら 1 */
 export function growRatio(f) {
+  if (isDreamF(f)) return 1;   // v0.8 ゆめの いきものは そだたない
   const sp = D.fishById[f.speciesId];
   const need = (sp?.growDays?.[f.stage] ?? 0) * B.GROW.hoursPerGrowDay;
   if (f.stage >= 2 || !need) return 1;
@@ -320,6 +334,7 @@ export function tick(state, gameMinutes, rnd = Math.random) {
     const h = Math.floor(state.clock.min / 60 + 1e-9);
     while (state.clock.judged < h) { state.clock.judged++; hourly(state, state.clock.judged, events, rnd); }
   }
+  DR.checkGift(state, events);   // v0.8 ゆめ係：5にちめ あさ 6じ いこうに ゆめのすいそう（{ type:'dreamGift', tankId, stored }）
   checkMissions(state, events);
   return events;
 }
@@ -375,6 +390,7 @@ function flowTank(state, t, h, events) {
   // v0.6 おそうじロボ（effect.wastePerHour）：ごみを すいこむ。1こ より 下には しない（さいごは あみで そうじ・ミッションも のこる）
   const wasteSuck = t.decor.reduce((a, id) => a + (items[id]?.effect?.wastePerHour || 0), 0);
   if (wasteSuck > 0 && t.waste > 1) t.waste = Math.max(1, t.waste - wasteSuck * h);
+  if (DR.isDreamTank(t)) DR.calm(t);   // v0.8 ゆめのすいそうは いつも ちょうど よい（すいおん・きれいさ・くうき）
 
   const H = B.HEALTH, M = B.MOOD;
   const safe = !state.tutorial.done;        // チュートリアル中は けんこう・ごきげん を 下げない
@@ -459,7 +475,7 @@ function autoFeed(t, hour, events) {
 
 function addGrow(state, f, n, events) {
   const sp = D.fishById[f.speciesId];
-  if (f.stage >= 2) return;
+  if (f.stage >= 2 || isDreamF(f)) return;   // v0.8 ゆめの いきものは そだたない（おとな の まま）
   f.grow += n;
   const need = (sp?.growDays?.[f.stage] ?? 99) * B.GROW.hoursPerGrowDay;
   if (f.grow >= need) {
@@ -746,10 +762,11 @@ export function addDex(state, f) {
 export function sizeOf(f) {
   const sp = D.fishById[f?.speciesId];
   if (!sp) return { cm: 0, maxCm: 0, pct: 50, crown: false, fixed: false, scale: 1 };
+  if (isDreamF(f)) return DR.sizeInfo(f);   // v0.8 ゆめ：えらんだ おおきさ（s・m・l）の まま
   return SZ.sizeInfo(sp, f, growRatio(f));
 }
-/** 3D の 大きさ倍率（aq.setFish の sizeMul） */
-export const lookScaleOf = (f) => { const sp = D.fishById[f?.speciesId]; return sp ? SZ.lookScale(sp, f, growRatio(f)) : 1; };
+/** 3D の 大きさ倍率（aq.setFish の sizeMul）。ゆめの いきものは 1（大きさは 3D係が f.dream.size で きめる） */
+export const lookScaleOf = (f) => { const sp = D.fishById[f?.speciesId]; return sp && !isDreamF(f) ? SZ.lookScale(sp, f, growRatio(f)) : 1; };
 /** その えさを たべるか：'love' | 'ok' | 'no' */
 export const foodPrefOf = (speciesId, foodId) => SZ.foodPref(D.fishById[speciesId], foodId);
 export const foodKindOf = (foodId) => SZ.foodKind(foodId);
@@ -871,15 +888,18 @@ export function missionProgress(state, m) {
   const g = m.goal || {};
   // 水槽が いくつ あっても、ぜんぶ まとめて かぞえる（なかよし・みんな げんき は どれか 1つの 水槽で）
   // おやすみすいそう・そうこの 生きもの／すいそうも「もっている」ので かぞえる（いれかえで ミッションが もどらない ように）
-  const allTanks = state.tanks.concat(state.storage || []);
-  const allFish = allCreatures(state);
+  // v0.8 ゆめ係：ゆめのすいそう・ゆめの いきものは ミッションに かぞえない
+  const roomTanks = state.tanks.filter((x) => !DR.isDreamTank(x));
+  const real = (list) => list.filter((f) => !isDreamF(f));
+  const allTanks = state.tanks.concat(state.storage || []).filter((x) => !DR.isDreamTank(x));
+  const allFish = real(allCreatures(state));
   const t = { fish: allFish, decor: allTanks.flatMap((x) => x.decor) };
   const st = state.stats;
   const cnt = (k) => ({ now: Math.min(st[k] || 0, g.count), need: g.count });
   switch (g.type) {
     case 'buyFish': return cnt('buyFish');
-    case 'fishCount': return { now: Math.min(state.tanks[0].fish.length, g.count), need: g.count };
-    case 'speciesCount': return { now: Math.min(new Set(state.tanks[0].fish.map((f) => f.speciesId)).size, g.count), need: g.count };
+    case 'fishCount': return { now: Math.min(real(state.tanks[0].fish).length, g.count), need: g.count };
+    case 'speciesCount': return { now: Math.min(new Set(real(state.tanks[0].fish).map((f) => f.speciesId)).size, g.count), need: g.count };
     case 'placeItem': return { now: t.decor.includes(g.id) || state.inv[g.id] ? 1 : 0, need: 1 };
     case 'feed': return cnt('feed');
     case 'waterChange': return cnt('waterChange');
@@ -890,20 +910,20 @@ export function missionProgress(state, m) {
     case 'natsuki': { const v = Math.max(0, ...t.fish.map((f) => f.natsuki)); return { now: Math.min(Math.floor(v), g.value), need: g.value }; }
     case 'friends': {
       let ok = 0;
-      for (const tk of state.tanks) for (let i = 0; i < tk.fish.length && !ok; i++) for (let j = i + 1; j < tk.fish.length; j++) if (D.compatOf(tk.fish[i].speciesId, tk.fish[j].speciesId) === 2) { ok = 1; break; }
+      for (const tk of roomTanks) for (let i = 0; i < tk.fish.length && !ok; i++) for (let j = i + 1; j < tk.fish.length; j++) if (D.compatOf(tk.fish[i].speciesId, tk.fish[j].speciesId) === 2) { ok = 1; break; }
       return { now: ok, need: 1 };
     }
     case 'allHealthy': {
       const need = g.minFish ?? 2;
       let best = 0;
-      for (const tk of state.tanks) {
+      for (const tk of roomTanks) {
         const good = tk.fish.filter((f) => f.health >= g.value).length;
         best = Math.max(best, tk.fish.length >= need && good === tk.fish.length ? need : Math.min(good, need - 1));
       }
       return { now: best, need };
     }
     case 'days': return cnt('days');
-    case 'tankCreatures': { const tk = state.tanks[g.tankIndex ?? 0]; return { now: Math.min(tk ? tk.fish.length : 0, g.count), need: g.count }; }
+    case 'tankCreatures': { const tk = state.tanks[g.tankIndex ?? 0]; return { now: Math.min(tk ? real(tk.fish).length : 0, g.count), need: g.count }; }
     case 'kindCount': return { now: Math.min(allFish.filter((f) => (D.fishById[f.speciesId]?.kind || 'fish') === g.kind).length, g.count), need: g.count };
     case 'tankCount': return { now: Math.min(allTanks.length, g.count), need: g.count };
     case 'hasTankWater': return { now: allTanks.some((x) => x.water === g.water) ? 1 : 0, need: 1 };
@@ -919,8 +939,8 @@ export function missionProgress(state, m) {
     case 'bigCount': return { now: Math.min(allFish.filter((f) => f.stage >= 2).length, g.count), need: g.count };
     case 'adultCount': return { now: Math.min(allFish.filter((f) => f.stage >= 1).length, g.count), need: g.count };
     case 'creatures': return { now: Math.min(allFish.length, g.count), need: g.count };
-    case 'boxCount': return { now: Math.min((state.box || []).length, g.count), need: g.count };
-    case 'storageCount': return { now: Math.min((state.storage || []).length, g.count), need: g.count };
+    case 'boxCount': return { now: Math.min(real(state.box || []).length, g.count), need: g.count };
+    case 'storageCount': return { now: Math.min((state.storage || []).filter((x) => !DR.isDreamTank(x)).length, g.count), need: g.count };
     case 'decorCount': return { now: Math.min(allTanks.reduce((a, tk) => a + tk.decor.filter((id) => D.itemById[id]?.type === 'decor').length, 0), g.count), need: g.count };
     case 'decorKinds': return { now: Math.min(new Set(t.decor.filter((id) => D.itemById[id]?.type === 'decor')).size, g.count), need: g.count };
     case 'zukanWater': return { now: Math.min(Object.keys(state.dex).filter((id) => D.fishById[id]?.water === g.water).length, g.count), need: g.count };
@@ -985,6 +1005,7 @@ export function claimMission(state, id) {
  */
 export function currentHint(state, t = state.tanks[0]) {
   if (!state.tutorial.done) return null;
+  if (DR.isDreamTank(t)) return null;   // v0.8 ゆめのすいそうは いつも ちょうど よい（からっぽの ときの あんないは すいそう画面）
   if (!t.fish.length) {
     const h = D.HINTS.find((x) => x.when?.type === 'tankEmpty');
     return h && t !== state.tanks[0] ? { key: h.id, text: h.text, action: h.action, uid: null, kind: 'hint' } : null;
@@ -1081,7 +1102,8 @@ export function tankName(state, t) {
 /** その 水の しゅるいが あるか（WATERS を 見る。'fresh' 'salt' 'pond' … これから ふえる） */
 export const waterOk = (w) => !!(B.WATERS && B.WATERS[w]);
 /** v0.6 ぼうけん係：その 水の すいそうに その 飾り・器具（items.js の water）が 入れられるか（WATERS[w].items） */
-export const itemFitsWater = (it, w) => !!it && (B.WATERS?.[w]?.items || [w, 'both']).includes(it.water);
+// v0.8 ゆめのすいそう（'dream'）には 器具・飾り（inTank）を 入れない（いつも ちょうど よい ふしぎな すいそう）。えさ・どうぐは かえる
+export const itemFitsWater = (it, w) => !!it && (w === 'dream' ? !it.inTank : (B.WATERS?.[w]?.items || [w, 'both']).includes(it.water));
 /** 水の なまえ（'かわ' 'うみ' 'いけ'） */
 export const waterName = (w) => B.WATERS?.[w]?.name || B.WATERS?.fresh?.name || 'かわ';
 /** すいそうの かずの 上限（へや＋そうこ）と いまの かず */

@@ -317,6 +317,10 @@ async function run(browser, base, W, H) {
   if (await p.evaluate(() => typeof G.sim.vitaminStart === 'function')) {
     try { await v03(); } catch (e) { notes.push('【不具合？】v0.3 の ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v03_stopped').catch(() => {}); }
   }
+  // 10. v0.8：とけい → 5にちめ あさ 6じ すぎに ゆめのすいそう → ぬりえ（ペン・ぬりつぶし・もじペン）→ できあがり → リロード
+  if (await p.evaluate(() => !!G.sim.dream)) {
+    try { await v08(); } catch (e) { notes.push('【不具合？】v0.8 の ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v08_stopped').catch(() => {}); }
+  }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
 
@@ -609,6 +613,97 @@ async function run(browser, base, W, H) {
     }
     await goRoom(); await p.waitForTimeout(800);
     await shot('51_room_v03');
+  }
+
+  async function v08() {
+    const goRoom = async () => { for (let i = 0; i < 4 && (await st()).scr !== 'room'; i++) { await p.click('#btn-back'); await p.waitForTimeout(500); } };
+    const reload = async () => { await p.evaluate(() => G.saveNow()); await p.goto(base + '/index.html?nosw', { waitUntil: 'load' }); await p.waitForFunction(() => window.G && G.state, null, { timeout: 20000 }); await p.waitForTimeout(1500); };
+    await goRoom();
+    // とけい（HUD・かべ）
+    const ck = await p.evaluate(() => ({ hud: document.getElementById('hud-clock-t')?.textContent || '', svg: !!document.querySelector('#hud-clock svg'), wall: !!document.querySelector('.room-clock svg') }));
+    notes.push('v0.8 とけい: ' + JSON.stringify(ck));
+    if (!/^\d{1,2}:\d\d$/.test(ck.hud) || !ck.svg) notes.push('【不具合】HUD に とけい（まるい とけい＋「6:30」）が ない');
+    if (!ck.wall) notes.push('【不具合】へやの かべに とけいが ない');
+    // 5にちめ あさ 6じ の すこし まえへ（もう すぎて いれば、まだ 見て いない おしらせを リロードで 出す）
+    const pre = await p.evaluate(() => {
+      const s = G.state;
+      const has = s.tanks.concat(s.storage || []).some((t) => t.water === 'dream');
+      if (!has && G.sim.gameDay(s.clock.min) < 5) { const m = 6 * 60 + 4 * 1440 - 6; s.clock.min = m; s.clock.judged = Math.floor(m / 60); G.refreshHud(); }
+      return { has, day: G.sim.gameDay(s.clock.min), notice: !!s.notices?.dream };
+    });
+    notes.push('v0.8 ゆめのすいそう まえ: ' + JSON.stringify(pre));
+    if (pre.has && !pre.notice) notes.push('（ゆめのすいそうは もう もらって おしらせも 見た あと）');
+    else if (pre.has) await reload();
+    const cel = await p.waitForFunction(() => !document.getElementById('celebrate').hidden && document.getElementById('celebrate').classList.contains('dream'), null, { timeout: 20000 }).then(() => true, () => false);
+    if (!cel && !(pre.has && !pre.notice)) { notes.push('【不具合】5にちめ あさ 6じを すぎても ゆめのすいそうの おしらせが でない'); return; }
+    if (cel) {
+      notes.push('v0.8 おしらせ: ' + (await p.textContent('#celebrate .cel-text')) + ' / ' + (await p.textContent('#celebrate .cel-sub')));
+      await shot('60_dream_notice');
+      await p.click('#celebrate .cel-shop'); await p.waitForTimeout(1800);
+    }
+    // ゆめのすいそうを ひらく（そうこに 入った ときは その旨だけ）
+    const dt = await p.evaluate(() => { const t = G.state.tanks.find((x) => x.water === 'dream'); return t ? { id: t.id, slot: t.slot } : null; });
+    if (!dt) { notes.push('ゆめのすいそうは そうこに 入った（へやが いっぱい）。おえかきの 通しは とばす'); return; }
+    if (!(await p.evaluate(() => G.screen === 'tank' && G.tank().water === 'dream'))) {
+      await goRoom(); await p.click(`.room-slot[data-slot="${dt.slot}"]`); await p.waitForFunction(() => G.screen === 'tank', null, { timeout: 5000 }); await p.waitForTimeout(1500);
+    }
+    await shot('61_dream_tank');
+    if (!(await p.$('#dream-add:not([hidden])'))) { notes.push('【不具合】ゆめのすいそうに「いきものを ついか」が ない'); return; }
+    // おえかき：ぬりえ（メダカ）
+    await p.click('#dream-add'); await p.waitForTimeout(800);
+    if ((await st()).scr !== 'draw') { notes.push('【不具合】「いきものを ついか」で おえかき がめんに ならない'); return; }
+    await p.click('#scr-draw .dr-big[data-v="nurie"]'); await p.waitForTimeout(600);
+    const baseId = await p.evaluate(() => (document.querySelector('#scr-draw .dr-card[data-id="medaka"]') || document.querySelector('#scr-draw .dr-card'))?.dataset.id);
+    if (!baseId) { notes.push('【不具合】ぬりえに えらべる いきものが ない'); return; }
+    await p.click(`#scr-draw .dr-card[data-id="${baseId}"]`);
+    await p.waitForSelector('#scr-draw .dr-canvas', { timeout: 8000 }); await p.waitForTimeout(600);
+    const box = await p.evaluate(() => { const r = document.querySelector('#scr-draw .dr-canvas').getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+    const at = (u, v) => [box.x + u * box.w, box.y + v * box.h];
+    const line = async (pts) => { const P = pts.map(([u, v]) => at(u, v)); await p.mouse.move(...P[0]); await p.mouse.down(); for (const q of P.slice(1)) await p.mouse.move(...q, { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(80); };
+    const pix = () => p.evaluate(() => { const c = document.querySelector('#scr-draw .dr-canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 16) h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) >>> 0; return h; });
+    const h0 = await pix();
+    await p.click('#scr-draw .dr-tool[data-tool="pen"]'); await p.click('#scr-draw .dr-color[data-color="#ff922b"]'); await p.click('#scr-draw .dr-size[data-size="l"]');
+    await line([[0.1, 0.35], [0.5, 0.3], [0.9, 0.4]]);
+    const h1 = await pix();
+    await p.click('#scr-draw .dr-tool[data-tool="fill"]'); await p.click('#scr-draw .dr-color[data-color="#70d6ef"]');
+    const fp = await p.evaluate(() => { const c = document.querySelector('#scr-draw .dr-canvas'); const g = c.getContext('2d'); for (const [u, v] of [[0.5, 0.6], [0.45, 0.65], [0.55, 0.55], [0.4, 0.5], [0.6, 0.6], [0.5, 0.5]]) { const d = g.getImageData(Math.round(u * c.width), Math.round(v * c.height), 1, 1).data; if (d[3] > 200 && d[0] > 245 && d[1] > 245 && d[2] > 245) return [u, v]; } return null; });
+    if (fp) { await p.mouse.click(...at(fp[0], fp[1])); await p.waitForTimeout(400); }
+    const h2 = await pix();
+    await p.click('#scr-draw .dr-tool[data-tool="moji"]'); await p.click('#scr-draw .dr-color[data-color="#222222"]');
+    await line([[0.45, 0.4], [0.4, 0.5], [0.45, 0.6]]);
+    await line([[0.5, 0.4], [0.5, 0.58], [0.56, 0.55]]);
+    const h3 = await pix();
+    await shot('62_draw_nurie');
+    if (h1 === h0) notes.push('【不具合】ぬりえで ペンが ぬれない');
+    if (!fp || h2 === h1) notes.push('【不具合？】ぬりえの ぬりつぶしが できない（しろい ところが みつからない かも）');
+    if (h3 === h2) notes.push('【不具合】もじペンで かけない');
+    // ぜんぶけす の かくにん → やめる
+    await p.click('#scr-draw .dr-clear'); await p.waitForTimeout(400);
+    const cm = await p.textContent('#dialog .modal-body').catch(() => '');
+    if (!/ほんとうに ぜんぶ けして いい/.test(cm || '')) notes.push('【仕様と ちがう】ぜんぶけす の かくにんが でない');
+    await p.click('#dialog .btn[data-v="false"]').catch(() => {}); await p.waitForTimeout(300);
+    if ((await pix()) !== h3) notes.push('【不具合】ぜんぶけす の「やめる」で 絵が きえた');
+    await p.click('#scr-draw .dr-done'); await p.waitForTimeout(700);
+    await p.click('#scr-draw .dr-opt[data-v="slow"]');
+    await p.click('#scr-draw .dr-name'); await p.keyboard.type('ゆめっち');
+    await shot('63_draw_info');
+    await p.click('#scr-draw .dr-finish'); await p.waitForTimeout(2500);
+    const made = await p.evaluate(() => { const t = G.tank(); const f = t.fish.find((x) => x.dream); return { scr: G.screen, water: t.water, f: f ? { uid: f.uid, name: f.dream.name, base: f.dream.base, speed: f.dream.speed, ov: (f.dream.overlay || '').length } : null }; });
+    notes.push('v0.8 できあがり: ' + JSON.stringify(made));
+    if (!made.f || made.scr !== 'tank' || made.water !== 'dream') { notes.push('【不具合】できあがり の あと ゆめのすいそうに いきものが いない'); return; }
+    if (made.f.name !== 'ゆめっち' || made.f.base !== baseId || made.f.speed !== 'slow') notes.push('【不具合】なまえ・もと・はやさ が きろく されない');
+    if (!made.f.ov) notes.push('【不具合】もじペンの 字（f.dream.overlay）が きろく されない');
+    await p.waitForTimeout(1500);
+    await shot('64_dream_swim');
+    const q = await p.evaluate((u) => G.aq?.screenPosOf?.(u), made.f.uid);
+    if (!q) notes.push('【不具合】かいた いきものが 3D の すいそうに 見えない');
+    else { const sz = Math.min(W, 300); const f = join(OUT, `${tag}_65_dream_fish_zoom.png`); await p.screenshot({ path: f, clip: { x: Math.max(0, Math.min(W - sz, q.x - sz / 2)), y: Math.max(0, Math.min(H - sz * 0.7, q.y - sz * 0.25)), width: sz, height: Math.round(sz * 0.7) } }); shots.push(f); }
+    // リロードで のこる
+    await reload();
+    const back = await p.evaluate((u) => { const t = G.state.tanks.find((x) => x.water === 'dream'); const f = t?.fish.find((x) => x.uid === u); return { ok: !!f, ov: (f?.dream?.overlay || '').length, layout: t?.layout, cel: !document.getElementById('celebrate').hidden }; }, made.f.uid);
+    notes.push('v0.8 リロード あと: ' + JSON.stringify(back));
+    if (!back.ok || !back.ov) notes.push('【不具合】リロードすると ゆめの いきもの・字が きえる');
+    if (back.cel) notes.push('【不具合】リロードすると ゆめのすいそうの おしらせが また でる');
   }
 }
 

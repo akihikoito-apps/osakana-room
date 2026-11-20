@@ -16,6 +16,7 @@ import * as photo from './ui/photo.js';
 import * as tutorial from './ui/tutorial.js';
 import { initAwake, awakeState } from './ui/awake.js';
 import { initBgmUi, wirePicker, bgmNow } from './ui/bgm-ui.js';
+import { makeClock, clockOf } from './ui/clock.js';   // v0.8 ゆめ係：HUD の とけい
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
@@ -72,6 +73,7 @@ async function boot() {
   // v0.5：あとから 足す 画面（js/ui/help.js など）。G.addScreen('help', { show(G, opts), hide(G) }) で とうろく
   const EXTRA = {};
   G.addScreen = (name, mod, { sheet = true } = {}) => { EXTRA[name] = mod; if (sheet && !SHEETS.includes(name)) SHEETS.push(name); };
+  G.hasScreen = (name) => !!EXTRA[name];   // v0.8 ゆめ係：おえかき（'draw'）が とうろく されているか
   function go(name, opts = {}) {
     if (name === G.screen) {
       // おなじ 画面でも タブや 水槽が かわったら かきなおす
@@ -110,13 +112,20 @@ async function boot() {
   });
 
   // ---------- 上の帯 ----------
-  let lastPhase = null;
+  let lastPhase = null, hudClock = null;
   function refreshHud() {
     const m = state.clock.min;
     $('#hud-day').textContent = `${sim.gameDay(m)}にちめ`;
     const ph = S.phaseOf(m);
     $('#hud-phase').textContent = S.PHASE_LABEL[ph];
     $('#hud-phase-ic').textContent = { morning: '🌅', noon: '☀️', evening: '🌇', night: '🌙' }[ph];
+    // v0.8 ゆめ係：小さな まるい とけい＋「6:30」（5ふん きざみ・12じかんせい。js/ui/clock.js）
+    if (!hudClock) {
+      hudClock = makeClock({ className: 'hud-ck', ticks: 4 });
+      $('#hud-time').append(el('span', { id: 'hud-clock' }, hudClock, el('b', { id: 'hud-clock-t' })));
+    }
+    hudClock.update(m);
+    $('#hud-clock-t').textContent = clockOf(m).text;
     $('#hud-coin-n').textContent = state.coins;
     $('#hud-heart-n').textContent = state.hearts > 9999 ? '9999＋' : String(state.hearts || 0);
     $('#hud-heart-day').textContent = `きょう ${Math.min(state.daily.hearts || 0, sim.balance().HEART.perDay ?? 20)}／${sim.balance().HEART.perDay ?? 20}`;
@@ -161,6 +170,8 @@ async function boot() {
       box.querySelector('.cel-sub').textContent = '';
       box.querySelector('.cel-ok').textContent = last ? 'やったー！' : 'つぎへ';
       box.querySelector('.cel-shop').hidden = !last;
+      box.querySelector('.cel-shop').textContent = '🛒 おみせへ';   // v0.8：ゆめのすいそうの おしらせと おなじ はこ なので もどす
+      box.classList.remove('dream');
       const cf = box.querySelector('.confetti');
       cf.replaceChildren();
       const colors = ['#b8e4f5', '#a8dcc3', '#ffe08a', '#f5b7a9'];
@@ -180,21 +191,68 @@ async function boot() {
       G.saveNow();
       if (toShop) go('shop', { tab: 'tanks' });      // 水槽の 売り場へ ちょくせつ
       G.emit('changed');
+      setTimeout(celebrateDream, 700);               // v0.8 ゆめのすいそうの おしらせが まって いれば つぎに
     };
     box.querySelector('.cel-ok').onclick = () => { if (page < pages.length - 1) { page++; showPage(); } else close(false); };
     box.querySelector('.cel-shop').onclick = () => close(true);
     showPage();
     box.hidden = false;
   }
+  // v0.8 ゆめ係：ゆめのすいそうの プレゼント（state.notices.dream = { tankId, stored }）。おなじ はこを つかう・あいだは 時計を とめる
+  function celebrateDream() {
+    const nt = state.notices?.dream;
+    if (!nt || celebrating || !state.tutorial.done) return;
+    const box = $('#celebrate');
+    const t = state.tanks.find((x) => x.id === nt.tankId);
+    const inStorage = !t && (state.storage || []).some((x) => x.id === nt.tankId);
+    celebrating = true;
+    box.classList.add('dream');
+    box.querySelector('.cel-ic').textContent = '🌙';
+    box.querySelector('.cel-text').textContent = 'ゆめのすいそうを もらったよ！';
+    box.querySelector('.cel-sub').textContent = inStorage ? 'へやが いっぱい だったので そうこに いれたよ。そうこから だして、いきものを かいて みよう' : 'タップして いきものを かいて みよう';
+    const ok = box.querySelector('.cel-ok'), go2 = box.querySelector('.cel-shop');
+    ok.textContent = 'あとで';
+    go2.textContent = inStorage ? '📦 そうこへ' : '✨ みに いく';
+    go2.hidden = !t && !inStorage;
+    const cf = box.querySelector('.confetti');
+    cf.replaceChildren();
+    const colors = ['#d9c8ff', '#b8e4f5', '#fff3b0', '#f7c8e8'];
+    for (let i = 0; i < 28; i++) {
+      const p = el('i');
+      p.style.left = ((i * 37) % 100) + '%';
+      p.style.background = colors[i % 4];
+      p.style.animationDelay = ((i * 0.07) % 0.6) + 's';
+      p.style.setProperty('--rx', ((i * 53) % 360) + 'deg');
+      cf.append(p);
+    }
+    const close = (goTo) => {
+      box.hidden = true;
+      box.classList.remove('dream');
+      celebrating = false;
+      delete state.notices.dream;
+      G.saveNow();
+      if (goTo && inStorage) go('storage');
+      else if (goTo && t) {
+        G.setTank(t.id);
+        if (G.screen === 'tank') { tankUi.hide(G); tankUi.show(G); } else go('tank');
+        G.emit('action', { type: 'openTank', tankId: t.id });
+      }
+      G.emit('changed');
+    };
+    ok.onclick = () => close(false);
+    go2.onclick = () => close(true);
+    box.hidden = false;
+  }
   G.celebrating = () => celebrating;
   G.celebrate = celebrate;
-  G.on('sim', (ev) => { if (ev.type === 'unlock') setTimeout(celebrate, 400); });
+  G.celebrateDream = celebrateDream;
+  G.on('sim', (ev) => { if (ev.type === 'unlock') setTimeout(celebrate, 400); if (ev.type === 'dreamGift') setTimeout(celebrateDream, 400); });
   $('#hud-hearts').addEventListener('click', () => toast('さかなを なでると ハートが たまるよ'));
 
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
   // v0.5：ヘルプ・こうしん りれき（案内係）／ミニゲーム・かりすいそう・プレイヤー（ゲーム係）。無くても うごく
-  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js', './ui/premium.js'].map(optional))) m.init?.(G);   // v0.7 premium：課金係
+  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js', './ui/premium.js', './ui/draw.js'].map(optional))) m.init?.(G);   // v0.7 premium：課金係・v0.8 draw：おえかき係
 
   // ずっと押していると出るメニューや、ダブルタップの拡大を止める
   document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -211,6 +269,7 @@ async function boot() {
   tutorial.resume(G);
   // v0.1 の セーブで もう 6ぴき いた・まえに 見のがした ときも ここで おいわい
   setTimeout(celebrate, 900);
+  setTimeout(celebrateDream, 1100);   // v0.8：まえに ひらいた ときに もらって まだ 見て いない・ひらいた とき もらった
   G.on('tutorialDone', () => setTimeout(celebrate, 1200));
 
   // あそんでいる あいだは 画面を くらく しない（Wake Lock、だめなら 無音の 小さな 動画）

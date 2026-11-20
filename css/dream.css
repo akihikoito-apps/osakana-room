@@ -1,0 +1,95 @@
+/* v0.8 ゆめ係：とけい（HUD・へやの かべ）と ゆめのすいそうの ボタン・おしらせ */
+
+/* ---------- とけい（js/ui/clock.js の SVG） ---------- */
+.clock-face { display: block; overflow: visible; }
+.clock-face .ck-rim { fill: #ffffff; stroke: #8fb9c9; stroke-width: 6; }
+.clock-face .ck-dial { fill: #fffdf4; }
+.clock-face .ck-tick { stroke: #9fb3ba; stroke-width: 3; stroke-linecap: round; }
+.clock-face .ck-tick.big { stroke: #6f868e; stroke-width: 4.5; }
+.clock-face .ck-hour { stroke: #3d4a52; stroke-width: 8; stroke-linecap: round; }
+.clock-face .ck-min { stroke: #3d4a52; stroke-width: 5; stroke-linecap: round; }
+.clock-face .ck-pin { fill: #f08a5d; }
+.clock-face .ck-num { font: 700 13px/1 system-ui, sans-serif; fill: #6b4a2a; }
+/* よるは もじばんを こい あおに（ひるか よるか 絵でも わかる） */
+.clock-face[data-phase="night"] .ck-dial { fill: #33406e; }
+.clock-face[data-phase="night"] .ck-hour, .clock-face[data-phase="night"] .ck-min { stroke: #fff6d8; }
+.clock-face[data-phase="night"] .ck-tick { stroke: #aab4dd; }
+.clock-face[data-phase="evening"] .ck-dial { fill: #ffe9d2; }
+
+/* HUD：「3にちめ あさ」の よこ */
+#hud-clock { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; }
+#hud-clock .hud-ck { width: 26px; height: 26px; flex: none; }
+/* 小さいので はりを ふとく（Codex・agy：よみにくい）・よるは はりを あかるい きいろに */
+#hud-clock .ck-hour { stroke-width: 12; }
+#hud-clock .ck-min { stroke-width: 8; }
+#hud-clock .ck-tick { stroke-width: 5; }
+#hud-clock .clock-face[data-phase="night"] .ck-hour, #hud-clock .clock-face[data-phase="night"] .ck-min { stroke: #ffe27a; }
+#hud-clock-t { font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: 0.02em; min-width: 2.6em; text-align: left; }
+@media (max-height: 500px) {
+  #hud-clock .hud-ck { width: 24px; height: 24px; }
+  #hud-clock { gap: 3px; }
+  /* せまい スマホは あさ／よる の 絵文字を けして とけいに ゆずる（すいそうの なまえと かさならない ように。もじばんの いろで ひる・よる） */
+  #hud-time #hud-phase-ic { display: none; }
+  #hud .time { gap: 6px; }
+}
+@media (min-height: 600px) and (min-width: 900px) { #hud-clock .hud-ck { width: 30px; height: 30px; } }
+
+/* へやの かべ：ROOMS.clock の まんなかに おく（大きさは 絵の 高さの わりあい） */
+.room-clock {
+  position: absolute; z-index: 2; aspect-ratio: 1 / 1; padding: 0; border: 0; background: transparent;
+  transform: translate(-50%, -50%); cursor: pointer; filter: drop-shadow(0 2px 3px rgba(80, 60, 40, 0.28));
+}
+.room-clock::after { content: ''; position: absolute; inset: -8px; }   /* さわれる ところを すこし ひろく */
+.room-clock .clock-face { width: 100%; height: 100%; }
+.room-clock .ck-rim { fill: #e6a861; stroke: #b97a3c; stroke-width: 4; }
+.room-clock .ck-dial { fill: #fffaf0; }
+.room-clock .ck-tick { stroke: #c9a27a; }
+.room-clock .ck-tick.big { stroke: #8a6440; }
+.room-clock .ck-hour, .room-clock .ck-min { stroke: #4a3a2a; }
+/* かべの とけいは よるも ほんものの とけいの まま（へやの くらさは へやの 絵が きめる） */
+.room-clock .clock-face[data-phase] .ck-dial { fill: #fffaf0; }
+.room-clock .clock-face[data-phase] .ck-hour, .room-clock .clock-face[data-phase] .ck-min { stroke: #4a3a2a; }
+.room-clock .clock-face[data-phase] .ck-tick { stroke: #c9a27a; }
+.room-clock .clock-face[data-phase] .ck-tick.big { stroke: #8a6440; }
+.room-clock:active { transform: translate(-50%, -50%) scale(0.95); }
+body.zooming .room-clock { pointer-events: none; }
+
+/* ---------- へやの 小さな ゆめのすいそう ---------- */
+.room-slot.dream .water { background: linear-gradient(#efe4ff, #b9c8f2 60%, #8ea6e2); }
+.room-slot.dream .sand { background: linear-gradient(#f4e9f7, #dccbe6); height: 12%; }
+.room-slot.dream .tank-rim { background: linear-gradient(#b9a3e6, #8f7ccc); }
+.room-slot.dream .water::before { content: '✦ ✧ ✦'; position: absolute; left: 8%; top: 8%; font-size: 10px; letter-spacing: 6px; color: rgba(255, 255, 255, 0.85); pointer-events: none; }
+.water-tag.dream { background: #e3d6ff; }
+#tank-title .tt-dots i.dream { background: #c7b4f2; }
+#tank-title .tt-dots i.on.dream { background: #8f7ccc; }
+
+/* ---------- すいそう画面 ---------- */
+#care .dream-add { background: linear-gradient(135deg, #f3ecff, #e3f1ff); }
+#care .dream-add .lb { line-height: 1.1; font-size: 0.92em; }
+#care .dream-add.cool { opacity: 0.55; }
+#dream-layout {
+  position: absolute; z-index: 10; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 104px);
+  display: flex; gap: 4px; padding: 4px; border-radius: 16px; background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow);
+}
+#dream-layout .dl-btn {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border-radius: 12px;
+  border: 2px solid transparent; background: #f2f4fb; color: var(--ink); font-size: 14px; font-weight: 700;
+}
+#dream-layout .dl-btn.on { background: #e5dbff; border-color: #8f7ccc; }
+#dream-layout .dl-ic { font-size: 18px; }
+@media (max-height: 500px) { #dream-layout { bottom: calc(var(--safe-b) + 96px); } #dream-layout .dl-btn { padding: 0 9px; font-size: 13px; } }
+@media (min-height: 600px) and (min-width: 900px) { #dream-layout { bottom: calc(var(--safe-b) + 128px); } #dream-layout .dl-btn { min-height: 52px; font-size: 16px; } }
+body.idle #dream-layout, body.photo #dream-layout { opacity: 0; pointer-events: none; }
+/* いきものの カードが ひらいて いる あいだは かくす（カードと かさならない ように） */
+body:has(#fish-card:not([hidden])) #dream-layout { display: none; }
+#dream-layout { transition: opacity 500ms ease; }
+
+#fish-card .c-stage.dream { background: #e5dbff; color: #5b4a99; }
+#fish-card .c-toart { margin-top: 6px; }
+.toart-pic { max-width: 70%; max-height: 120px; object-fit: contain; }
+.box-item .pic.dream { background: linear-gradient(#f3ecff, #e3f1ff); }
+
+/* ---------- プレゼントの おしらせ（#celebrate を つかいまわす） ---------- */
+#celebrate.dream { background: rgba(70, 60, 120, 0.45); }
+#celebrate.dream .cel-box { background: linear-gradient(160deg, #ffffff 0%, #f4eeff 55%, #e6f2ff 100%); }
+#celebrate.dream .cel-ic { font-size: 52px; }

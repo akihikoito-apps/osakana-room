@@ -322,6 +322,22 @@ export const WATERS = {
   fresh: { name: 'かわ', items: ['fresh', 'both'] },
   salt:  { name: 'うみ', items: ['salt', 'both'] },
   pond:  { name: 'いけ', items: ['fresh', 'both'] },
+  dream: { name: 'ゆめ', items: ['fresh', 'both'] },   // v0.8 ゆめ係：ゆめのすいそう（器具・飾りは 入れない。sim.itemFitsWater が はじく）
+};
+
+// ---------------- v0.8 ゆめのすいそう（ゆめ係。しくみは js/dream.js） ----------------
+export const DREAM = {
+  giftDay: 5,                  // ゲームの 5にちめ あさ 6じ いこうに 1かいだけ もらえる（sim.gameDay(min) >= 5）
+  maxPerTank: 6,               // 1つの すいそうに 6ぴき まで（いまの すいそうと おなじ）
+  maxCreatures: 30,            // ゆめの いきもの ぜんぶ（すいそう＋そうこ＋おやすみすいそう）。絵を セーブに 入れるので localStorage の 大きさの ため
+  sizeCm: { s: 3, m: 6, l: 10 },   // えらんだ おおきさ（そだたない）
+  start: { onaka: 80, health: 100, mood: 80, natsuki: 0 },   // かいた ばかりの いきもの
+  steady: { temp: 25, clean: 100, air: 100 },               // ゆめのすいそうは いつも ちょうど よい
+  nameMax: 8,                  // なまえ（ひらがな・カタカナ）
+  artMaxChars: 400000,         // 絵 1まい（data URL）の ながさの 上限（512px の PNG で おおくて 200KB くらい）
+  artBudgetChars: 3000000,     // 絵 ぜんぶ（art ＋ もじペンの overlay）の ながさの 上限（localStorage は 5MB くらい。ほかの セーブの ぶんを のこす）
+  // みつもり：art 1まい 30〜100KB ＋ overlay（ほとんど すける）10〜30KB → 1ぴき 40〜130KB × 30ぴき ＝ 1.2〜3.9MB。
+  // おおきい 絵ばかりの ときは maxCreatures より さきに artBudgetChars で とまる（ついか できない だけ。けさない）
 };
 
 // ---------------- ぼうけん ----------------

@@ -20,7 +20,7 @@ test('ぼうけん：数は balance.js（300・えさ 3こ→100コイン・1日
     assert.equal([1, 2, 3, 4, 5].reduce((a, r) => a + w[r], 0), 100, m);
     for (let r = 1; r < 5; r++) assert.ok(w[r] > w[r + 1], `${m} ★${r} は ★${r + 1} より でやすい`);
   }
-  assert.deepEqual(Object.keys(balance.WATERS).sort(), ['fresh', 'pond', 'salt']);
+  assert.deepEqual(Object.keys(balance.WATERS).sort(), ['dream', 'fresh', 'pond', 'salt']);   // v0.8 ゆめ係：ゆめのすいそう（tests/v08_dream.test.js）
   assert.deepEqual(balance.WATERS.pond.items, ['fresh', 'both']);
 });
 
