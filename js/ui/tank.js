@@ -206,7 +206,7 @@ function foodPrefs3d(f) {
   if (G.sim.foodPrefOf) for (const id of Object.keys(FOODS)) out[FOODS[id].kind] = PREF3D[G.sim.foodPrefOf(f.speciesId, id)] || 'ok';
   return out;
 }
-function syncDecor() { aq?.setDecor(G.tank().decor.slice()); }
+function syncDecor() { const t = G.tank(); aq?.setDecor(t.decor.concat(t.autoCare === true ? ['auto_care'] : [])); }   // v0.9 おせわき係：おせわきは decor に 入れずに 3D へ だけ わたす
 function syncWater() {
   if (!aq) return;
   const t = G.tank();

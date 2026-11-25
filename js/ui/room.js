@@ -151,14 +151,15 @@ function render(force) {
     const t = s.tanks.find((x) => x.slot === k);
     const kind = t ? 'tank' : G.sim.isUnlocked(s, 'tank6') ? 'free' : 'lock';
     const weak = !!t && t.fish.some((f) => f.health < G.sim.balance().HEALTH.weak);
-    const key = kind + '|' + weak + '|' + (t ? t.water + t.fish.map((f) => f.uid + f.stage).join(',') + '|' + t.decor.join(',') + '|' + G.sim.tankName(s, t) : '');
+    const ac = !!t && t.autoCare === true;   // v0.9 おせわき係：じどう おせわきの しるし
+    const key = kind + '|' + weak + '|' + ac + '|' + (t ? t.water + t.fish.map((f) => f.uid + f.stage).join(',') + '|' + t.decor.join(',') + '|' + G.sim.tankName(s, t) : '');
     const glow = b.classList.contains('guide-target');
     b.className = 'room-slot ' + kind + (t ? ' ' + t.water : '') + (t && t.clean < 40 ? ' dirty' : '') + (glow ? ' guide-target' : '');
     if (!force && keys[k] === key) return;
     keys[k] = key;
     tag.hidden = !t;
     if (t) tag.textContent = G.sim.tankName(s, t);
-    if (kind === 'tank') { b.setAttribute('aria-label', G.sim.tankName(s, t)); b.replaceChildren(...miniTank(t, b), weak ? el('span', { class: 'slot-drop', text: '💧' }) : ''); }
+    if (kind === 'tank') { b.setAttribute('aria-label', G.sim.tankName(s, t)); b.replaceChildren(...miniTank(t, b), weak ? el('span', { class: 'slot-drop', text: '💧' }) : '', ac ? el('span', { class: 'slot-ac', title: 'じどう おせわき' }, el('img', { src: 'assets/items/auto_care.png', alt: '' })) : ''); }
     else if (kind === 'free') { b.setAttribute('aria-label', 'すいそうを おく'); b.replaceChildren(el('span', { class: 'slot-plus', text: '＋' }), el('span', { class: 'slot-free', text: 'すいそうを おける' })); }
     else { b.setAttribute('aria-label', 'まだ つかえない'); b.replaceChildren(el('span', { class: 'slot-lock', text: '🔒' })); }
   });

@@ -475,6 +475,8 @@ export function createAquarium(canvas, opts = {}) {
     get _agents() { return [...fishes.values()].map((f) => f.agent); },
     /** 自動えさやり機から少しえさを落とす（機械が無ければ右上から）。 */
     autoFeed(o = {}) { tank.autoFeed(o.kind || 'flake'); },
+    /** v0.9 じどう おせわき（setDecor に 'auto_care' を わたすと 前の ふちに 出る）が うごいた：{ feed, water, scoop, attach } */
+    autoCare(o = {}) { tank.autoCarePulse?.(o); },
     /**
      * えさの好みを渡す（何度呼んでもよい。渡した uid だけ上書き）。
      * 例：setFoodPrefs({ f1: { vitamin: 'love' }, f2: { vitamin: 'dislike' } })、f3: 'love' のように文字だけでも可。null で消す。

@@ -708,6 +708,7 @@ export class Tank {
     this.swayMats = [];
     this.heaterGlow = null;
     this.feeder = null; this.fanBlades = null; this.robot = null;
+    this.acBot = null;   // v0.9 じどう おせわき
     // v0.6 いけ：飾りは 水の ある ところ（りくちの てまえ）に ちぢめて ならべる。W と sandHeight を 水の はばで かりに かえて つくり、あとで ずらす
     const realW = this.W, pond = !!this.land;
     let dOff = 0;
@@ -752,6 +753,7 @@ export class Tank {
       co2_kit: () => this.makeCo2(-0.36 * W, -2.4),
       skimmer: () => (this.waterType === 'salt' ? this.makeSkimmer(-0.45 * W, -D / 2 + 0.5) : null),
       clean_robot: () => this.makeCleanRobot(-0.12 * W, 0.3),   // v0.6：そこの ごみの 帯の 手前がわ（z 0.15〜0.5、飾りの ない 通り道）を うごく
+      auto_care: () => this.makeAutoCare(-0.15 * W),   // v0.9 じどう おせわき：前の ふち（左の えさやりと まんなかの あいだ。まんなかは すいそうの なまえの ふだで かくれる。Codex・agy は まんなか案）
     };
     for (const id of ids) {
       const n = used[id] = (used[id] ?? -1) + 1;
@@ -774,6 +776,7 @@ export class Tank {
       for (const e of this.emitters) e.x += dOff;
       for (const k of ['rest', 'coral', 'cling']) for (const sp of extra[k]) sp.x += dOff;
       if (this.feeder) this.feeder.x += dOff;
+      if (this.acBot) this.acBot.x += dOff;
     }
     this.decorGroup.position.x = dOff;
     this.decorGroup.updateMatrixWorld(true);
@@ -1653,6 +1656,77 @@ export class Tank {
     return grp;
   }
 
+  /**
+   * v0.9 じどう おせわき：前の ふちの まんなかに クリップで とまる 白い たまご形の きかい（アイコン assets/items/auto_care.png と おなじ 形）。
+   * にこにこ顔の 目が ゆっくり ひかり、うごいた ときは あかるく ひかって（autoCarePulse）、ごはんなら つぶを おとし、みずかえ・そうじ なら あわ。
+   */
+  makeAutoCare(x) {
+    const grp = new THREE.Group();
+    const z = TANK_D / 2 - 1.6;
+    const y = this.waterTop - 1.5;   // 水面の した（カメラは まんなかを 見るので ふちの 上だと HUD に かくれる：agy）。うでで ふちに とまる
+    const white = new THREE.MeshLambertMaterial({ color: '#f7f9f8', emissive: '#e8f4f0', emissiveIntensity: 0.35 });   // 水の 中でも しろく 見える ように
+    const mint = new THREE.MeshLambertMaterial({ color: '#9fdcbf' });
+    const blue = new THREE.MeshLambertMaterial({ color: '#a9cdee' });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 14), white);
+    body.scale.set(1, 0.92, 0.85);
+    body.position.set(x, y, z);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.05, 8, 28), mint);
+    band.rotation.x = Math.PI / 2; band.position.set(x, y - 0.16, z);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#dff3ff', transparent: true, opacity: 0.55 }));
+    dome.position.set(x, y + 0.36, z);
+    const food = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#e8913a' }));
+    food.position.set(x, y + 0.37, z);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 12), mint);
+    cap.position.set(x, y + 0.64, z);
+    // かお（てまえ がわ）：こい あおの まるい まど＋ひかる 目と くち
+    const faceZ = z + 0.43;
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.25, 22), new THREE.MeshLambertMaterial({ color: '#3c6aa0' }));
+    face.position.set(x - 0.05, y - 0.02, faceZ);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.04, 6, 24), mint);
+    rim.position.copy(face.position); rim.position.z += 0.005;
+    const eyeMat = new THREE.MeshLambertMaterial({ color: '#fff3b0', emissive: '#ffe58a', emissiveIntensity: 0.6 });
+    const eyeL = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), eyeMat);
+    const eyeR = eyeL.clone();
+    eyeL.position.set(x - 0.13, y + 0.03, faceZ + 0.01);
+    eyeR.position.set(x + 0.03, y + 0.03, faceZ + 0.01);
+    const mouth = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.075, 12, 1, Math.PI * 1.15, Math.PI * 0.7), eyeMat);   // したの 弧＝にこにこ
+    mouth.position.set(x - 0.05, y - 0.01, faceZ + 0.01);
+    // みずへ のびる ノズルと うしろの クリップ
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.035, 1.0, 8), blue);
+    nozzle.position.set(x - 0.05, y - 0.75, z + 0.05);
+    // ガラスの ふちへ のびる うで（クリップ）
+    const armH = TANK_H - y - 0.3;
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(0.14, armH, 0.14), new THREE.MeshLambertMaterial({ color: '#9aa3a9' }));
+    clip.position.set(x + 0.55, y + 0.3 + armH / 2, z + 0.3);
+    grp.add(body, band, dome, food, cap, face, rim, eyeL, eyeR, mouth, nozzle);
+    // すこし おおきく（Codex・agy：とおくから 見ても わかる ように）。からだの まんなかを もとに ひろげる
+    const K = 1.3;
+    for (const m of grp.children) { m.position.set(x + (m.position.x - x) * K, y + (m.position.y - y) * K, z + (m.position.z - z) * K); m.scale.multiplyScalar(K); }
+    grp.add(clip);
+    const em = { kind: 'autocare', x: x - 0.05, y: y - 1.3, z: z + 0.05, rate: 0, spread: 0.12, size: [0.05, 0.1], acc: 0 };
+    this.emitters.push(em);
+    this.acBot = { x: x - 0.05, z: z - 0.2, eyeMat, body, baseY: y, t: 0, glow: 0, em };
+    return grp;
+  }
+
+  /** v0.9 じどう おせわきが うごいた（見ている ときだけ よばれる）：目が ひかり、ごはんは つぶ、みずかえ・そうじ は あわ */
+  autoCarePulse(o = {}) {
+    const a = this.acBot;
+    if (!a) return;
+    a.glow = 2.2;
+    if (o.feed) setTimeout(() => { if (!this.disposed) this.dropFood(a.x, clamp(a.z, this.bounds.minZ, this.bounds.maxZ), 'flake', 3, this.waterTop - 0.05); }, 350);
+    if (o.water || o.scoop) a.em.rate = 18;
+  }
+
+  updateAutoCare(dt) {
+    const a = this.acBot;
+    a.t += dt;
+    if (a.glow > 0) a.glow = Math.max(0, a.glow - dt);
+    else a.em.rate = 0;
+    a.eyeMat.emissiveIntensity = 0.5 + Math.sin(a.t * 1.6) * 0.15 + a.glow * 0.6;
+    a.body.position.y = a.baseY + (a.glow > 0 ? Math.sin(a.t * 18) * 0.03 : 0);   // うごいて いる ときは すこし ぷるぷる
+  }
+
   /** クリップ式ファン：前のふち（右）。羽根が回る。 */
   makeFan(x) {
     const grp = new THREE.Group();
@@ -1902,6 +1976,7 @@ export class Tank {
     }
     if (this.feeder && this.feeder.spin > 0) { this.feeder.spin -= dt; this.feeder.drum.rotation.y += dt * 6; }
     if (this.robot) this.updateCleanRobot(dt);
+    if (this.acBot) this.updateAutoCare(dt);   // v0.9 じどう おせわき
     // 浮遊物
     const mp = this.motes.geometry.attributes.position;
     for (let i = 0; i < this.moteCount; i++) {

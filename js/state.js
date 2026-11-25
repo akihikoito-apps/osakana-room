@@ -119,6 +119,8 @@ function fixTank(t, b, i) {
     water: typeof t.water === 'string' && /^[a-z]{2,12}$/.test(t.water) ? t.water : 'fresh',
     // v0.8 ゆめ係：ゆめのすいそうの かたち（'water'＝みずだけ・'land'＝はんぶん りく）。ほかの すいそうには つけない
     ...(t.water === 'dream' ? { layout: t.layout === 'land' ? 'land' : 'water' } : {}),
+    // v0.9 おせわき係：じどう おせわきが ついているか（true だけ のこす・ゆめのすいそうには つけない。かずの そろえは js/autocare.js）
+    ...('autoCare' in t ? { autoCare: t.autoCare === true && t.water !== 'dream' } : {}),
     name: typeof t.name === 'string' ? t.name.slice(0, 16) : '',
     slot: Number.isInteger(t.slot) ? t.slot : i,
     temp: n(t.temp, b.temp, 0, 40), clean: n(t.clean, b.clean), air: n(t.air, b.air), leftover: n(t.leftover, 0, 0, 99), waste: n(t.waste, 0, 0, 99),

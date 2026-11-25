@@ -1,6 +1,6 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
@@ -13,6 +13,7 @@ const FILES = [
   'css/size.css', 'js/size.js', 'js/data/sizes.js', 'assets/items/food_bloodworm.png', 'assets/items/food_brine.png', 'assets/items/food_veggie.png', 'assets/items/food_krill.png',   // v0.6 個体差係
   'js/aquarium/index.js', 'js/aquarium/tank.js', 'js/aquarium/swim.js', 'js/aquarium/fishModel.js', 'js/aquarium/fx.js', 'js/aquarium/fallbackArt.js', 'js/aquarium/speciesDefaults.js', 'js/aquarium/clean.js', 'js/aquarium/waterchange.js', 'js/aquarium/tweezers.js',   // v0.7 みずかえ・ピンセット
   'js/aquarium/dreamSpec.js',   // v0.8 3D係：ゆめの いきもの
+  'js/autocare.js', 'js/ui/autocare.js', 'css/autocare.css', 'assets/items/auto_care.png',   // v0.9 おせわき係：じどう おせわき
   'vendor/three.module.min.js',
   'assets/bgm/pokapoka.m4a', 'assets/bgm/hidamari.m4a', 'assets/bgm/yurayura.m4a', 'assets/bgm/suichu.m4a', 'assets/bgm/ohirune.m4a',
   'assets/bgm/parade.m4a', 'assets/bgm/matsuri.m4a', 'assets/bgm/skip.m4a', // v0.7 たのしい 3曲（音楽係）

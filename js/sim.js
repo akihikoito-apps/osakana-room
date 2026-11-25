@@ -9,6 +9,8 @@ import { newUid } from './state.js';
 import * as SZ from './size.js';   // v0.6 個体差（おおきさ・キラキラ・えいよう・えさの すききらい）
 import * as DR from './dream.js';  // v0.8 ゆめ係：ゆめのすいそう（sim.dream として 再輸出）
 export * as dream from './dream.js';
+import * as AC from './autocare.js';   // v0.9 おせわき係：じどう おせわき（sim.autocare として 再輸出）
+export * as autocare from './autocare.js';
 const isDreamF = (f) => !!f && typeof f.speciesId === 'string' && f.speciesId.startsWith('dream_') && D?.fishById[f.speciesId]?.obtain === 'dream';
 
 let D = null;          // setup() で入る
@@ -182,6 +184,7 @@ export function normalize(state) {
   normSizeState(state);        // v0.6 個体差：ずかんの きろく・古い ビッグの 魚の おおきさ
   checkUnlock(state);         // 読み込んだ 直後にも しらべる（v0.1 で もう 6ぴき なら ここで ひらく）
   DR.checkGift(state);        // v0.8：もう 5にちめを すぎて いる 人は ひらいた とき もらえる（おしらせは state.notices.dream）
+  AC.normalizeState(state);   // v0.9 おせわき係：かずを そろえる・もう すいそうが 6つ ある 人は ここで もらう（おしらせは state.notices.autoCare）
   return state;
 }
 
@@ -330,11 +333,13 @@ export function tick(state, gameMinutes, rnd = Math.random) {
     const dt = Math.min(5, left, toHour < 1e-9 ? 60 : toHour);
     left -= dt;
     flow(state, dt, events);
+    AC.run(state, events);   // v0.9 おせわき係：じどう おせわき（へやの すいそう だけ。{ type:'autoCare', tankId, fed, water, scoop }）
     // 整数時刻を またいだら 1時間ぶんの はんてい
     const h = Math.floor(state.clock.min / 60 + 1e-9);
     while (state.clock.judged < h) { state.clock.judged++; hourly(state, state.clock.judged, events, rnd); }
   }
   DR.checkGift(state, events);   // v0.8 ゆめ係：5にちめ あさ 6じ いこうに ゆめのすいそう（{ type:'dreamGift', tankId, stored }）
+  AC.checkGift(state, events);   // v0.9 おせわき係：すいそうが 6つで じどう おせわき 3つ（{ type:'autoCareGift', count }）
   checkMissions(state, events);
   return events;
 }
@@ -925,7 +930,8 @@ export function missionProgress(state, m) {
     case 'days': return cnt('days');
     case 'tankCreatures': { const tk = state.tanks[g.tankIndex ?? 0]; return { now: Math.min(tk ? real(tk.fish).length : 0, g.count), need: g.count }; }
     case 'kindCount': return { now: Math.min(allFish.filter((f) => (D.fishById[f.speciesId]?.kind || 'fish') === g.kind).length, g.count), need: g.count };
-    case 'tankCount': return { now: Math.min(allTanks.length, g.count), need: g.count };
+    // v0.9 ミッション係：すいそうの かずは ゆめのすいそうも かぞえる（本人：へやに 6つ ならんだら 6つ）
+    case 'tankCount': return { now: Math.min(state.tanks.length + (state.storage || []).length, g.count), need: g.count };
     case 'hasTankWater': return { now: allTanks.some((x) => x.water === g.water) ? 1 : 0, need: 1 };
     case 'waterFishCount': return { now: Math.min(allFish.filter((f) => D.fishById[f.speciesId]?.water === g.water).length, g.count), need: g.count };
     case 'hearts': return { now: Math.min(state.heartsTotal || 0, g.count), need: g.count };
@@ -947,6 +953,17 @@ export function missionProgress(state, m) {
     case 'zukanRarity': return { now: Math.min(Object.keys(state.dex).filter((id) => (D.fishById[id]?.rarity || 1) >= g.rarity).length, g.count), need: g.count };
     case 'tanksWater': return { now: Math.min(allTanks.filter((x) => x.water === g.water).length, g.count), need: g.count };
     case 'quizBest': return { now: Math.min(st.quizBest || 0, g.count), need: g.count };
+    // ---- v0.9（ミッション係）：へやの すいそう（ゆめのすいそうも ふくむ）を 1つずつ みる ----
+    // lifeTanks：いきものが いる すいそう／cleanTanks：きれいさ ≥ value／healthyTanks：いきものが いて みんな けんこう ≥ value
+    case 'roomTanks': return { now: Math.min(state.tanks.length, g.count), need: g.count };   // へやに ならべた すいそう（そうこは のぞく）
+    case 'lifeTanks': return { now: Math.min(state.tanks.filter((x) => x.fish.length > 0).length, g.count), need: g.count };
+    // all: true なら「count こ そろった とき だけ 1」（gate 'started' と くみあわせて、そろった とき だけ 出す＝まどを ふさがない）
+    case 'cleanTanks': case 'healthyTanks': {
+      const n = state.tanks.filter((x) => (g.type === 'cleanTanks' ? x.clean >= (g.value ?? 70) : x.fish.length > 0 && x.fish.every((f) => f.health >= (g.value ?? 70)))).length;
+      return g.all ? { now: n >= g.count ? 1 : 0, need: 1 } : { now: Math.min(n, g.count), need: g.count };
+    }
+    case 'waterKinds': return { now: Math.min(new Set(allTanks.map((x) => x.water).filter((w) => ['fresh', 'salt', 'pond'].includes(w))).size, g.count), need: g.count };
+    case 'autoCareOn': return { now: Math.min(state.tanks.concat(state.storage || []).filter((x) => x.autoCare === true).length, g.count), need: g.count };   // じどう おせわきを つけている すいそう
     default: return { now: 0, need: 1 };
   }
 }

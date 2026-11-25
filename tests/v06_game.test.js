@@ -158,10 +158,10 @@ test('チュートリアル：さいごは ヘルプの ばしょを おしえ�
 });
 
 // ---------------- ミッション ----------------
-test('ミッション：いつも 5つ 見える・80〜110こ・lane は 5しゅるい', () => {
+test('ミッション：いつも 5つ 見える・80〜140こ（v0.9 で 20こ ふえた）・lane は 5しゅるい', () => {
   const M = missions.MISSIONS;
   assert.equal(missions.MISSION_VISIBLE, 5);
-  assert.ok(M.length >= 80 && M.length <= 110, String(M.length));
+  assert.ok(M.length >= 80 && M.length <= 140, String(M.length));
   const lanes = new Set(M.map((m) => m.lane));
   assert.deepEqual([...lanes].sort(), ['care', 'grow', 'play', 'room', 'zukan']);
   for (const m of M) {

@@ -289,4 +289,13 @@ export const ITEMS = [
     icon: 'assets/items/gasa_net.png',
     desc: 'いけの みずくさを ガサガサ すると いきものが つかまるよ。1にち 1かい。',
   },
+  // ---- v0.9 じどう おせわき（おせわき係）。しくみは js/autocare.js、数は balance.js AUTOCARE ----
+  // おみせでは うらない（price: null）。すいそうが 6つに なると 3つ もらえる。もっている かずは state.inv.auto_care（とりつけて いない もの）、
+  // とりつけは t.autoCare === true（decor には 入れない）。ゆめのすいそう には つけられない
+  {
+    id: 'auto_care', name: 'じどう おせわき', type: 'autocare', price: null, water: 'both', inTank: false, max: 3,
+    effect: { feedBelow: 30, feedTo: 75 },      // くわしい 数は balance.js AUTOCARE（こちらは めやす）
+    icon: 'assets/items/auto_care.png',
+    desc: 'すいそうに つけると、おなかが すいた いきものに ごはんを あげて、よごれたら みずかえと おそうじを して くれるよ。コインや ハートは じぶんで おせわ した ときに ふえるよ。',
+  },
 ];

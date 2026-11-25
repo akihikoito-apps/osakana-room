@@ -246,13 +246,85 @@ async function boot() {
   G.celebrating = () => celebrating;
   G.celebrate = celebrate;
   G.celebrateDream = celebrateDream;
-  G.on('sim', (ev) => { if (ev.type === 'unlock') setTimeout(celebrate, 400); if (ev.type === 'dreamGift') setTimeout(celebrateDream, 400); });
+  // v0.9 おせわき係：じどう おせわきを もらった あんない（state.notices.autoCare）。3まいの かみしばい → つけに いく。
+  // おなじ はこ（#celebrate）を つかい、あいだは 時計を とめる。チュートリアル中・ほかの おしらせ中は まつ（おわって 'changed' の あとに 出る）
+  function celebrateAutoCare() {
+    if (!state.notices?.autoCare || celebrating || !state.tutorial.done || G.tutorialBusy?.()) return;
+    if (!sim.autocare?.unlocked(state)) { delete state.notices.autoCare; return; }
+    const box = $('#celebrate');
+    const n = sim.balance().AUTOCARE?.count ?? 3;
+    const pic = () => el('img', { src: 'assets/items/auto_care.png', alt: '' });
+    const pages = [
+      { ic: '🎉', text: 'すいそうが 6つに なったね！', sub: `おいわいに じどう おせわきを ${n}つ プレゼント！` },
+      { ic: pic, text: 'おせわが たいへんな ときは\nじどう おせわきを つけてね', sub: 'おなかが すいたら ごはん、よごれたら みずかえと おそうじを して くれるよ' },
+      { ic: pic, text: 'すいそうを ひらいて\n「じどう おせわき」の ボタンで つけられるよ', sub: 'コインや ハートは じぶんで おせわ した ときに ふえるよ。はずして つけかえも できるよ' },
+    ];
+    let page = 0;
+    celebrating = true;
+    box.classList.add('autocare');
+    const dots = el('div', { class: 'cel-page' });
+    box.querySelector('.cel-sub').after(dots);
+    const ok = box.querySelector('.cel-ok'), go2 = box.querySelector('.cel-shop');
+    const showPage = () => {
+      const p = pages[page];
+      const ic = box.querySelector('.cel-ic');
+      if (typeof p.ic === 'function') ic.replaceChildren(p.ic()); else ic.textContent = p.ic;
+      box.querySelector('.cel-text').textContent = p.text;
+      box.querySelector('.cel-sub').textContent = p.sub;
+      dots.textContent = pages.map((_, i) => (i === page ? '●' : '○')).join('');
+      const last = page >= pages.length - 1;
+      ok.textContent = last ? 'あとで' : 'つぎへ';
+      go2.hidden = !last;
+      go2.textContent = '🤖 つけに いく';
+      const cf = box.querySelector('.confetti');
+      cf.replaceChildren();
+      if (page === 0) {
+        const colors = ['#a8dcc3', '#b8e4f5', '#ffe08a', '#d9f2e6'];
+        for (let i = 0; i < 24; i++) {
+          const q = el('i');
+          q.style.left = ((i * 37) % 100) + '%';
+          q.style.background = colors[i % 4];
+          q.style.animationDelay = ((i * 0.07) % 0.6) + 's';
+          q.style.setProperty('--rx', ((i * 53) % 360) + 'deg');
+          cf.append(q);
+        }
+      }
+    };
+    const close = (goTo) => {
+      box.hidden = true;
+      box.classList.remove('autocare');
+      dots.remove();
+      go2.textContent = '🛒 おみせへ';
+      celebrating = false;
+      delete state.notices.autoCare;
+      G.saveNow();
+      toast(`じどう おせわきを ${n}こ もらったよ`, 'gold');
+      if (goTo) {
+        // いま 見ている すいそう → へやの わくの じゅんで、まだ ついて いない ふつうの すいそう
+        const cand = [G.tank()].concat(state.tanks.slice().sort((a, b) => a.slot - b.slot)).find((t) => sim.autocare.canHold(t) && t.autoCare !== true);
+        if (cand) {
+          G.setTank(cand.id);
+          if (G.screen === 'tank') { tankUi.hide(G); tankUi.show(G); } else go('tank');
+          G.emit('action', { type: 'openTank', tankId: cand.id });
+          setTimeout(() => { const b = $('#ac-sw'); if (b) { b.classList.add('hint-glow'); setTimeout(() => b.classList.remove('hint-glow'), 6000); } }, 300);
+        }
+      }
+      G.emit('changed');
+    };
+    ok.onclick = () => { if (page < pages.length - 1) { page++; showPage(); } else close(false); };
+    go2.onclick = () => close(true);
+    showPage();
+    box.hidden = false;
+  }
+  G.celebrateAutoCare = celebrateAutoCare;
+  G.on('sim', (ev) => { if (ev.type === 'unlock') setTimeout(celebrate, 400); if (ev.type === 'dreamGift') setTimeout(celebrateDream, 400); if (ev.type === 'autoCareGift') setTimeout(celebrateAutoCare, 600); });
+  G.on('changed', () => { if (state.notices?.autoCare && !celebrating) setTimeout(celebrateAutoCare, 900); });   // ほかの おしらせが おわった あと
   $('#hud-hearts').addEventListener('click', () => toast('さかなを なでると ハートが たまるよ'));
 
   // ---------- 各画面 ----------
   room.init(G); tankUi.init(G); shop.init(G); dex.init(G); missions.init(G); photo.init(G); tutorial.init(G);
   // v0.5：ヘルプ・こうしん りれき（案内係）／ミニゲーム・かりすいそう・プレイヤー（ゲーム係）。無くても うごく
-  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js', './ui/premium.js', './ui/draw.js'].map(optional))) m.init?.(G);   // v0.7 premium：課金係・v0.8 draw：おえかき係
+  for (const m of await Promise.all(['./ui/help.js', './ui/changelog.js', './ui/minigame.js', './ui/box.js', './ui/player.js', './ui/storage.js', './ui/adventure.js', './ui/premium.js', './ui/draw.js', './ui/autocare.js'].map(optional))) m.init?.(G);   // v0.7 premium：課金係・v0.8 draw：おえかき係・v0.9 autocare：おせわき係
 
   // ずっと押していると出るメニューや、ダブルタップの拡大を止める
   document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -270,7 +342,9 @@ async function boot() {
   // v0.1 の セーブで もう 6ぴき いた・まえに 見のがした ときも ここで おいわい
   setTimeout(celebrate, 900);
   setTimeout(celebrateDream, 1100);   // v0.8：まえに ひらいた ときに もらって まだ 見て いない・ひらいた とき もらった
+  setTimeout(celebrateAutoCare, 1300);   // v0.9：もう すいそうが 6つ ある 人・まえに 見のがした 人
   G.on('tutorialDone', () => setTimeout(celebrate, 1200));
+  G.on('tutorialDone', () => setTimeout(celebrateAutoCare, 1600));
 
   // あそんでいる あいだは 画面を くらく しない（Wake Lock、だめなら 無音の 小さな 動画）
   initAwake();

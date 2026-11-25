@@ -121,7 +121,9 @@ test('ミッション：id・order が かぶらない、goal の type が わ�
     'tankCreatures', 'unlock', 'kindCount', 'tankCount', 'hasTankWater', 'waterFishCount', 'hearts',
     'vitaminEat', 'gadgetCount',
     // v0.6（ゲーム係）
-    'stat', 'bigCount', 'adultCount', 'creatures', 'boxCount', 'storageCount', 'decorCount', 'decorKinds', 'zukanWater', 'zukanRarity', 'tanksWater', 'quizBest'];
+    'stat', 'bigCount', 'adultCount', 'creatures', 'boxCount', 'storageCount', 'decorCount', 'decorKinds', 'zukanWater', 'zukanRarity', 'tanksWater', 'quizBest',
+    // v0.9（ミッション係）
+    'roomTanks', 'lifeTanks', 'cleanTanks', 'healthyTanks', 'waterKinds', 'autoCareOn'];
   const M = missions.MISSIONS;
   assert.equal(new Set(M.map((m) => m.id)).size, M.length);
   assert.equal(new Set(M.map((m) => m.order)).size, M.length);

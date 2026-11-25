@@ -321,6 +321,10 @@ async function run(browser, base, W, H) {
   if (await p.evaluate(() => !!G.sim.dream)) {
     try { await v08(); } catch (e) { notes.push('【不具合？】v0.8 の ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v08_stopped').catch(() => {}); }
   }
+  // 11. v0.9：すいそうが 6つに なる → じどう おせわきの あんない（3まい）→ つけに いく → 1つ とりつける → じどうで ごはん
+  if (await p.evaluate(() => !!G.sim.autocare)) {
+    try { await v09(); } catch (e) { notes.push('【不具合？】v0.9 おせわきの ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v09_stopped').catch(() => {}); }
+  }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
 
@@ -704,6 +708,54 @@ async function run(browser, base, W, H) {
     notes.push('v0.8 リロード あと: ' + JSON.stringify(back));
     if (!back.ok || !back.ov) notes.push('【不具合】リロードすると ゆめの いきもの・字が きえる');
     if (back.cel) notes.push('【不具合】リロードすると ゆめのすいそうの おしらせが また でる');
+  }
+
+  // v0.9 おせわき係：6つめで あんない → 1つ とりつける → じどうで ごはん（コインは ふえない）
+  async function v09() {
+    const goRoom = async () => { for (let i = 0; i < 4 && (await st()).scr !== 'room'; i++) { await p.click('#btn-back'); await p.waitForTimeout(500); } };
+    await goRoom();
+    const pre = await p.evaluate(() => {
+      const s = G.state;
+      const had = !!s.unlocks.autoCare;
+      // すいそうを 6つに（へや＋そうこ・ゆめのすいそうも かぞえる）
+      while (s.tanks.length + (s.storage || []).length < 6) if (!G.sim.addTank(s, 'fresh', ['heater', 'air_pump'])) break;
+      G.emit('changed');
+      return { had, n: s.tanks.length + (s.storage || []).length, notice: !!s.notices?.autoCare };
+    });
+    notes.push('v0.9 おせわき まえ: ' + JSON.stringify(pre));
+    if (pre.had && !pre.notice) { notes.push('（おせわきは もう もらって あんないも 見た あと）'); return; }
+    const cel = await p.waitForFunction(() => !document.getElementById('celebrate').hidden && document.getElementById('celebrate').classList.contains('autocare'), null, { timeout: 15000 }).then(() => true, () => false);
+    if (!cel) { notes.push('【不具合】すいそうが 6つに なっても じどう おせわきの あんないが でない'); return; }
+    const pages = [];
+    for (let i = 0; i < 3; i++) {
+      pages.push(await p.textContent('#celebrate .cel-text'));
+      await shot(`70_autocare_gift_${i + 1}`);
+      if (i < 2) { await p.click('#celebrate .cel-ok'); await p.waitForTimeout(300); }
+    }
+    notes.push('v0.9 あんない: ' + pages.join(' / '));
+    const got = await p.evaluate(() => ({ left: G.state.inv.auto_care, un: !!G.state.unlocks.autoCare }));
+    if (got.left !== 3 || !got.un) notes.push('【不具合】じどう おせわきを 3つ もらえて いない: ' + JSON.stringify(got));
+    await p.click('#celebrate .cel-shop');
+    await p.waitForFunction(() => G.screen === 'tank', null, { timeout: 8000 }).catch(() => {});
+    await p.waitForTimeout(1200);
+    if (!(await p.$('#ac-sw:not([hidden])'))) { notes.push('【不具合】すいそう画面に じどう おせわきの ボタンが ない'); return; }
+    await p.click('#ac-sw', { force: true });   // あんないの あとは ボタンが ゆっくり ひかる（うごいて いるので force）
+    await p.waitForTimeout(800);
+    const on = await p.evaluate(() => ({ on: G.tank().autoCare === true, left: G.state.inv.auto_care, stat: G.state.stats.autoCareAttach || 0, txt: document.querySelector('#ac-sw .ac-state')?.textContent }));
+    notes.push('v0.9 とりつけ: ' + JSON.stringify(on));
+    if (!on.on || on.left !== 2) notes.push('【不具合】じどう おせわきを とりつけられない');
+    await shot('71_autocare_on');
+    // じどうで ごはん：おなかを へらして つぎの tick を まつ（コインは ふえない）
+    const coins = await p.evaluate(() => { for (const f of G.tank().fish) f.onaka = 20; return G.state.coins; });
+    await p.waitForTimeout(2500);
+    const after = await p.evaluate(() => ({ onaka: G.tank().fish.map((f) => Math.round(f.onaka)), coins: G.state.coins, note: document.getElementById('ac-note')?.textContent || '' }));
+    notes.push('v0.9 じどうで ごはん: ' + JSON.stringify(after));
+    if (after.onaka.some((x) => x < 70)) notes.push('【不具合】じどう おせわきが ごはんを あげない');
+    if (after.coins > coins) notes.push('【不具合】じどうの おせわで コインが ふえた');
+    await shot('72_autocare_fed');
+    await goRoom(); await p.waitForTimeout(800);
+    if (!(await p.$('.room-slot .slot-ac'))) notes.push('【不具合】へやの 棚に おせわきの しるしが ない（そうこに ある とき いがい）');
+    await shot('73_autocare_room');
   }
 }
 

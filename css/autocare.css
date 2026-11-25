@@ -1,0 +1,48 @@
+/* v0.9 じどう おせわき（おせわき係）。js/ui/autocare.js が よみこむ */
+
+/* すいそう画面の ボタン：ていいん（#tank-cap）の うえ。じどう えさやり・おんど ダイヤル が ある ときは その うえ */
+#ac-sw { position: absolute; z-index: 10; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 112px); display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 2px 6px 2px 4px; border-radius: 14px; background: rgba(255,255,255,0.92); box-shadow: var(--shadow); font-size: 14px; color: var(--ink); border: 2px solid transparent; }
+#ac-sw img { width: 34px; height: 34px; object-fit: contain; }
+#ac-sw .ac-txt { display: grid; line-height: 1.15; text-align: left; }
+#ac-sw .ac-left { font-size: 12px; color: var(--ink-soft); }
+#ac-sw .ac-state { padding: 3px 10px; border-radius: 10px; background: #ffe7a3; color: var(--ink); font-weight: 700; }
+#ac-sw.on { border-color: #7fd3b0; background: rgba(238, 252, 245, 0.95); }
+#ac-sw.on .ac-state { background: var(--good); }
+#ac-sw.cool .ac-state { background: #eef3f1; color: var(--ink-soft); }
+body.idle #ac-sw, body.photo #ac-sw, body.photo #ac-note { opacity: 0; pointer-events: none; }   /* しらせは ながめて いる とき（idle）も 出す */
+
+/* じどうで おせわ した ときの 小さな しらせ（ボタンの すこし うえ） */
+#ac-note { position: absolute; z-index: 11; right: calc(var(--safe-r) + 8px); bottom: calc(var(--safe-b) + 162px); padding: 4px 12px; border-radius: 14px; background: rgba(255,255,255,0.95); box-shadow: var(--shadow); font-size: 15px; font-weight: 700; color: #1f5a48; border: 2px solid #9fdcbf; pointer-events: none; }
+#ac-note.show { animation: acNote 3s ease-out forwards; }
+@keyframes acNote { 0% { opacity: 0; transform: translateY(6px); } 10% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* じどう えさやりの スイッチ・おんど ダイヤル（どちらも みぎ した）が ある ときは その うえへ（playtest の かさなり 点検） */
+#feeder-sw:not([hidden]) ~ #ac-sw, #thermo:not([hidden]) ~ #ac-sw { bottom: calc(var(--safe-b) + 222px); }
+#feeder-sw:not([hidden]) ~ #ac-note, #thermo:not([hidden]) ~ #ac-note { bottom: calc(var(--safe-b) + 272px); }
+
+@media (max-height: 500px) {
+  #ac-sw { bottom: calc(var(--safe-b) + 108px); }
+  #ac-note { bottom: calc(var(--safe-b) + 158px); }
+  #feeder-sw:not([hidden]) ~ #ac-sw, #thermo:not([hidden]) ~ #ac-sw { bottom: calc(var(--safe-b) + 210px); }
+  #feeder-sw:not([hidden]) ~ #ac-note, #thermo:not([hidden]) ~ #ac-note { bottom: calc(var(--safe-b) + 260px); }
+}
+@media (min-height: 600px) and (min-width: 900px) {
+  #ac-sw { bottom: calc(var(--safe-b) + 150px); }
+  #ac-note { bottom: calc(var(--safe-b) + 202px); }
+  #feeder-sw:not([hidden]) ~ #ac-sw, #thermo:not([hidden]) ~ #ac-sw { bottom: calc(var(--safe-b) + 274px); }
+  #feeder-sw:not([hidden]) ~ #ac-note, #thermo:not([hidden]) ~ #ac-note { bottom: calc(var(--safe-b) + 326px); }
+}
+
+/* もらう ときの かみしばい（#celebrate を つかいまわす） */
+#celebrate.autocare .cel-box { background: linear-gradient(160deg, #ffffff 0%, #effbf5 60%, #e8f5ff 100%); }
+#celebrate.autocare .cel-ic img { width: 84px; height: 84px; object-fit: contain; }
+#celebrate.autocare .cel-text { white-space: pre-line; }
+#celebrate.autocare .cel-page { font-size: 12px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 4px; }
+@media (max-height: 420px) { #celebrate.autocare .cel-ic img { width: 60px; height: 60px; } }
+
+/* へやの 棚：おせわきが ついている すいそうの 小さな しるし */
+.room-slot .slot-ac { position: absolute; z-index: 3; left: -6px; top: -10px; width: 30%; min-width: 28px; max-width: 52px; aspect-ratio: 1; border-radius: 50%; background: #dff6ea; border: 2px solid #4fbf92; box-shadow: var(--shadow); display: grid; place-items: center; pointer-events: none; }
+.room-slot .slot-ac img { width: 92%; height: 92%; object-fit: contain; }
+
+/* はずす ダイアログの え */
+.ac-dlg-pic { display: block; width: 72px; height: 72px; margin: 0 auto 4px; object-fit: contain; }
