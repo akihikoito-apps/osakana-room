@@ -1,6 +1,6 @@
 // オフラインで動くようにする サービスワーカー（部屋・ゲーム係）。
 // VERSION は js/version.js と かならず そろえる（ここが かわると 新しい版として 入れなおす）。
-const VERSION = '0.10.0';
+const VERSION = '0.10.1';
 const CACHE = 'osakana-room-' + VERSION;
 
 const FILES = [
@@ -17,6 +17,9 @@ const FILES = [
   'assets/items/bait_gold.png',   // v0.10 つり係：キラキラ えさ
   'js/race/stats.js', 'js/data/raceStats.js', 'js/ui/raceCard.js', 'css/stats.css',   // v0.10 のうりょく係
   'js/race/course.js', 'js/race/physics.js', 'js/race/ai.js', 'js/race/race.js', 'js/race/reward.js', 'js/race/scene.js', 'js/ui/race.js', 'css/race.css',   // v0.10 レース係
+  'js/race/backdrop.js', 'assets/race/far_reef.png', 'assets/race/far_kelp.png', 'assets/race/far_cave.png',   // v0.10.1 レース景色係：海の 中の 景色
+  'assets/race/props_reef.png', 'assets/race/props_kelp.png', 'assets/race/props_cave.png',
+  'assets/race/school.png', 'assets/race/manta.png', 'assets/race/turtle.png', 'assets/race/whale.png',
   'vendor/three.module.min.js',
   'assets/bgm/pokapoka.m4a', 'assets/bgm/hidamari.m4a', 'assets/bgm/yurayura.m4a', 'assets/bgm/suichu.m4a', 'assets/bgm/ohirune.m4a',
   'assets/bgm/parade.m4a', 'assets/bgm/matsuri.m4a', 'assets/bgm/skip.m4a', // v0.7 たのしい 3曲（音楽係）

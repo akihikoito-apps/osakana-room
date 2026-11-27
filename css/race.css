@@ -140,8 +140,8 @@ body.race-play #hud, body.race-play #btn-bgm, body.race-play #toasts { visibilit
 @keyframes rcFull { to { box-shadow: 0 0 0 6px rgba(255, 224, 102, 0.7), 0 6px 0 rgba(20, 60, 90, 0.3); } }
 /* はやい ときの すじ（ダッシュ・あわの わ） */
 #race-body.rc-play::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 0.25s;
-  background: repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 255, 255, 0.0) 0deg 7deg, rgba(255, 255, 255, 0.28) 7deg 8deg);
-  -webkit-mask: radial-gradient(circle at 50% 45%, transparent 38%, #000 75%); mask: radial-gradient(circle at 50% 45%, transparent 38%, #000 75%); }
+  background: repeating-conic-gradient(from 0deg at 50% 45%, rgba(255, 255, 255, 0.0) 0deg 7deg, rgba(225, 248, 255, 0.17) 7deg 8deg);
+  -webkit-mask: radial-gradient(circle at 50% 45%, transparent 45%, #000 85%); mask: radial-gradient(circle at 50% 45%, transparent 45%, #000 85%); }   /* v0.10.1 景色係：海の 光の すじと まざらない よう すこし よわく */
 #race-body.rc-play.fast::after { opacity: 1; }
 .rc-gauge { display: none; }
 @media (max-height: 500px) {
