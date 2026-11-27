@@ -4,6 +4,7 @@
 //          'hover'  … 底の近くでホバリング（マンダリン・ハタタテハゼ）
 //          'cling'  … ガラスや流木・石にはりつく（オトシンクルス）
 //          'crawl'  … 貝。面に沿ってとてもゆっくり這う
+//   limb: 'frog' | 'turtle' … v0.10 水の 中を 足で 泳ぐ（カエル＝けって すべる／カメ＝前あしで 漕ぐ。swim.js STROKE）
 export const SPECIES_DEFAULTS = {
   // 海水
   clownfish:     { kind: 'fish', water: 'salt', look: { lengthToHeight: 2.6, thickness: 0.24, finStyle: 'normal' }, swim: { layer: 'middle', speed: 0.8, school: false, habit: 'coral' } },
@@ -74,14 +75,14 @@ export const SPECIES_DEFAULTS = {
   hotokedojou:   { kind: 'fish', water: 'pond', look: { lengthToHeight: 5, thickness: 0.2, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.6, school: false } },
   namazu:        { kind: 'fish', water: 'pond', look: { lengthToHeight: 6, thickness: 0.2, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.5, school: false } },
   gengorou:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 1.8, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'middle', speed: 1.2, school: false } },
-  tonosamagaeru: { kind: 'fish', water: 'pond', look: { lengthToHeight: 2, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'top', speed: 0.6, school: false, habit: 'land' } },
-  amagaeru:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 1.8, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'top', speed: 0.5, school: false, habit: 'land' } },
-  kusagame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
-  ishigame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
+  tonosamagaeru: { kind: 'fish', water: 'pond', look: { lengthToHeight: 2, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'top', speed: 0.6, school: false, habit: 'land', limb: 'frog' } },
+  amagaeru:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 1.8, thickness: 0.4, finStyle: 'normal' }, swim: { layer: 'top', speed: 0.5, school: false, habit: 'land', limb: 'frog' } },
+  kusagame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land', limb: 'turtle' } },
+  ishigame:      { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.2, thickness: 0.5, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land', limb: 'turtle' } },
   tagame:        { kind: 'shrimp', water: 'pond', look: { lengthToHeight: 2.8, thickness: 0.25, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.3, school: false } },
   // v0.7 課金係：とくべつ コーナー（スッポンは 水の 中が おおいので habit なし）
   gold_goldfish: { kind: 'fish', water: 'fresh', look: { lengthToHeight: 2.6, thickness: 0.3, finStyle: 'long' }, swim: { layer: 'any', speed: 0.7, school: false } },
-  albino_suppon: { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.6, thickness: 0.32, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.45, school: false } },
+  albino_suppon: { kind: 'fish', water: 'pond', look: { lengthToHeight: 2.6, thickness: 0.32, finStyle: 'normal' }, swim: { layer: 'bottom', speed: 0.45, school: false, limb: 'turtle' } },
   blue_zarigani: { kind: 'shrimp', water: 'pond', look: { lengthToHeight: 2.8, thickness: 0.35, finStyle: 'shrimp' }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
 };
 

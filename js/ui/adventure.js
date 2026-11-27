@@ -3,7 +3,7 @@
 // - ひらいたら おいわい（いけの すいそう・ガサガサの あみ の プレゼント）。
 // - ぼうけん画面：行き先の カード（balance.js ADVENTURE.places）→ うみ（つり）・いけ（ガサガサ）。
 // - 画面の 部品は ここで つくる（index.html には css の link だけ）。
-import { $, el, toast, bumpCoins, stars } from './common.js';
+import { $, $$, el, toast, bumpCoins, stars } from './common.js';
 import * as A from '../adventure.js';
 
 let G = null;
@@ -205,6 +205,7 @@ function show(g, opts = {}) {
   else {
     if (!G.state.adventure.seen) { G.state.adventure.seen = true; save(); }
     view = opts.place === 'sea' || opts.place === 'pond' ? opts.place : 'menu';
+    if (view === 'sea') resetBaitChoice();
   }
   busy = false;
   render();
@@ -258,7 +259,12 @@ function renderMenu(main) {
 function go(place) {
   if (busy) return;
   view = place;
+  if (place === 'sea') resetBaitChoice();
   render();
+}
+/** うみに 入る たびに えさは ふつうに もどす（まえの キラキラを わすれて つかって しまわない。Codex・agy） */
+function resetBaitChoice() {
+  if (G.state.adventure?.useBait === 'premium') { A.setBait(G.state, 'normal'); save(); }
 }
 
 // ---------- うみ（つり） ----------
@@ -270,10 +276,11 @@ function renderSea(main) {
   main.replaceChildren(
     el('div', { class: 'adv-top' },
       el('div', { class: 'adv-title' }, el('span', { class: 'at-name', text: '🌊 うみ' }), el('span', { class: 'at-sub', text: 'つりを しよう' })),
-      el('button', { class: 'adv-bait', onclick: openBaitShop },
-        el('img', { src: icon(F.bait), alt: '' }),
-        el('span', { class: 'ab-n' }, 'えさ ', el('b', { text: String(A.bait(s)) }), 'こ'),
-        el('span', { class: 'ab-buy', text: 'かう' }))),
+      el('button', { class: 'adv-bait', onclick: openBaitShop, 'aria-label': 'えさやさん' },
+        ...A.BAIT_KINDS.map((k) => el('span', { class: 'ab-kind ab-' + k, 'data-kind': k },
+          el('img', { src: icon(A.baitRule(k).id), alt: '' }), el('b', { text: String(A.bait(s, k)) }), 'こ')),
+        el('span', { class: 'ab-buy', text: 'かう' })),
+      el('div', { class: 'adv-pity', hidden: true, text: 'つぎは かならず ★4いじょう！' })),
     el('div', { class: 'fish-stage' },
       el('img', { class: 'fs-rod', src: 'assets/adventure/rod_scene.png', alt: '', hidden: !hasRod, onerror: (e) => { e.target.src = icon(F.rod); } }),   // うきの ない さお（うきが 2つ 見えない ように）
       svgLine(),
@@ -282,7 +289,12 @@ function renderSea(main) {
       el('div', { class: 'fs-mark', hidden: true }, el('b', { text: '！' }), el('span', { text: 'タップ！' })),
       el('div', { class: 'fs-shadow', hidden: true })),
     el('div', { class: 'adv-actions' },
-      el('button', { class: 'btn primary adv-go fish-go', onclick: onFish }, '🎣 つる', el('small', { text: 'えさ 1こ' }))),
+      el('div', { class: 'bait-pick', role: 'radiogroup', 'aria-label': 'つかう えさ' },
+        ...A.BAIT_KINDS.map((k) => el('button', { class: 'bp-btn bp-' + k, 'data-kind': k, role: 'radio', onclick: () => pickBait(k) },
+          el('img', { src: icon(A.baitRule(k).id), alt: '' }),
+          el('span', { class: 'bp-name', text: baitName(k) }),
+          el('span', { class: 'bp-n' }, '×', el('b', { text: String(A.bait(s, k)) }))))),
+      el('button', { class: 'btn primary adv-go fish-go', onclick: onFish }, '🎣 つる', fishSmall())),
   );
   updateFishButton();
   // はじめて：つりざお → えさ
@@ -295,13 +307,47 @@ function svgLine() {
   return box.firstChild;
 }
 
+// ---- えさの えらびかた（v0.10 つり係）----
+const baitName = (k) => G.data.itemById[A.baitRule(k).id]?.name || (k === 'premium' ? 'キラキラ えさ' : 'つりえさ');
+/** つる ボタンの 小さな 字：なにを 1こ つかうか */
+function fishSmall() {
+  const k = A.chosenBait(G.state);
+  return el('small', { class: 'fg-bait' + (k === 'premium' ? ' premium' : '') }, el('img', { src: icon(A.baitRule(k).id), alt: '' }), `${baitName(k)} 1こ`);
+}
+function pickBait(k) {
+  if (busy) return;
+  const s = G.state;
+  if (k === 'premium' && A.bait(s, 'premium') < 1) {
+    toast(`${baitName('premium')}が ないよ。えさやさんで かえるよ`);
+    return;
+  }
+  A.setBait(s, k);
+  save();
+  updateFishButton();
+}
+
 function updateFishButton() {
   const b = $('#scr-adventure .fish-go');
   if (!b) return;
-  const c = A.canFish(G.state);
+  const s = G.state;
+  const c = A.canFish(s);
   b.classList.toggle('cant', !c.ok);
-  const n = $('#scr-adventure .adv-bait b');
-  if (n) n.textContent = String(A.bait(G.state));
+  const k = A.chosenBait(s);
+  b.classList.toggle('premium', k === 'premium');
+  if (!busy) { const sm = b.querySelector('small'); if (sm) sm.replaceWith(fishSmall()); }
+  const pn = $('#scr-adventure .adv-pity');
+  if (pn) pn.hidden = !(A.pityNext(s) && !s.adventure.catch);
+  for (const x of $$('#scr-adventure .ab-kind')) {
+    x.querySelector('b').textContent = String(A.bait(s, x.dataset.kind));
+  }
+  for (const x of $$('#scr-adventure .bp-btn')) {
+    const n = A.bait(s, x.dataset.kind);
+    x.querySelector('.bp-n b').textContent = String(n);
+    const on = x.dataset.kind === k;
+    x.classList.toggle('on', on);
+    x.classList.toggle('empty', n < 1);
+    x.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
 }
 
 async function seaIntro() {
@@ -331,7 +377,7 @@ function guide(text, pic) {
   });
 }
 
-// えさやさん
+// えさやさん（v0.10：ふつう と キラキラ えさ の 2だん）
 function openBaitShop() {
   if (busy) return;
   const s = G.state;
@@ -342,7 +388,8 @@ function openBaitShop() {
     el('button', { class: 'ap-close', 'aria-label': 'とじる', text: '✕', onclick: close }),
     el('div', { class: 'ap-head' }, el('img', { src: icon(F.bait), alt: '' }), el('div', {},
       el('div', { class: 'ap-title', text: 'えさやさん' }),
-      el('div', { class: 'ap-have' }, 'もっている えさ ', el('b', { text: String(A.bait(s)) }), `こ（${F.baitMax}こ まで）`))));
+      s.adventure.baitGift ? el('div', { class: 'ap-have', text: '1かい つるのに えさを 1こ つかうよ。' })
+        : el('div', { class: 'ap-have' }, 'もっている えさ ', el('b', { text: String(A.bait(s)) }), `こ（${F.baitMax}こ まで）`))));
   if (!s.adventure.baitGift) {
     body.append(el('div', { class: 'ap-gift' },
       el('div', { class: 'ap-gift-t', text: `🎁 はじめての えさ ${F.firstBait}こ プレゼント！` }),
@@ -355,32 +402,77 @@ function openBaitShop() {
         later(200, () => guide('これで つれるよ！「つる」を おしてみよう。'));
       } })));
   } else {
-    body.append(el('div', { class: 'ap-price' }, 'えさ 1こ ', el('span', { class: 'coin-ic sm', 'aria-hidden': 'true' }), `${F.baitPrice}`));
-    const row = el('div', { class: 'ap-packs' });
-    for (const n of F.buyPacks || [1]) {
-      const c = A.canBuyBait(s, n);
-      row.append(el('button', { class: 'btn primary ap-pack' + (c.ok ? '' : ' cant'), onclick: () => buyBait(n) },
-        `${n}こ かう`, el('small', {}, el('span', { class: 'coin-ic sm', 'aria-hidden': 'true' }), String(c.price)),
-        !c.ok && c.reason === 'coins' ? el('em', { text: `あと ${c.need}` }) : !c.ok && c.reason === 'max' ? el('em', { text: 'もちきれないよ' }) : null));
-    }
-    body.append(row, el('div', { class: 'ap-note', text: '1かい つるのに えさを 1こ つかうよ。' }));
+    for (const k of A.BAIT_KINDS) body.append(baitRow(k));
   }
   panel.replaceChildren(body);
   panel.hidden = false;
   panel.onclick = (e) => { if (e.target === panel) close(); };
 }
 
-function buyBait(n) {
-  const r = A.buyBait(G.state, n);
+/** えさやさんの 1だん：え・なまえ・もっている かず・かう ボタン（キラキラは はじめて 1こ おためし） */
+function baitRow(k) {
+  const s = G.state;
+  const B = A.baitRule(k);
+  const prem = k === 'premium';
+  const row = el('div', { class: 'ap-row' + (prem ? ' premium' : '') },
+    el('img', { class: 'ap-row-ic', src: icon(B.id), alt: '' }),
+    el('div', { class: 'ap-row-t' },
+      el('div', { class: 'ap-row-name' }, baitName(k), ' ', el('span', { class: 'coin-ic sm', 'aria-hidden': 'true' }), el('span', { class: 'ap-row-price', text: String(B.price) })),
+      el('div', { class: 'ap-row-desc', text: prem ? '★3いじょうが つれる！ ★4・★5 が でやすいよ' : 'いろいろな いきものが つれるよ' }),
+      el('div', { class: 'ap-row-have' }, 'もっている ', el('b', { text: String(A.bait(s, k)) }), `こ（${B.max}こ まで）`)));
+  const btns = el('div', { class: 'ap-packs' });
+  if (prem && A.canClaimPremiumGift(s)) {
+    btns.append(el('button', { class: 'btn primary ap-pack ap-try', onclick: () => {
+      const r = A.claimPremiumGift(s);
+      if (!r.ok) return;
+      save();
+      toast(`${baitName('premium')}を ${r.n}こ もらったよ！ ためしてね`, 'gold');
+      openBaitShop();
+      updateFishButton();
+    } }, '🎁 おためし', el('small', { text: `${A.rules().fishing.premium?.firstGift ?? 1}こ もらう` })));
+  } else {
+    for (const n of B.packs) {
+      const c = A.canBuyBait(s, n, k);
+      btns.append(el('button', { class: 'btn primary ap-pack' + (c.ok ? '' : ' cant'), onclick: () => (prem ? confirmPremium(n) : buyBait(n, k)) },
+        `${n}こ かう`, el('small', {}, el('span', { class: 'coin-ic sm', 'aria-hidden': 'true' }), String(c.price)),
+        !c.ok && c.reason === 'coins' ? el('em', { text: `あと ${c.need}` }) : !c.ok && c.reason === 'max' ? el('em', { text: 'もちきれないよ' }) : null));
+    }
+  }
+  row.append(btns);
+  return row;
+}
+
+/** キラキラ えさは かう まえに 1かい きく（500コインを おしまちがいで つかわない。Codex・agy） */
+function confirmPremium(n) {
+  const s = G.state;
+  const c = A.canBuyBait(s, n, 'premium');
+  if (!c.ok) { buyBait(n, 'premium'); return; }
+  const panel = $('#scr-adventure .adv-panel');
+  $('#toasts').replaceChildren();   // かくにんの もじに かさならない ように
+  const back = () => openBaitShop();
+  panel.replaceChildren(el('div', { class: 'ap-box bait-shop ap-confirm' },
+    el('img', { class: 'ap-confirm-ic', src: icon(A.baitRule('premium').id), alt: '' }),
+    el('div', { class: 'ap-title c', text: `${baitName('premium')}を ${n}こ かう？` }),
+    el('div', { class: 'ap-confirm-coin' }, el('span', { class: 'coin-ic sm', 'aria-hidden': 'true' }), `${c.price} つかうよ`),
+    el('div', { class: 'ap-confirm-left' }, 'かった あとの コイン ', el('b', { text: String(s.coins - c.price) })),
+    el('div', { class: 'ap-packs' },
+      el('button', { class: 'btn soft ap-pack', text: 'やめる', onclick: back }),
+      el('button', { class: 'btn primary ap-pack ap-yes', text: 'かう', onclick: () => buyBait(n, 'premium') }))));
+  panel.onclick = (e) => { if (e.target === panel) back(); };
+}
+
+function buyBait(n, kind = 'normal') {
+  const r = A.buyBait(G.state, n, kind);
   if (!r.ok) {
     toast(r.reason === 'coins' ? `コインが あと ${r.need} たりないよ` : r.reason === 'max' ? 'もう もちきれないよ' : 'いまは かえないよ');
+    if (kind === 'premium') openBaitShop();
     return;
   }
   bumpCoins();
   G.refreshHud();
   save();
   G.handleEvents(r.events);
-  toast(`えさを ${n}こ かったよ！`, 'gold');
+  toast(`${baitName(kind)}を ${n}こ かったよ！`, 'gold');
   openBaitShop();
   updateFishButton();
 }
@@ -390,7 +482,8 @@ function onFish() {
   const s = G.state;
   const c = A.canFish(s);
   if (!c.ok) {
-    if (c.reason === 'noBait') { toast('えさが ないよ。えさやさんで かおう'); openBaitShop(); }
+    if (c.reason === 'noBait' && A.bait(s, 'premium') > 0) toast(`${baitName('normal')}が ないよ。${baitName('premium')}を えらんでね`);
+    else if (c.reason === 'noBait') { toast('えさが ないよ。えさやさんで かおう'); openBaitShop(); }
     else if (c.reason === 'noRod') seaIntro();
     else if (c.reason === 'pending') showResult(null);
     else toast('いまは つれないよ');
@@ -402,6 +495,7 @@ function onFish() {
   G.handleEvents(r.events);
   updateFishButton();
   playFishing(r);
+  if (r.backToNormal) later(400, () => toast(`${baitName('premium')}を つかいきったよ。つぎは ${baitName('normal')}`));
 }
 
 /** つりの えんしゅつ：なげる → うきが ゆれる → しずむ（！）→ ひく → つれた！ */
@@ -416,6 +510,7 @@ function playFishing(r) {
   const shadow = stage.querySelector('.fs-shadow');
   const rare = r.rarity >= 4;
   const fast = reduced();
+  stage.parentElement?.classList.toggle('gold-bait', r.bait === 'premium');   // キラキラ えさは うきの まわりが ひかる
   const wait = fast ? 300 : T.wait[0] + Math.random() * (T.wait[1] - T.wait[0]);
   stage.className = 'fish-stage cast';
   bob.hidden = false;
@@ -573,9 +668,10 @@ function finishCatch(r) {
   const stage = $('#scr-adventure .fish-stage, #scr-adventure .gasa-stage');
   if (stage) { stage.onclick = null; stage.className = stage.classList.contains('fish-stage') ? 'fish-stage' : 'gasa-stage'; }
   const fb = $('#scr-adventure .fish-go');
-  if (fb) { fb.onclick = onFish; fb.classList.remove('wait', 'pull'); fb.replaceChildren('🎣 つる', el('small', { text: 'えさ 1こ' })); updateFishButton(); }
+  if (fb) { fb.onclick = onFish; fb.classList.remove('wait', 'pull'); fb.replaceChildren('🎣 つる', fishSmall()); updateFishButton(); }
   const bob = $('#scr-adventure .fs-bobber');
   if (bob) bob.hidden = true;
+  $('#scr-adventure .adv-main')?.classList.remove('gold-bait');
   drawLine();
   const gb = $('#scr-adventure .gasa-go');
   if (gb) { gb.classList.remove('wait'); renderPondState(); }
@@ -610,6 +706,7 @@ function showResult(r) {
     el('div', { class: 'ar-pic' }, el('img', { src: sp.texture, alt: '', onerror: (e) => { e.target.replaceWith(el('span', { class: 'ar-emoji', text: KIND_IC[sp.kind] || '🐟' })); } })),
     el('div', { class: 'ar-name' }, sp.name || ''),
     el('div', { class: 'ar-tags' }, el('span', { class: 'stars', text: stars(rar) }), RARE_WORD[rar] ? el('span', { class: 'ar-rare', text: RARE_WORD[rar] }) : null, shiny ? el('span', { class: 'ar-shiny', text: '✨ キラキラ！' }) : null),
+    c.bait === 'premium' ? el('div', { class: 'ar-bait' }, el('img', { src: icon(A.baitRule('premium').id), alt: '' }), `${baitName('premium')}で つれたよ`) : null,
     first ? el('div', { class: 'ar-first', text: '📖 はじめて！ ずかんに のったよ' }) : null,
     el('div', { class: 'ar-ask' + (why ? ' strong' : ''), text: why || 'どの すいそうに いれる？' }),
     btns,

@@ -8,8 +8,8 @@
 // - 指でドラッグすると左右に少し見回せる（opts.look:false で無効）。4秒さわらないと正面に戻る。
 import * as THREE from '../../vendor/three.module.min.js';
 import { FISH } from '../data/fish.js';
-import { SpeciesLibrary, makeFishMaterial, loadDreamLook } from './fishModel.js';
-import { FishAgent } from './swim.js';
+import { SpeciesLibrary, makeFishMaterial, loadDreamLook, limbAreaOf } from './fishModel.js';
+import { FishAgent, STROKE } from './swim.js';
 import { dreamSpec, dreamKey, dreamLookMul } from './dreamSpec.js';
 import { Tank, TANK_H, TANK_D, WATER_TOP } from './tank.js';
 import { FxLayer } from './fx.js';
@@ -136,7 +136,7 @@ export function createAquarium(canvas, opts = {}) {
     agent.clampToTank(tank.bounds, agent.onFloor);
     if (agent.onFloor && agent.surf !== 'glass') agent.pos.y = tank.groundHeight(agent.pos.x, agent.pos.z);
     const ph = flat ? null : lib.get(base);   // ぬりえ：もとの しゅるいの 形を かりに（見せない）
-    const mat = makeFishMaterial(ph ? ph.texture : null, { flat, twoSided: typeof d.overlay === 'string' && d.overlay.length > 0 });   // v0.8 もじペンの 字
+    const mat = makeFishMaterial(ph ? ph.texture : null, { flat, twoSided: typeof d.overlay === 'string' && d.overlay.length > 0, ...limbOpts(agent, spec.baseId) });   // v0.8 もじペンの 字・v0.10 足で 泳ぐ
     if (agent.isShrimp) mat.userData.u.uK.value = 3;
     if (agent.isSnail) { mat.userData.u.uAmp.value = 0; mat.userData.u.uRim.value = 0.5; }
     const mesh = new THREE.Mesh(ph ? ph.geometry : flatPH, mat);
@@ -158,6 +158,19 @@ export function createAquarium(canvas, opts = {}) {
     fishes.set(info.uid, f);
   }
 
+  /** v0.10 足で 泳ぐ 子（swim.limb）の マテリアルの 設定：足の しゅるいと 絵の 中の 足の あたり（ぬりえは もとの しゅるい） */
+  function limbOpts(agent, id) {
+    return agent.limb ? { limb: agent.limb, limbArea: limbAreaOf(id, agent.limb) } : {};
+  }
+
+  /** v0.10 足の うごきを マテリアルへ（uLimb＝足の 位相×つよさ、uHalf＝いまの 形の 半分の 長さ・高さ。絵が とどいて 形が かわっても あう） */
+  function setLimb(f, a, u) {
+    if (!u.uLimb) return;
+    u.uLimb.value.set(a.limbA, a.limbB);
+    const g = f.mesh.geometry.userData;
+    u.uHalf.value.set(f.flat ? (g.flatW || 1) * 0.5 : 0.5, Math.max(0.02, (g.heightRatio || a.heightRatio) * 0.5));
+  }
+
   function addFish(info) {
     if (info.dream) { addDreamFish(info); return; }
     const spec = specOf(info.speciesId);
@@ -166,7 +179,7 @@ export function createAquarium(canvas, opts = {}) {
     agent.heightRatio = entry.geometry.userData.heightRatio || 0.3;
     agent.clampToTank(tank.bounds, agent.onFloor);
     if (agent.onFloor && agent.surf !== 'glass') agent.pos.y = tank.groundHeight(agent.pos.x, agent.pos.z);
-    const mat = makeFishMaterial(entry.texture);
+    const mat = makeFishMaterial(entry.texture, limbOpts(agent, spec.id));   // v0.10 カエル・カメは 足で 泳ぐ
     if (agent.isShrimp) mat.userData.u.uK.value = 3;
     if (agent.isSnail) { mat.userData.u.uAmp.value = 0; mat.userData.u.uRim.value = 0.5; }
     const mesh = new THREE.Mesh(entry.geometry, mat);
@@ -333,13 +346,14 @@ export function createAquarium(canvas, opts = {}) {
       if (a.isSnail && a.surf === 'glass') f.mesh.position.set(a.pos.x - Math.sin(a.pitch) * lift * Math.cos(a.yaw), a.pos.y + a.oy + Math.cos(a.pitch) * lift, a.pos.z + a.oz);
       else f.mesh.position.set(a.pos.x, a.pos.y + a.oy + lift, a.pos.z + a.oz);
       f.mesh.rotation.y = a.renderYaw();
-      f.mesh.position.y += a.hy;   // v0.8 カエルの ぴょん
-      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
+      f.mesh.position.y += a.hy + a.sbob;   // v0.8 カエルの ぴょん・v0.10 カメの 上下
+      f.mesh.rotation.z = THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch + a.spitch, -0.75, 0.75);   // ロール（横倒し）は絶対にしない
       f.mesh.rotation.x = 0;
-      f.mesh.scale.set(a.len * a.sx, a.len * (2 - a.sx) * 0.5 + a.len * 0.5, a.len);
+      f.mesh.scale.set(a.len * a.sx * (1 + a.stretch), (a.len * (2 - a.sx) * 0.5 + a.len * 0.5) * (1 - a.stretch * 0.5), a.len);   // v0.10 カエルは けると のびる
       u.uWave.value = a.wave;
       u.uAmp.value = a.amp;
-      u.uBend.value = THREE.MathUtils.clamp(-a.yawRate * 0.22, -0.5, 0.5);
+      u.uBend.value = THREE.MathUtils.clamp(-a.yawRate * 0.22, -0.5, 0.5) * (a.limb ? STROKE[a.limb].bend : 1);   // 足で 泳ぐ 子は 体が まがらない（こうらは まがらない）
+      setLimb(f, a, u);
       u.uDull.value = a.dull;
       u.uFlash.value = a.flash;
       // v0.6 キラキラ（個体差係）：つや＋4〜8びょうに 1かい ちいさな ✦
@@ -375,15 +389,16 @@ export function createAquarium(canvas, opts = {}) {
     const d = wrapA(a.yaw - (face > 0 ? 0 : Math.PI));
     f.sway += dt * TAU * 0.33;
     const flipping = 1 - Math.abs(f.flip);   // めくって いる とちゅう（0〜1）は すこし うく（agy）
-    f.mesh.position.set(a.pos.x, a.pos.y + a.oy + a.hy + flipping * 0.04, a.pos.z + a.oz);
+    f.mesh.position.set(a.pos.x, a.pos.y + a.oy + a.hy + a.sbob + flipping * 0.04, a.pos.z + a.oz);
     f.mesh.rotation.y = THREE.MathUtils.clamp(d * FLAT.tilt, -FLAT.maxTilt, FLAT.maxTilt) + a.oyaw;
-    f.mesh.rotation.z = (THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch, -0.75, 0.75) + Math.sin(f.sway) * FLAT.sway) * sgn;
+    f.mesh.rotation.z = (THREE.MathUtils.clamp(a.pitch + a.opitch + a.hpitch + a.spitch, -0.75, 0.75) + Math.sin(f.sway) * FLAT.sway * (1 - a.limbAmp * 0.5)) * sgn;   // v0.10 泳ぐ あいだは ゆれを よわく（Codex）
     f.mesh.rotation.x = 0;
-    f.mesh.scale.set(a.len * a.sx * fl, a.len * (2 - a.sx) * 0.5 + a.len * 0.5, a.len);
+    f.mesh.scale.set(a.len * a.sx * fl * (1 + a.stretch), (a.len * (2 - a.sx) * 0.5 + a.len * 0.5) * (1 - a.stretch * 0.5), a.len);
     if (u.uFlipX) u.uFlipX.value = fl < 0 ? 1 : 0;   // もじペンの 字：左むきは 裏の 絵（字が 左右反対に ならない）
     u.uWave.value = a.wave;
     u.uAmp.value = a.amp;
     u.uBend.value = 0;
+    setLimb(f, a, u);
     u.uDull.value = a.dull;
     u.uFlash.value = a.flash;
     u.uShiny.value = a.shiny ? 1 : 0;

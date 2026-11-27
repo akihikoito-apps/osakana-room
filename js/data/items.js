@@ -284,6 +284,13 @@ export const ITEMS = [
     desc: 'つりの えさ。1かい つるのに 1こ つかうよ。',
   },
   {
+    // v0.10 つり係：1こ 500コイン（balance.js ADVENTURE.fishing.premium）。★3いじょうが つれて、★4・★5 が でやすい
+    id: 'bait_gold', name: 'キラキラ えさ', type: 'adventure', price: null, water: 'both', inTank: false, max: 10,
+    effect: {},
+    icon: 'assets/items/bait_gold.png',
+    desc: 'とくべつな つりの えさ。ほし みっつ いじょうが つれて、めずらしい いきものが つれやすいよ。',
+  },
+  {
     id: 'gasa_net', name: 'ガサガサの あみ', type: 'adventure', price: null, water: 'both', inTank: false, max: 1,
     effect: {},
     icon: 'assets/items/gasa_net.png',

@@ -2,6 +2,7 @@
 // - これまでに あつめた ハート（state.heartsTotal）が ADVENTURE.openHearts（300）で ひらく。
 //   ひらいた とき：いけの すいそう（sim.addTank(state,'pond')。へやが いっぱいなら そうこ）と ガサガサの あみ を プレゼント。
 // - うみ（つり）：はじめて 入ると つりざお。えさ 1こで 1かい。レア度で 出やすさが かわる ガチャ。
+//   v0.10：えさは ふつう（100）と キラキラ えさ（500・★3いじょう・★4〜5 が でやすい）。つる ときに えらぶ。
 // - いけ（ガサガサ）：1日 1かい（ゲームの 1日＝あさ 6:00 で もどる）。
 // - 手に入れた 子は いったん state.adventure.catch に のこし（とじても きえない）、入れる すいそうを えらんで placeCatch。
 //   入れられる すいそうが ない ときは おやすみすいそう（state.box）へ。
@@ -17,7 +18,11 @@ const DEF = {
     { id: 'sea', name: 'うみ', mode: 'fishing', bg: 'assets/adventure/bg_sea.jpg' },
     { id: 'pond', name: 'いけ', mode: 'gasagasa', bg: 'assets/adventure/bg_pond.jpg' },
   ],
-  fishing: { obtain: 'fishing', rod: 'fishing_rod', bait: 'bait', firstBait: 3, baitPrice: 100, buyPacks: [1, 5], baitMax: 30, weights: { 1: 46, 2: 28, 3: 16, 4: 7, 5: 3 }, pity: { every: 10, minRarity: 4 } },
+  fishing: {
+    obtain: 'fishing', rod: 'fishing_rod', bait: 'bait', firstBait: 3, baitPrice: 100, buyPacks: [1, 5], baitMax: 30, weights: { 1: 46, 2: 28, 3: 16, 4: 7, 5: 3 }, pity: { every: 10, minRarity: 4 },
+    // v0.10 ごうかな えさ（つり係）。くわしい 数は balance.js ADVENTURE.fishing.premium
+    premium: { bait: 'bait_gold', price: 500, buyPacks: [1], max: 10, firstGift: 1, weights: { 1: 0, 2: 0, 3: 55, 4: 32, 5: 13 }, pityStep: 1 },
+  },
   gasagasa: { obtain: 'gasagasa', net: 'gasa_net', perDay: 1, weights: { 1: 36, 2: 28, 3: 21, 4: 10, 5: 5 }, pity: { every: 7, minRarity: 4 } },
   fishingAnim: { cast: 700, wait: [1300, 2000], bite: 1600, reel: 800, rareExtra: 900 },
   gasaAnim: { sweep: 2100, lift: 700, rareExtra: 900 },
@@ -50,12 +55,14 @@ export function norm(state) {
     pondPending: !!a.pondPending,                             // いけの すいそうを まだ わたせて いない（すいそうの 上限）
     seaIntro: Number.isFinite(a.seaIntro) ? a.seaIntro : 0,   // うみの あんない（0 まだ・1 つりざお・2 えさを もらった）
     baitGift: !!a.baitGift,                                   // はじめての えさ 3こ を もらった
+    premiumGift: !!a.premiumGift,                             // v0.10 キラキラ えさの おためし 1こ を もらった
     gasaDay: Number.isFinite(a.gasaDay) ? a.gasaDay : 0,      // さいごに ガサガサした ゲームの 日
     gasaToday: Number.isFinite(a.gasaToday) ? a.gasaToday : 0,
     pity: { fishing: 0, gasagasa: 0, ...(a.pity && typeof a.pity === 'object' ? a.pity : {}) },   // ★4いじょうが 出ていない かいすう
     caught: { fishing: 0, gasagasa: 0, ...(a.caught && typeof a.caught === 'object' ? a.caught : {}) },
     catch: a.catch && typeof a.catch === 'object' && a.catch.fish && typeof a.catch.fish.speciesId === 'string' ? a.catch : null,   // まだ 入れていない 子
     seen: !!a.seen,                                           // ひらいてから ぼうけん画面を 見た（へやの ボタンの キラキラ）
+    useBait: a.useBait === 'premium' ? 'premium' : 'normal',  // v0.10 さいごに えらんだ えさ（'normal'｜'premium'）。古い セーブは ふつう
   };
   // しらない 水の すいそうは かわに（あたらしい 版の セーブを 古い 版で ひらいた とき など）
   for (const t of (state.tanks || []).concat(state.storage || [])) if (sim.waterOk && !sim.waterOk(t.water)) t.water = 'fresh';
@@ -125,8 +132,8 @@ export function pool(mode) {
 }
 
 /** レア度ごとの 出やすさ（%。その レア度の しゅるいが ない ところは 0 に して わりなおす）。minRarity で てんじょう */
-export function rarityOdds(mode, minRarity = 1) {
-  const W = rules()[mode]?.weights || {};
+export function rarityOdds(mode, minRarity = 1, weights = null) {
+  const W = weights || rules()[mode]?.weights || {};
   const have = new Set(pool(mode).map((f) => f.rarity || 1));
   const raw = {};
   let sum = 0;
@@ -139,15 +146,18 @@ export function rarityOdds(mode, minRarity = 1) {
   return out;
 }
 
-/** 1ぴき えらぶ（レア度 → その中で おなじ 出やすさ）。{ spec, rarity, pity } */
-export function roll(state, mode, rnd = Math.random) {
+/**
+ * 1ぴき えらぶ（レア度 → その中で おなじ 出やすさ）。{ spec, rarity, pity }
+ * opts.weights：レア度の おもみを かえる（ごうかな えさ）。てんじょうの ときも その おもみの ★4いじょうで わける
+ */
+export function roll(state, mode, rnd = Math.random, opts = {}) {
   norm(state);
   const R = rules()[mode] || {};
   const list = pool(mode);
   if (!list.length) return null;
   const P = R.pity || {};
   const pity = P.every > 0 && (state.adventure.pity[mode] || 0) >= P.every - 1;
-  const odds = rarityOdds(mode, pity ? P.minRarity || 4 : 1);
+  const odds = rarityOdds(mode, pity ? P.minRarity || 4 : 1, opts.weights || null);
   let x = rnd(), rar = 0;
   for (let r = 1; r <= 5; r++) { if (odds[r] <= 0) continue; rar = r; if (x < odds[r]) break; x -= odds[r]; }
   const tier = list.filter((f) => (f.rarity || 1) === rar);
@@ -155,23 +165,23 @@ export function roll(state, mode, rnd = Math.random) {
   return { spec, rarity: spec.rarity || 1, pity };
 }
 
-function afterRoll(state, mode, got) {
+function afterRoll(state, mode, got, step = 1) {
   const P = rules()[mode]?.pity || {};
-  state.adventure.pity[mode] = (got.rarity >= (P.minRarity || 4)) ? 0 : (state.adventure.pity[mode] || 0) + 1;
+  state.adventure.pity[mode] = (got.rarity >= (P.minRarity || 4)) ? 0 : (state.adventure.pity[mode] || 0) + step;
   state.adventure.caught[mode] = (state.adventure.caught[mode] || 0) + 1;
 }
 
-/** 手に入れた 子を つくって まつ（state.adventure.catch）。ずかんにも のせる */
-function takeCatch(state, mode, rnd) {
-  const got = roll(state, mode, rnd);
+/** 手に入れた 子を つくって まつ（state.adventure.catch）。ずかんにも のせる。opts：{ weights, pityStep, bait } */
+function takeCatch(state, mode, rnd, opts = {}) {
+  const got = roll(state, mode, rnd, opts);
   if (!got) return { ok: false, reason: 'none' };
-  afterRoll(state, mode, got);
+  afterRoll(state, mode, got, opts.pityStep ?? 1);
   const f = sim.createFish(state, got.spec.id, { source: mode, rnd });
   const first = sim.addDex(state, f);
-  state.adventure.catch = { mode, fish: f, first, day: today(state) };
+  state.adventure.catch = { mode, fish: f, first, day: today(state), ...(opts.bait ? { bait: opts.bait } : {}) };
   const events = [];
   sim.checkMissions(state, events);
-  return { ok: true, fish: f, spec: got.spec, rarity: got.rarity, first, pity: got.pity, events };
+  return { ok: true, fish: f, spec: got.spec, rarity: got.rarity, first, pity: got.pity, bait: opts.bait || null, events };
 }
 
 // ---------------- うみ（つり） ----------------
@@ -185,7 +195,33 @@ export function enterSea(state) {
   if (state.adventure.seaIntro < 1) state.adventure.seaIntro = 1;
   return { ok: true, gotRod };
 }
-export const bait = (state) => Math.max(0, Math.floor(state.inv?.[rules().fishing.bait] || 0));
+// えさは 2しゅるい：'normal'（つりえさ・inv.bait）と 'premium'（v0.10 ごうかな えさ・inv.bait_gold）。
+// ごうかな えさは レア度の おもみが かわる だけ（てんじょうは おなじ カウンタ）。古い セーブの inv.bait は そのまま。
+/** えさの きまり：{ kind, id, price, packs, max, weights（null＝ふつう）, pityStep } */
+export function baitRule(kind = 'normal') {
+  const F = rules().fishing;
+  if (kind === 'premium') {
+    const P = F.premium || {};
+    return { kind, id: P.bait || 'bait_gold', price: P.price ?? 500, packs: P.buyPacks || [1], max: P.max ?? 10, weights: P.weights || null, pityStep: P.pityStep ?? 1 };
+  }
+  return { kind: 'normal', id: F.bait, price: F.baitPrice ?? 100, packs: F.buyPacks || [1], max: F.baitMax ?? 999, weights: null, pityStep: 1 };
+}
+export const BAIT_KINDS = ['normal', 'premium'];
+/** もっている えさの かず（kind：'normal'｜'premium'） */
+export const bait = (state, kind = 'normal') => Math.max(0, Math.floor(state.inv?.[baitRule(kind).id] || 0));
+/** いま つかう えさ。ごうかが 0 なら ふつう */
+export function chosenBait(state) {
+  norm(state);
+  return state.adventure.useBait === 'premium' && bait(state, 'premium') > 0 ? 'premium' : 'normal';
+}
+/** つかう えさを えらぶ。もっていない ごうかは えらべない。{ ok, kind, reason: 'none' } */
+export function setBait(state, kind) {
+  norm(state);
+  const k = kind === 'premium' ? 'premium' : 'normal';
+  if (k === 'premium' && bait(state, 'premium') < 1) return { ok: false, reason: 'none', kind: chosenBait(state) };
+  state.adventure.useBait = k;
+  return { ok: true, kind: k };
+}
 
 /** はじめての えさ（3こ）。いちどだけ */
 export function claimFirstBait(state) {
@@ -199,47 +235,80 @@ export function claimFirstBait(state) {
   return { ok: true, n: F.firstBait ?? 3, bait: bait(state) };
 }
 
-/** えさが かえるか。{ ok, reason: 'gift'|'max'|'coins', price, room } */
-export function canBuyBait(state, n = 1) {
+/** キラキラ えさの おためし（1こ）。ふつうの えさの プレゼントを もらった あと、いちどだけ。古い セーブでも 1かい もらえる */
+export function canClaimPremiumGift(state) {
   norm(state);
-  const F = rules().fishing;
-  const price = (F.baitPrice ?? 100) * n;
-  if (!state.adventure.baitGift) return { ok: false, reason: 'gift', price };
-  const room = (F.baitMax ?? 999) - bait(state);
-  if (n > room) return { ok: false, reason: 'max', price, room };
-  if (state.coins < price) return { ok: false, reason: 'coins', price, need: price - state.coins };
-  return { ok: true, price };
+  return !!state.adventure.baitGift && !state.adventure.premiumGift && (rules().fishing.premium?.firstGift ?? 1) > 0;
 }
-export function buyBait(state, n = 1) {
-  const c = canBuyBait(state, n);
-  if (!c.ok) return c;
-  const F = rules().fishing;
-  state.coins -= c.price;
-  state.inv[F.bait] = bait(state) + n;
-  state.owned[F.bait] = true;
-  inc(state, 'buyBait', n);
-  return { ok: true, price: c.price, bait: bait(state), events: sim.checkMissions(state, []) };
+export function claimPremiumGift(state) {
+  if (!canClaimPremiumGift(state)) return { ok: false, reason: state.adventure.baitGift ? 'done' : 'gift' };
+  const B = baitRule('premium');
+  const n = rules().fishing.premium?.firstGift ?? 1;
+  state.adventure.premiumGift = true;
+  state.inv[B.id] = Math.min(B.max, bait(state, 'premium') + n);
+  state.owned[B.id] = true;
+  return { ok: true, n, bait: bait(state, 'premium') };
 }
 
-/** つれるか。{ ok, reason: 'closed'|'noRod'|'noBait'|'pending'|'none' } */
-export function canFish(state) {
+/** えさが かえるか。kind：'normal'｜'premium'。{ ok, reason: 'gift'|'max'|'coins', price, room, kind } */
+export function canBuyBait(state, n = 1, kind = 'normal') {
+  norm(state);
+  const B = baitRule(kind);
+  const price = B.price * n;
+  if (!state.adventure.baitGift) return { ok: false, reason: 'gift', price, kind: B.kind };
+  const room = B.max - bait(state, B.kind);
+  if (n > room) return { ok: false, reason: 'max', price, room, kind: B.kind };
+  if (state.coins < price) return { ok: false, reason: 'coins', price, need: price - state.coins, kind: B.kind };
+  return { ok: true, price, kind: B.kind };
+}
+/** えさを かう。ごうかを かったら つかう えさも ごうかに する（かった ときに えらぶ 気もちが ある） */
+export function buyBait(state, n = 1, kind = 'normal') {
+  const c = canBuyBait(state, n, kind);
+  if (!c.ok) return c;
+  const B = baitRule(kind);
+  state.coins -= c.price;
+  state.inv[B.id] = bait(state, B.kind) + n;
+  state.owned[B.id] = true;
+  inc(state, 'buyBait', n);
+  if (B.kind === 'premium') { inc(state, 'buyBaitPremium', n); state.adventure.useBait = 'premium'; }
+  return { ok: true, price: c.price, kind: B.kind, bait: bait(state, B.kind), events: sim.checkMissions(state, []) };
+}
+
+/** つぎの 1かいが てんじょう（★4いじょう かくてい）か。画面で「つぎは ほし 4いじょう！」を 出す */
+export function pityNext(state, mode = 'fishing') {
+  norm(state);
+  const P = rules()[mode]?.pity || {};
+  return P.every > 0 && (state.adventure.pity[mode] || 0) >= P.every - 1;
+}
+
+/** つれるか。kind を わたさなければ いま えらんでいる えさ。{ ok, kind, reason: 'closed'|'noRod'|'noBait'|'pending'|'none' } */
+export function canFish(state, kind = null) {
   norm(state);
   const F = rules().fishing;
-  if (!isOpen(state)) return { ok: false, reason: 'closed' };
-  if (!state.inv[F.rod]) return { ok: false, reason: 'noRod' };
-  if (state.adventure.catch) return { ok: false, reason: 'pending' };
-  if (!pool('fishing').length) return { ok: false, reason: 'none' };
-  if (bait(state) < 1) return { ok: false, reason: 'noBait' };
-  return { ok: true };
+  const k = kind === 'premium' || kind === 'normal' ? kind : chosenBait(state);
+  if (!isOpen(state)) return { ok: false, reason: 'closed', kind: k };
+  if (!state.inv[F.rod]) return { ok: false, reason: 'noRod', kind: k };
+  if (state.adventure.catch) return { ok: false, reason: 'pending', kind: k };
+  if (!pool('fishing').length) return { ok: false, reason: 'none', kind: k };
+  if (bait(state, k) < 1) return { ok: false, reason: 'noBait', kind: k };
+  return { ok: true, kind: k };
 }
-/** つる（えさ 1こ）。けっかは すぐ きまり、画面は 演出の あとで 見せる */
-export function fish(state, rnd = Math.random) {
-  const c = canFish(state);
+/**
+ * つる（えさ 1こ）。けっかは すぐ きまり、画面は 演出の あとで 見せる。
+ * kind：'normal'｜'premium'（わたさなければ いま えらんでいる えさ）。ごうかが 0 に なったら ふつうに もどす
+ */
+export function fish(state, rnd = Math.random, kind = null) {
+  const c = canFish(state, kind);
   if (!c.ok) return c;
-  const F = rules().fishing;
-  state.inv[F.bait] = bait(state) - 1;
+  const B = baitRule(c.kind);
+  state.inv[B.id] = bait(state, B.kind) - 1;
   inc(state, 'fishing');
-  return takeCatch(state, 'fishing', rnd);
+  if (B.kind === 'premium') inc(state, 'fishingPremium');
+  const back = B.kind === 'premium' && bait(state, 'premium') < 1;
+  if (back) state.adventure.useBait = 'normal';
+  const r = takeCatch(state, 'fishing', rnd, B.kind === 'premium' ? { weights: B.weights, pityStep: B.pityStep, bait: 'premium' } : {});
+  if (r.ok) r.backToNormal = back;
+  return r;
 }
 
 // ---------------- いけ（ガサガサ） ----------------

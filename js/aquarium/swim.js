@@ -15,6 +15,39 @@ const LATERAL = 0.75;
 const SALT_SCALE = 1.2;
 // v0.8 カエルの ぴょん（Codex・agy の 案の まんなか）：1かい 0.56びょう（空中 64%）・高さ 体長×0.38（上限 0.9）・距離 体長×0.8・着地後 0.4〜1.0びょう やすむ
 export const HOP = { dur: 0.56, air: 0.64, h: 0.38, hMax: 0.9, dist: 0.8, rest: [0.4, 1.0], tilt: 0.22 };
+/**
+ * v0.10 カエル・カメの 泳ぎ（swim.limb＝'frog'|'turtle'。水の 中を すすむ ときだけ。りくの ぴょん・あるく は そのまま）。Codex・agy と 相談。
+ * - period：1かいの 周期（びょう）の はば。はやく すすむ ほど みじかい。idle：水中で とまって いる ときの 周期と つよさ（カメだけ）。
+ * - amp・bend：魚の くねり（uAmp）と まがり（uBend の 倍率）。足の ある 子は 体が くねらない。
+ * カエル：p 0〜kick で けり（足が のびる）、hold まで のびて すべる、のこりで たたむ。進む はやさは FROG_SPEED の 波（平均 1）。
+ *   のびると 体が stretch だけ ながく・あたまが pitch だけ さがる、たたむと fold だけ ちぢみ foldPitch だけ おきる（agy）。水中で とまると あたまを float 上げて ういて まつ。
+ * カメ：θ=2πp。前あしが うしろへ うごく（sinθ>0）ときに すこし はやい（0.9〜1.21）。からだは すこし 上下・かたむく。
+ */
+export const STROKE = {
+  frog:   { period: [0.8, 1.4], kick: 0.17, hold: 0.53, amp: 0.01, bend: 0.25, stretch: 0.03, fold: 0.015, pitch: 0.04, foldPitch: 0.03, float: 0.06, idle: 0, idlePeriod: 0 },
+  turtle: { period: [1.5, 2.7], amp: 0.004, bend: 0.05, bob: 0.018, pitch: 0.035, idle: 0.35, idlePeriod: 3.2 },
+};
+// カエルの はやさの 波（p, 倍率）。なめらかに つないで 平均で わる（Codex：最大 約2.1・最小 約0.44）
+const FROG_SPEED = [[0, 0.45], [0.15, 2.2], [0.35, 1.3], [0.65, 0.65], [1, 0.45]];
+const FROG_SPEED_MEAN = 1.03375;
+/** カエルの 1かいの なかの 足の のび e（0＝たたむ＝絵の まま 〜 1＝のびきる）と はやさの 倍率 f（周期で 平均 1） */
+export function frogStroke(p) {
+  p = ((p % 1) + 1) % 1;
+  const S = STROKE.frog;
+  const e = p < S.kick ? ease(p / S.kick) : p < S.hold ? 1 : 1 - ease((p - S.hold) / (1 - S.hold));
+  let f = FROG_SPEED[0][1];
+  for (let i = 1; i < FROG_SPEED.length; i++) {
+    const [p0, f0] = FROG_SPEED[i - 1], [p1, f1] = FROG_SPEED[i];
+    if (p <= p1) { f = f0 + (f1 - f0) * ease((p - p0) / (p1 - p0)); break; }
+  }
+  return { e, f: f / FROG_SPEED_MEAN };
+}
+/** カメの 1かい：前あしの 前後 c（+1＝いちばん 前）・s（>0 で うしろへ 漕ぐ）と はやさの 倍率 f（周期で 平均 1） */
+export function turtleStroke(p) {
+  const th = TAU * p, s = Math.sin(th);
+  return { c: Math.cos(th), s, f: 0.9 + 0.1 * Math.PI * Math.max(0, s) };
+}
+
 const SNAIL_GLASS_MAX = 1.6;   // 貝がガラスを上る高さの上限（底の近くだけ。高いと浮いて見える）     // 横向きからこれ以上ずれない（ラジアン）
 
 /** 種と育ち具合から水槽内の全長（ワールド単位）を決める。 */
@@ -39,6 +72,11 @@ export class FishAgent {
     this.flat = !!spec.dream?.flat;
     this.hopper = !!spec.swim?.hop;
     this.hy = 0; this.hpitch = 0; this.hopPh = 0; this.hopRest = 0;
+    // v0.10 カエル・カメの 泳ぎ：limb＝足の しゅるい、strokePh＝位相、limbAmp＝うごきの つよさ（りく・底では 0）、
+    // limbA・limbB＝シェーダーへ（カエル：足の のび・0／カメ：前あしの cos・sin）。sbob・spitch・stretch＝描画だけの 上乗せ（ぴょん・リアクションとは べつ）
+    this.limb = spec.swim?.limb === 'frog' || spec.swim?.limb === 'turtle' ? spec.swim.limb : null;
+    this.strokePh = Math.random(); this.strokeBase = 0; this.limbAmp = 0; this.limbA = 0; this.limbB = 0;
+    this.sbob = 0; this.spitch = 0; this.stretch = 0; this.floatK = 0;
     this.landMode = 'land';
     this.surf = 'ground';   // 貝：'ground'（砂・石の上）か 'glass'（奥のガラス）
     this.cling = null; this.clingCool = rand(3, 8);
@@ -287,14 +325,15 @@ export class FishAgent {
     if (this.food) cruise *= this.weak ? 2.0 : 1.8;   // 元気がなくても えさには来る
     else if (this.pauseT > 0) cruise *= 0.06;
     else if (dist < 1.5) cruise *= 0.45 + 0.55 * (dist / 1.5);
-    if (this.burst > 0 && this.pauseT <= 0) cruise *= 1.55;
+    if (this.burst > 0 && this.pauseT <= 0 && !this.limb) cruise *= 1.55;   // v0.10 足で 泳ぐ 子は けり いがいで きゅうに はやく ならない
     if (this.habit === 'hover' && !this.food) cruise *= 0.75;
     if (ctx.avoid && this.pos.distanceTo(ctx.avoid.pos) < ctx.avoid.r) cruise = Math.max(cruise, 1.3);
     if (Math.abs(diff) > 1.4) cruise *= 0.55;
     cruise *= speedScale;
     if (holdStill) cruise = 0;
     const acc = cruise > this.speed ? 2.2 : 0.9;   // 加速は速く、減速は惰性で
-    this.speed += (cruise - this.speed) * Math.min(1, dt * acc);
+    if (this.limb && !(this.restAtBottom && this.pauseT > 0)) this.speed = this.strokeStep(dt, cruise);   // v0.10 カエル・カメ：足で 泳ぐ（底で やすむ ときは 絵の 姿勢）
+    else { this.speed += (cruise - this.speed) * Math.min(1, dt * acc); this.relaxLimb(dt); }
 
     const cp = Math.cos(this.pitch);
     this.pos.x += Math.cos(this.yaw) * cp * this.speed * dt;
@@ -307,7 +346,7 @@ export class FishAgent {
     // くねり
     const freq = 2.2 + this.speed * 3.2 + (this.burst > 0 ? 2.5 : 0);
     this.wave += freq * dt * ampScale * (r && r.type === 'happy' ? 2 : 1);
-    const ampT = Math.max(0.03, (0.035 + Math.min(0.06, this.speed * 0.035)) * (this.weak ? 0.85 : 1) * ampScale);   // 休んでいてもひれは動かす
+    const ampT = this.limb ? STROKE[this.limb].amp : Math.max(0.03, (0.035 + Math.min(0.06, this.speed * 0.035)) * (this.weak ? 0.85 : 1) * ampScale);   // 休んでいてもひれは動かす（足で 泳ぐ 子は 体を くねらせない）
     this.amp += (ampT - this.amp) * Math.min(1, dt * 3);
 
     this.checkEat(ctx, dt);
@@ -370,8 +409,11 @@ export class FishAgent {
     let cruise = (swimming ? 0.75 : 0.42) * Math.max(0.5 * dm, this.speedMul) * sp * (this.food ? 1.6 : 1);
     if ((this.pauseT > 0 && !this.food) || holdStill) cruise = 0;
     else if (dist < 0.8) cruise *= 0.4 + 0.6 * (dist / 0.8);
-    if (this.hopper && (!swimming || this.hopPh > 0)) this.speed = this.hopStep(dt, cruise, dist, dm, holdStill);   // v0.8 カエル：りくでは ぴょん
-    else { this.speed += (cruise - this.speed) * Math.min(1, dt * 3); this.hy = 0; this.hpitch = 0; }
+    // v0.10 足が とどかない ふかさで およいで いる（あさせ・りくでは あるく・ぴょん）
+    const floating = swimming && groundAt(this.pos.x, this.pos.z) <= L.waterTop - this.bodyH;
+    if (this.hopper && (!swimming || this.hopPh > 0)) { this.speed = this.hopStep(dt, cruise, dist, dm, holdStill); this.relaxLimb(dt); }   // v0.8 カエル：りくでは ぴょん
+    else if (this.limb && floating) { this.speed = this.strokeStep(dt, cruise); this.hy = 0; this.hpitch = 0; }   // v0.10 カエル：けって すいっ／カメ：前あしで 漕ぐ
+    else { this.speed += (cruise - this.speed) * Math.min(1, dt * 3); this.hy = 0; this.hpitch = 0; this.relaxLimb(dt); }
     if (dist > 1e-3) { this.pos.x += (dx / dist) * this.speed * dt; this.pos.z += (dz / dist) * this.speed * dt; }
     // たかさ：りくち・さかは 地面の うえ。みずの 中は めあての たかさへ（底より した には いかない）
     const ground = groundAt(this.pos.x, this.pos.z);
@@ -390,7 +432,7 @@ export class FishAgent {
     this.pos.z = clamp(this.pos.z, b.minZ, b.maxZ);
     // あし・ひれ
     this.wave += dt * (this.speed > 0.05 ? (swimming ? 7 : 5) : 1.5);
-    this.amp += ((swimming ? 0.045 : 0.02) - this.amp) * Math.min(1, dt * 3);
+    this.amp += ((swimming ? (this.limb ? STROKE[this.limb].amp : 0.045) : 0.02) - this.amp) * Math.min(1, dt * 3);
     this.checkEat(ctx, dt);
   }
 
@@ -418,6 +460,56 @@ export class FishAgent {
     } else { this.hy = 0; this.hpitch *= 0.8; }
     if (this.hopPh >= 1) { this.hopPh = 0; this.hy = 0; this.hopRest = rand(HOP.rest[0], HOP.rest[1]) / Math.max(0.5, dm); }
     return v;
+  }
+
+  /**
+   * v0.10 カエル・カメの 泳ぎ（limb）。水の 中で およいで いる ときに よぶ。もどりは この フレームの はやさ。
+   * はやさ ＝ なめらかな 基準（cruise へ）×（1 ＋ つよさ ×（f(p) − 1））。波を はやさの 平滑化に とおさない（Codex：けりの 山が きえる）。
+   * 水中で とまって まつ ときは カメは 小さく ゆっくり 漕ぐ（STROKE.turtle.idle）・カエルは 足を たたむ。
+   */
+  strokeStep(dt, cruise) {
+    const S = STROKE[this.limb];
+    if (this.limbAmp < 0.01) this.strokeBase = this.speed;   // りく・底から 入った ときは いまの はやさから
+    this.floatK += (1 - this.floatK) * Math.min(1, dt * 2);
+    this.strokeBase += (cruise - this.strokeBase) * Math.min(1, dt * (cruise > this.strokeBase ? 2.5 : 1.2));
+    const moving = this.strokeBase > 0.05 && cruise > 0.02;
+    if (moving && this.limb === 'frog' && this.limbAmp < 0.05) this.strokePh = 0;   // カエルは けりから はじめる
+    const ampT = moving ? 1 : S.idle;
+    this.limbAmp += (ampT - this.limbAmp) * Math.min(1, dt * (ampT > this.limbAmp ? 4 : 2.5));
+    const k = clamp(this.strokeBase / 0.9, 0, 1);
+    const T = moving ? S.period[1] - (S.period[1] - S.period[0]) * k : S.idlePeriod || S.period[1];
+    if (this.limbAmp > 0.01) this.strokePh = (this.strokePh + dt / T) % 1;
+    const f = this.applyStroke();
+    return this.strokeBase * (1 + this.limbAmp * (f - 1));
+  }
+
+  /** v0.10 りく・底・ぴょんの あいだ：足を 絵の 姿勢へ もどす（位相は とめる） */
+  relaxLimb(dt) {
+    if (!this.limb) return;
+    this.limbAmp += (0 - this.limbAmp) * Math.min(1, dt * 3);
+    if (this.limbAmp < 0.002) this.limbAmp = 0;
+    this.floatK += (0 - this.floatK) * Math.min(1, dt * 3);
+    this.applyStroke();
+  }
+
+  /** v0.10 位相と つよさ → シェーダー・描画の 上乗せ。もどりは はやさの 倍率 f */
+  applyStroke() {
+    const S = STROKE[this.limb], a = this.limbAmp;
+    if (this.limb === 'frog') {
+      const { e, f } = frogStroke(this.strokePh);
+      this.limbA = e * a; this.limbB = 0;
+      this.stretch = (S.stretch * e - S.fold * (1 - e)) * a;
+      // まって いる（つよさ 0）ときは あたまを すこし 上げて ふわふわ
+      const idle = this.floatK * (1 - a);
+      this.spitch = (-S.pitch * e + S.foldPitch * (1 - e)) * a + S.float * idle;
+      this.sbob = 0.012 * this.len * Math.sin((this.clock || 0) * 2.2) * idle;
+      return f;
+    }
+    const { c, s, f } = turtleStroke(this.strokePh);
+    this.limbA = c * a; this.limbB = s * a; this.stretch = 0;
+    this.sbob = S.bob * this.len * Math.sin(TAU * this.strokePh - 0.6) * a;
+    this.spitch = S.pitch * c * a;
+    return f;
   }
 
   updateShrimp(dt, ctx, sp, holdStill) {

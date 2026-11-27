@@ -11,6 +11,9 @@ import * as DR from './dream.js';  // v0.8 ゆめ係：ゆめのすいそう（s
 export * as dream from './dream.js';
 import * as AC from './autocare.js';   // v0.9 おせわき係：じどう おせわき（sim.autocare として 再輸出）
 export * as autocare from './autocare.js';
+import * as RS from './race/stats.js';   // v0.10 のうりょく係：レースの のうりょく（sim.race として 再輸出）
+export * as race from './race/stats.js';
+export * as raceReward from './race/reward.js';   // v0.10 レース係：レースの ごほうび（sim.raceReward.finish(state, uid, level, rank)）
 const isDreamF = (f) => !!f && typeof f.speciesId === 'string' && f.speciesId.startsWith('dream_') && D?.fishById[f.speciesId]?.obtain === 'dream';
 
 let D = null;          // setup() で入る
@@ -203,6 +206,7 @@ function normFish(f) {
   f.day = { d: 0, feedBond: 0, petBond: 0, waterBond: 0, thanks: 0, feedGrow: 0, ...(f.day || {}) };
   f.lastHeartMin = Number.isFinite(f.lastHeartMin) ? f.lastHeartMin : -1e9;   // さいごに ハートを くれた ゲーム時刻
   SZ.normSize(f);                             // v0.6 個体差（生まれつきが ない 古い 魚には uid から おだやかに）
+  RS.normFish(f);                             // v0.10 のうりょく係：こたいち（ない 古い 魚には uid から）・おせわの きろく
 }
 
 // ---------------- まとめて 見るもの ----------------
@@ -458,6 +462,7 @@ function hourly(state, hourIndex, events, rnd) {
       // そだち +1（よい時間）
       if (f.onaka >= G.onaka && f.health >= G.health && (!G.tempInRange || tj.out === 0)) addGrow(state, f, 1, events);
       SZ.hourTick(f);   // v0.6 えいよう：1じかんで すこし へる・ビッグまでの へいきんに 足す
+      RS.hourTick(f);   // v0.10 のうりょく：けんこう・えいようの よさを へいきんに（そだちの のびかた）
       // ありがとうの 条件を みたした 時間
       const T = B.COIN.thanks;
       if (f.health >= T.need.health && f.mood >= T.need.mood && f.onaka >= T.need.onaka) f.okHours++;
@@ -744,6 +749,7 @@ export function createFish(state, id, { source = 'shop', rnd = Math.random } = {
   const s = B.START.fish;
   const f = { uid: newUid(), speciesId: id, stage: 0, onaka: s.onaka, health: s.health, mood: s.mood, natsuki: s.natsuki, born: state.clock.min, source };
   Object.assign(f, SZ.rollBirth(rnd));          // v0.6 生まれつきの おおきさ（ふつう分布）と 1% の キラキラ
+  f.rIndiv = RS.rollIndiv(rnd); f.rQ = RS.RULE.oldQ; f.rH = 0;   // v0.10 のうりょく係：こたいち（手に入れた とき きまる）
   normFish(f);
   dayBucket(state, f);
   return f;

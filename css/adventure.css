@@ -234,3 +234,69 @@ body.on-room #btn-bgm { bottom: auto; top: calc(var(--safe-t) + var(--hud-h) + 2
 #btn-adventure { max-width: none; width: max-content; }
 #btn-adventure .arb-body { flex: none; min-width: 0; }
 #btn-adventure .arb-name { line-height: 1.3; }
+
+/* ---------- v0.10 キラキラ えさ（つり係） ---------- */
+/* 上の だん：ふつう と キラキラ の かず */
+.adv-bait .ab-kind { display: inline-flex; align-items: center; gap: 2px; }
+.adv-bait .ab-kind img { width: 36px; height: 36px; }
+.adv-bait .ab-kind b { font-size: 20px; }
+.adv-bait .ab-premium b { color: #b8860b; }
+.adv-pity { align-self: center; padding: 6px 14px; border-radius: 999px; background: linear-gradient(90deg, #ffd34d, #ff9ab8); font-weight: 800; font-size: 15px; box-shadow: var(--shadow); animation: arbPop 1.6s ease-in-out infinite; }
+.adv-pity[hidden] { display: none; }
+/* 下の だん：えさを えらぶ */
+.bait-pick { display: flex; gap: 6px; align-items: stretch; }
+.bp-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 84px; min-height: 64px; padding: 2px 8px 4px; border-radius: 18px; background: rgba(255, 255, 255, 0.82); border: 3px solid transparent; box-shadow: var(--shadow); line-height: 1.1; color: var(--ink); }
+.bp-btn img { width: 30px; height: 30px; object-fit: contain; }
+.bp-btn .bp-name { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.bp-btn .bp-n { font-size: 13px; }
+.bp-btn .bp-n b { font-size: 17px; }
+.bp-btn.on { background: #fff; border-color: #36a3d9; }
+.bp-btn.on::after { content: '✓'; position: absolute; top: -8px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #36a3d9; color: #fff; font-size: 14px; font-weight: 800; display: grid; place-items: center; }
+.bp-btn.bp-premium.on { background: linear-gradient(#fff8d8, #ffe58a); border-color: #e0a800; }
+.bp-btn.bp-premium.on::after { background: #e0a800; }
+.bp-btn.empty { opacity: 0.55; }
+.adv-busy .bait-pick { pointer-events: none; opacity: 0.4; }
+/* つる ボタン：キラキラ えさの ときは 金いろ（おす ときに 下の ボタンしか 見ない 子にも わかる。agy） */
+.fish-go .fg-bait { display: flex; align-items: center; gap: 3px; }
+.fish-go .fg-bait img { width: 18px; height: 18px; object-fit: contain; }
+.fish-go.premium:not(.wait):not(.pull):not(.cant) { background: linear-gradient(#ffe680, #f5b800); color: #5a3d00; box-shadow: 0 0 0 3px #fff6c8, var(--shadow-strong); }
+.fish-go.premium:not(.wait):not(.pull) small { color: #6b4a00; }
+/* キラキラ えさで つって いる あいだ：うきの まわりが ひかる */
+.gold-bait .fish-stage .fs-bobber::after { content: ''; position: absolute; left: -22px; top: -18px; width: 78px; height: 78px; border-radius: 50%; background: radial-gradient(rgba(255, 236, 140, 0.85), rgba(255, 236, 140, 0) 65%); animation: rareGlow 0.6s ease-in-out infinite alternate; pointer-events: none; }
+.gold-bait .fish-stage .fs-bobber i { z-index: 1; }
+@media (max-height: 420px) {
+  .bp-btn { min-width: 74px; min-height: 54px; }
+  .bp-btn img { width: 24px; height: 24px; }
+  .adv-bait .ab-kind img { width: 30px; height: 30px; }
+}
+/* えさやさん：2だん */
+.bait-shop .ap-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 10px; border-radius: 18px; background: #f2f8f6; text-align: left; flex-wrap: wrap; }
+.bait-shop .ap-row.premium { background: linear-gradient(#fffbe8, #fff0b8); box-shadow: inset 0 0 0 2px #f0cf5a; }
+.bait-shop .ap-row-ic { width: 56px; height: 56px; object-fit: contain; }
+.bait-shop .ap-row-t { flex: 1; min-width: 150px; }
+.bait-shop .ap-row-name { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.bait-shop .ap-row-price { font-size: 17px; }
+.bait-shop .ap-row-desc { font-size: 13px; color: var(--ink-soft); }
+.bait-shop .ap-row.premium .ap-row-desc { color: #8a5a00; font-weight: 700; }
+.bait-shop .ap-row-have { font-size: 13px; color: var(--ink-soft); }
+.bait-shop .ap-row-have b { font-size: 16px; color: var(--ink); }
+.bait-shop .ap-row .ap-packs { margin-top: 0; gap: 6px; }
+.bait-shop .ap-row .ap-pack { min-width: 96px; min-height: 52px; font-size: 16px; }
+.bait-shop .ap-row.premium .ap-pack:not(.cant) { background: linear-gradient(#ffe680, #f5b800); color: #5a3d00; }
+.bait-shop .ap-try small { font-size: 12px; }
+.ap-confirm .ap-confirm-ic { width: 84px; height: 84px; object-fit: contain; }
+.ap-confirm .ap-title.c { text-align: center; }
+.ap-confirm-coin { margin-top: 4px; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.ap-confirm-left { font-size: 14px; color: var(--ink-soft); }
+.ap-confirm .ap-packs { margin-top: 12px; }
+.ap-confirm .ap-yes { background: linear-gradient(#ffe680, #f5b800); color: #5a3d00; }
+@media (max-height: 420px) {
+  .bait-shop .ap-row { margin-top: 6px; padding: 4px 8px; }
+  .bait-shop .ap-row-ic { width: 42px; height: 42px; }
+  .bait-shop .ap-row .ap-pack { min-height: 46px; }
+  .ap-confirm .ap-confirm-ic { width: 56px; height: 56px; }
+}
+/* つれた！の「キラキラ えさで つれたよ」 */
+.ar-bait { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 1px 10px 1px 4px; border-radius: 999px; background: #fff3c4; font-size: 13px; font-weight: 700; color: #7a5200; }
+.ar-bait img { width: 22px; height: 22px; object-fit: contain; }
+@media (prefers-reduced-motion: reduce) { .adv-pity, .gold-bait .fish-stage .fs-bobber::after { animation: none !important; } }

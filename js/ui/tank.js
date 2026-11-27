@@ -3,6 +3,8 @@ import { createAquarium } from '../aquarium/index.js';
 import { $, $$, el, toast, popAt, bumpCoins, dialog } from './common.js';
 import { lightOf } from '../state.js';
 import { sizeWord, forecastWord, eiyoLevel, FOODS, EIYO } from '../size.js';   // v0.6 個体差（個体差係）
+import { hasStats, statsRows } from './raceCard.js';   // v0.10 のうりょく係：カードの のうりょく タブ
+let cardTab = 'main';         // v0.10 カードの タブ（'main' ようす／'stats' のうりょく）。魚を かえても おぼえておく
 
 let G = null;
 let aq = null;                // いま 見ている 水槽の 3D
@@ -681,11 +683,16 @@ function renderCard() {
   const nk = sim.nakayoshiOf(t, f);
   const close = el('button', { class: 'c-close', 'aria-label': 'とじる', text: '✕', onclick: () => { selected = null; renderCard(); } });
   const gr = sim.growRatio(f);
+  const hasSt = hasStats(sim, f) && !tutorialOn();   // v0.10 のうりょく係：レースに でられる さかな だけ タブ
+  const statsOn = hasSt && cardTab === 'stats';
+  const tab = (id, text) => el('button', { class: 'c-tab' + ((id === 'stats') === statsOn ? ' on' : ''), text, onclick: () => { cardTab = id; renderCard(); armCardClose(); } });
   card.replaceChildren(...[
     el('div', { class: 'c-head' },
       el('div', { class: 'c-name', text: nm(f) }, f.shiny ? el('span', { class: 'c-shiny', title: 'キラキラ', text: '✨' }) : null),
       el('span', { class: 'c-stage' + (f.dream ? ' dream' : ''), text: f.dream ? 'ゆめ' : B.LABELS.stage[f.stage] }),
       close),
+    hasSt ? el('div', { class: 'c-tabs' }, tab('main', 'ようす'), tab('stats', 'のうりょく')) : null,
+    ...(statsOn ? statsRows(sim, G.state, f) : [
     ...sizeRows(f, sp),
     faceRow('けんこう', 'health', f.health),
     faceRow('ごきげん', 'mood', f.mood),
@@ -703,8 +710,10 @@ function renderCard() {
     f.dream && !tutorialOn()
       ? el('button', { class: 'btn soft c-toart', text: '🎨 えに もどす', onclick: async () => { clearTimeout(cardTimer); if (await toArtAsk(f)) { selected = null; renderCard(); } else armCardClose(); } })
       : null,
+    ]),
   ].filter(Boolean));   // v0.6：null が「null」の 文字に ならない ように（replaceChildren は null を 文字に する）
   card.classList.toggle('shiny', !!f.shiny);
+  card.classList.toggle('stats-on', statsOn);
   card.hidden = false;
 }
 

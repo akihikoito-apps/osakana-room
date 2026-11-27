@@ -325,6 +325,10 @@ async function run(browser, base, W, H) {
   if (await p.evaluate(() => !!G.sim.autocare)) {
     try { await v09(); } catch (e) { notes.push('【不具合？】v0.9 おせわきの ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_v09_stopped').catch(() => {}); }
   }
+  // 12. v0.10 レース：へやの ボタン → えらぶ → かんたん → 3・2・1 → じどうで はしる（とちゅうで はやおくり）→ けっか → へや
+  if (await p.evaluate(() => !!G.sim.raceReward && !!document.getElementById('btn-race'))) {
+    try { await v010race(); } catch (e) { notes.push('【不具合？】v0.10 レースの ながれが とちゅうで とまった: ' + e.message.split('\n').slice(0, 8).join(' / ')); await shot('99_race_stopped').catch(() => {}); }
+  }
   await ctx.close();
   return { tag, errors, warns, notes, shots, audits };
 
@@ -756,6 +760,31 @@ async function run(browser, base, W, H) {
     await goRoom(); await p.waitForTimeout(800);
     if (!(await p.$('.room-slot .slot-ac'))) notes.push('【不具合】へやの 棚に おせわきの しるしが ない（そうこに ある とき いがい）');
     await shot('73_autocare_room');
+  }
+
+  // v0.10 レース係：えらぶ → かんたん → じどうで はしる（とちゅうで はやおくり）→ けっか → へや
+  async function v010race() {
+    for (let i = 0; i < 4 && (await st()).scr !== 'room'; i++) { await p.click('#btn-back'); await p.waitForTimeout(500); }
+    const pre = await p.evaluate(() => { const f = G.state.tanks.flatMap((t) => t.fish).find((x) => G.sim.race.canRace(x).ok); if (f) f.onaka = Math.max(f.onaka, 60); return { ok: !!f, coins: G.state.coins, hearts: G.state.hearts, run: G.state.stats.raceRun || 0 }; });
+    if (!pre.ok) { notes.push('（レースに でられる さかなが いない）'); return; }
+    await p.click('#btn-race'); await p.waitForTimeout(500);
+    await shot('80_race_select');
+    await p.click('.rc-go'); await p.waitForTimeout(400);
+    await shot('81_race_level');
+    await p.click('.rc-lv.easy');
+    await p.waitForFunction(() => G.race.R && G.race.R.phase === 'run', null, { timeout: 15000 });
+    await p.evaluate(() => { G.race.auto = true; });
+    await p.waitForTimeout(5000);
+    await shot('82_race_run');
+    await p.evaluate(() => { const R = G.race.R; for (const r of R.racers) r.s = Math.max(r.s, R.course.total - 40 - (r.isPlayer ? 0 : 6)); });
+    await p.waitForSelector('.rc-res', { timeout: 30000 });
+    await p.evaluate(() => { G.race.auto = false; });
+    await shot('83_race_result');
+    const post = await p.evaluate(() => ({ coins: G.state.coins, hearts: G.state.hearts, run: G.state.stats.raceRun || 0, gl: performance.memory ? 0 : 0 }));
+    notes.push('v0.10 レース: ' + JSON.stringify({ pre, post }));
+    if (post.run !== pre.run + 1) notes.push('【不具合】レースの かいすうが ふえない');
+    await p.click('.rc-rbtns .btn.soft:last-child'); await p.waitForTimeout(600);
+    if ((await st()).scr !== 'room') notes.push('【不具合】けっかから へやに もどれない');
   }
 }
 

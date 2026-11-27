@@ -10,12 +10,13 @@ export const DREAM_KINDS = ['fish', 'crab', 'frog', 'reptile'];
 // オリジナルの kind → swim.js が わかる しゅるい・すむ ところ。
 //   fish：ふつうに およぐ。crab：そこを あるく（エビの しくみ＝kind 'shrimp'）。
 //   frog：りくで ぴょん・みずでは およぐ（habit 'land' ＋ hop）。reptile：りくを あるく・みずでは ゆっくり（habit 'land'）。
+//   v0.10 limb：水の 中では 足で 泳ぐ（frog＝けって すべる、reptile＝カメの ように 漕ぐ）。
 //   りくが ない ゆめのすいそう では、land の 子は みずの 中（frog）と 底ちかく（reptile）で すごす（swim.js の ふつうの およぎ）。
 export const DREAM_KIND_SPEC = {
   fish:    { kind: 'fish',   look: { lengthToHeight: 2.6, thickness: 0.2 },  swim: { layer: 'middle', speed: 0.9, school: false } },
   crab:    { kind: 'shrimp', look: { lengthToHeight: 1.6, thickness: 0.3 },  swim: { layer: 'bottom', speed: 0.45, school: false } },
-  frog:    { kind: 'fish',   look: { lengthToHeight: 1.8, thickness: 0.4 },  swim: { layer: 'middle', speed: 0.6, school: false, habit: 'land', hop: true } },
-  reptile: { kind: 'fish',   look: { lengthToHeight: 2.4, thickness: 0.45 }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land' } },
+  frog:    { kind: 'fish',   look: { lengthToHeight: 1.8, thickness: 0.4 },  swim: { layer: 'middle', speed: 0.6, school: false, habit: 'land', hop: true, limb: 'frog' } },
+  reptile: { kind: 'fish',   look: { lengthToHeight: 2.4, thickness: 0.45 }, swim: { layer: 'bottom', speed: 0.4, school: false, habit: 'land', limb: 'turtle' } },
 };
 // 最後の はやさ（もとの はやさ × 倍率）の はば。おそい しゅるい × slow で とまって 見えない ように（agy）。貝（crawl）は のぞく
 export const DREAM_SPEED_RANGE = [0.35, 1.8];
